@@ -254,19 +254,21 @@ function renderBracket(){
     card.innerHTML = '<h2>Bracket</h2><div class="empty-state">Este torneio ainda não tem bracket gerado.</div>';
     return;
   }
-  const find = id => matches.find(m=>m.id===id);
   const nameLabel = currentData.name ? escapeHtml(currentData.name) + ' ' : '';
   let html = `<h2>${nameLabel}<span class="tier-pill">${currentData.tier||''}</span></h2>`;
-  html += `<div class="bracket-round"><div class="round-label">Play-in</div>${matchRow(find('playin'))}</div>`;
-  html += `<div class="bracket-round"><div class="round-label">Quartas de final</div>
-    ${matchRow(find('qf1'))}${matchRow(find('qf2'))}${matchRow(find('qf3'))}${matchRow(find('qf4'))}
-  </div>`;
-  html += `<div class="bracket-round"><div class="round-label">Semifinais</div>
-    ${matchRow(find('sf1'))}${matchRow(find('sf2'))}
-  </div>`;
-  html += `<div class="bracket-round"><div class="round-label">Final</div>${matchRow(find('final'))}</div>`;
-  const champ = find('final') ? find('final').winner : null;
-  if(champ) html += `<div class="champion-banner">🏆 Campeão do torneio: ${champ}</div>`;
+  let lastLabel = null;
+  matches.forEach(m=>{
+    if(m.label !== lastLabel){
+      if(lastLabel !== null) html += '</div>';
+      html += `<div class="bracket-round"><div class="round-label">${m.label}</div>`;
+      lastLabel = m.label;
+    }
+    html += matchRow(m);
+  });
+  html += '</div>';
+
+  const finalMatch = matches.find(m=>m.next===null);
+  if(finalMatch && finalMatch.winner) html += `<div class="champion-banner">🏆 Campeão do torneio: ${finalMatch.winner}</div>`;
   card.innerHTML = html;
 }
 
