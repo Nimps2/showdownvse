@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-PT">
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -70,6 +70,21 @@ select:focus{outline:none;border-color:var(--tera-cyan);}
 .status-dot.off{background:#e0607a;}
 .tier-pill{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--bg-panel);border:1px solid var(--line);
   color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;margin-left:8px;}
+textarea{
+  width:100%;padding:8px 10px;background:var(--bg-code);border:1px solid var(--line);
+  border-radius:6px;color:#c3c9de;font-family:'JetBrains Mono',monospace;font-size:12px;
+  resize:vertical;margin-bottom:6px;
+}
+textarea:focus{outline:none;border-color:var(--tera-cyan);}
+.set-details{margin-top:6px;}
+.set-details summary{
+  cursor:pointer;font-family:'Chakra Petch',sans-serif;font-size:11px;
+  color:var(--tera-cyan);list-style:none;user-select:none;padding:2px 0;
+}
+.set-details summary::-webkit-details-marker{display:none;}
+.set-details summary::before{content:'▸ ';}
+.set-details[open] summary::before{content:'▾ ';}
+.hint{font-size:11px;color:var(--text-faint);margin-bottom:4px;}
 </style>
 </head>
 <body>
@@ -152,6 +167,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 let tournaments = [];
 let currentData = null;
+let currentTournamentId = null;
 
 function sbHeaders(){
   return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
@@ -194,7 +210,10 @@ function renderTournamentSelect(){
     const opt = document.createElement('option');
     opt.value = t.id;
     const d = new Date(t.created_at);
-    opt.textContent = `${d.toLocaleDateString('pt-PT')} — ${t.tier||'?'} (${t.status==='concluido'?'Concluído':'Em curso'})`;
+    const name = (t.data && t.data.name) ? t.data.name : null;
+    opt.textContent = name
+      ? `${name} — ${t.tier||'?'} (${t.status==='concluido'?'Concluído':'Em curso'})`
+      : `${d.toLocaleDateString('pt-BR')} — ${t.tier||'?'} (${t.status==='concluido'?'Concluído':'Em curso'})`;
     sel.appendChild(opt);
   });
 }
@@ -207,6 +226,7 @@ function onSelectTournament(){
 function loadTournamentData(id){
   const t = tournaments.find(x=>x.id===id);
   if(!t) return;
+  currentTournamentId = id;
   currentData = t.data || {};
   renderBracket();
   renderWhoAmI();
@@ -235,7 +255,8 @@ function renderBracket(){
     return;
   }
   const find = id => matches.find(m=>m.id===id);
-  let html = `<h2>Bracket <span class="tier-pill">${currentData.tier||''}</span></h2>`;
+  const nameLabel = currentData.name ? escapeHtml(currentData.name) + ' ' : '';
+  let html = `<h2>${nameLabel}<span class="tier-pill">${currentData.tier||''}</span></h2>`;
   html += `<div class="bracket-round"><div class="round-label">Play-in</div>${matchRow(find('playin'))}</div>`;
   html += `<div class="bracket-round"><div class="round-label">Quartas de final</div>
     ${matchRow(find('qf1'))}${matchRow(find('qf2'))}${matchRow(find('qf3'))}${matchRow(find('qf4'))}
@@ -264,6 +285,51 @@ function renderWhoAmI(){
 
 function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+// ---------- Parser: importar texto colado no formato do Showdown ----------
+function parseStatString(str){
+  const out = {};
+  str.split('/').forEach(part=>{
+    const m = part.trim().match(/^(\d+)\s+(HP|Atk|Def|SpA|SpD|Spe)$/i);
+    if(m) out[m[2].toLowerCase()] = parseInt(m[1],10);
+  });
+  return out;
+}
+
+function parseShowdownImport(text){
+  const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
+  if(!lines.length) return null;
+  const result = { name:null, item:null, ability:null, nature:null, evs:{}, ivs:{}, teraType:null, moves:[] };
+
+  const first = lines[0];
+  let namePart = first, item = null;
+  const atIdx = first.indexOf(' @ ');
+  if(atIdx !== -1){
+    namePart = first.slice(0, atIdx).trim();
+    item = first.slice(atIdx+3).trim();
+  }
+  const nickMatch = namePart.match(/^(.*?)\s*\(([^)]+)\)\s*(?:\((?:M|F)\))?$/i);
+  let species = namePart;
+  if(nickMatch && nickMatch[2] && !/^(M|F)$/i.test(nickMatch[2])){
+    species = nickMatch[2].trim();
+  }
+  species = species.replace(/\s*\((M|F)\)\s*$/i,'').trim();
+  result.name = species;
+  result.item = item;
+
+  for(let i=1;i<lines.length;i++){
+    const line = lines[i];
+    let m;
+    if((m = line.match(/^Ability:\s*(.+)$/i))){ result.ability = m[1].trim(); continue; }
+    if((m = line.match(/^EVs:\s*(.+)$/i))){ result.evs = parseStatString(m[1]); continue; }
+    if((m = line.match(/^IVs:\s*(.+)$/i))){ result.ivs = parseStatString(m[1]); continue; }
+    if((m = line.match(/^Tera Type:\s*(.+)$/i))){ result.teraType = m[1].trim(); continue; }
+    if((m = line.match(/^([A-Za-z]+)\s+Nature$/i))){ result.nature = m[1].trim(); continue; }
+    if(/^Level:/i.test(line) || /^Shiny:/i.test(line) || /^Happiness:/i.test(line)){ continue; }
+    if((m = line.match(/^-\s*(.+)$/))){ result.moves.push(m[1].trim()); continue; }
+  }
+  return result;
+}
+
 function copyText(id, btn){
   const txt = document.getElementById(id).innerText;
   navigator.clipboard.writeText(txt).then(()=>{
@@ -289,27 +355,91 @@ function renderMyDraw(){
   let html = `<h2>Os seus Pokémon</h2><div class="player-result"><div class="pname">${playerName}</div>`;
   (d.random||[]).forEach((r,i)=>{
     const boxId = `box-r-${i}`;
+    const pasteId = `paste-r-${i}`;
     html += `<div class="mon-block">
       <div class="mon-head">
         <span class="mon-name">${r.mon}</span>
         <span><button class="copy-btn" onclick="copyText('${boxId}', this)">Copiar</button><span class="copied-msg">Copiado!</span></span>
       </div>
       <div class="import-box" id="${boxId}">${escapeHtml(r.text || r.mon)}</div>
+      <details class="set-details">
+        <summary>Importar set do Showdown</summary>
+        <div class="hint">Cole aqui o import completo do Showdown (item, ability, EVs, moves...)</div>
+        <textarea id="${pasteId}" rows="5" placeholder="${r.mon} @ Leftovers&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2"></textarea>
+        <button class="copy-btn" onclick="importMyMon(${pIdx},${i},'random')">Importar e salvar</button>
+      </details>
     </div>`;
   });
   (d.free||[]).forEach((f,i)=>{
-    if(!f.name) return;
     const boxId = `box-f-${i}`;
+    const pasteId = `paste-f-${i}`;
+    if(!f.name){
+      html += `<div class="mon-block free">
+        <div class="mon-head"><span class="mon-name free-label">Escolha livre ${i+1}: (ainda não escolhida)</span></div>
+        <details class="set-details">
+          <summary>Importar set do Showdown</summary>
+          <div class="hint">Cole aqui o import completo do Showdown — o nome do Pokémon é preenchido automaticamente</div>
+          <textarea id="${pasteId}" rows="5" placeholder="Pokémon @ Item&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2"></textarea>
+          <button class="copy-btn" onclick="importMyMon(${pIdx},${i},'free')">Importar e salvar</button>
+        </details>
+      </div>`;
+      return;
+    }
     html += `<div class="mon-block free">
       <div class="mon-head">
         <span class="mon-name free-label">Escolha livre ${i+1}: ${f.name}</span>
         <span><button class="copy-btn" onclick="copyText('${boxId}', this)">Copiar</button><span class="copied-msg">Copiado!</span></span>
       </div>
       <div class="import-box" id="${boxId}">${escapeHtml(f.text || f.name)}</div>
+      <details class="set-details">
+        <summary>Importar set do Showdown</summary>
+        <div class="hint">Cole aqui o import completo do Showdown (item, ability, EVs, moves...)</div>
+        <textarea id="${pasteId}" rows="5" placeholder="${f.name} @ Leftovers&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2"></textarea>
+        <button class="copy-btn" onclick="importMyMon(${pIdx},${i},'free')">Importar e salvar</button>
+      </details>
     </div>`;
   });
   html += `</div>`;
   card.innerHTML = html;
+}
+
+function importMyMon(pIdx, idx, kind){
+  const taId = kind==='random' ? `paste-r-${idx}` : `paste-f-${idx}`;
+  const raw = document.getElementById(taId).value.trim();
+  if(!raw){ alert('Cole o import do Showdown na caixa de texto primeiro.'); return; }
+  const parsed = parseShowdownImport(raw);
+  if(!parsed || !parsed.name){ alert('Não consegui reconhecer o import. Confirme o formato (nome do Pokémon na primeira linha).'); return; }
+
+  if(!currentData.draws) currentData.draws = {};
+  if(!currentData.draws[pIdx]) currentData.draws[pIdx] = { random:[{},{},{},{}], free:[{name:'',text:''},{name:'',text:''}] };
+
+  if(kind === 'random'){
+    const existingMon = currentData.draws[pIdx].random[idx] ? currentData.draws[pIdx].random[idx].mon : parsed.name;
+    currentData.draws[pIdx].random[idx] = { mon: existingMon, text: raw, src:'manual', moves: parsed.moves, item: parsed.item, ability: parsed.ability };
+  } else {
+    currentData.draws[pIdx].free[idx] = { name: parsed.name, text: raw, src:'manual', moves: parsed.moves, item: parsed.item, ability: parsed.ability };
+  }
+  saveMyDraws(pIdx);
+}
+
+async function saveMyDraws(pIdx){
+  if(!currentTournamentId){ alert('Nenhum torneio carregado.'); return; }
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}&select=data`, {headers: sbHeaders()});
+    const rows = await res.json();
+    const freshData = (rows && rows[0] && rows[0].data) || {};
+    if(!freshData.draws) freshData.draws = {};
+    freshData.draws[pIdx] = currentData.draws[pIdx];
+    currentData = freshData;
+    await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}`, {
+      method:'PATCH',
+      headers: Object.assign(sbHeaders(), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify({ data: freshData })
+    });
+    renderMyDraw();
+  } catch(e){
+    alert('Não foi possível salvar o set. Verifique a conexão e tente novamente.');
+  }
 }
 
 if(localStorage.getItem('torneio_auth_ok') === '1'){
