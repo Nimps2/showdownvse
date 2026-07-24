@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Torneio Showdown — Bracket & Sorteio</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -42,6 +43,17 @@ select:focus{outline:none;border-color:var(--tera-cyan);}
 .match .p.winner{color:var(--tera-cyan);font-weight:700;}
 .match .bo-tag{font-size:10px;background:var(--bg-panel);border:1px solid var(--line);
   padding:2px 8px;border-radius:20px;color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;}
+.bo3-tracker{margin-top:8px;background:var(--bg-void);border:1px solid var(--line);border-radius:8px;padding:9px 11px;}
+.bo3-row{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+.bo3-row:last-of-type{margin-bottom:8px;}
+.bo3-name{flex:1;font-size:12px;color:var(--text-dim);}
+.bo3-name.winner{color:var(--tera-cyan);font-weight:700;}
+.bo3-dots{display:flex;gap:6px;}
+.game-dot{width:14px;height:14px;border-radius:50%;background:var(--bg-card);border:1px solid var(--line);display:inline-block;}
+.game-dot.won{background:var(--success);border-color:var(--success);}
+.game-dot.lost{background:#e0607a;border-color:#e0607a;opacity:0.55;}
+.bo3-score{text-align:center;font-family:'Chakra Petch',sans-serif;font-size:14px;font-weight:700;
+  color:var(--text-main);border-top:1px solid var(--line);padding-top:7px;letter-spacing:1px;}
 .champion-banner{margin-top:10px;padding:14px;text-align:center;border-radius:10px;
   background:linear-gradient(90deg, rgba(240,182,79,0.12), rgba(165,107,240,0.12));
   border:1px solid rgba(240,182,79,0.3);font-family:'Chakra Petch',sans-serif;font-size:15px;color:var(--tera-amber);font-weight:700;}
@@ -237,6 +249,30 @@ function matchRow(m){
   if(!m) return '';
   const p1cls = m.winner===m.p1 ? 'winner' : '';
   const p2cls = m.winner===m.p2 ? 'winner' : '';
+
+  let body = '';
+  if(m.p1 && m.p2 && m.bo === 3 && m.games){
+    const p1wins = m.games.filter(g=>g===m.p1).length;
+    const p2wins = m.games.filter(g=>g===m.p2).length;
+    const numGamesToShow = (p1wins===1 && p2wins===1) ? 3 : 2;
+    const dotsFor = (player, opponent) => {
+      let dots = '';
+      for(let i=0;i<numGamesToShow;i++){
+        const g = m.games[i];
+        let cls = 'game-dot';
+        if(g === player) cls += ' won';
+        else if(g === opponent) cls += ' lost';
+        dots += `<span class="${cls}"></span>`;
+      }
+      return dots;
+    };
+    body = `<div class="bo3-tracker">
+      <div class="bo3-row"><span class="bo3-name ${p1cls}">${m.p1}</span><span class="bo3-dots">${dotsFor(m.p1, m.p2)}</span></div>
+      <div class="bo3-row"><span class="bo3-name ${p2cls}">${m.p2}</span><span class="bo3-dots">${dotsFor(m.p2, m.p1)}</span></div>
+      <div class="bo3-score">${p1wins} - ${p2wins}</div>
+    </div>`;
+  }
+
   return `<div class="match">
     <div class="match-row">
       <span class="p ${p1cls}">${m.p1 || '—'}</span>
@@ -244,6 +280,7 @@ function matchRow(m){
       <span class="p ${p2cls}">${m.p2 || '—'}</span>
       <span class="bo-tag">Bo${m.bo}</span>
     </div>
+    ${body}
   </div>`;
 }
 
