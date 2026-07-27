@@ -321,11 +321,15 @@ function matchRow(m){
     lowerBody = `<div class="bo3-tracker"><div class="bo3-score">${p1wins} - ${p2wins}</div></div>`;
   }
 
+  const nameLink = (n, cls) => n
+    ? `<a class="p ${cls}" style="text-decoration:none;color:inherit;" href="perfil.html?jogador=${encodeURIComponent(n)}">${escapeHtml(n)}</a>`
+    : `<span class="p">—</span>`;
+
   return `<div class="match">
     <div class="match-row">
-      <span class="p-group"><span class="p ${p1cls}">${m.p1 || '—'}</span>${p1Dots}</span>
+      <span class="p-group">${nameLink(m.p1, p1cls)}${p1Dots}</span>
       <span class="vs">VS</span>
-      <span class="p-group right">${p2Dots}<span class="p ${p2cls}">${m.p2 || '—'}</span></span>
+      <span class="p-group right">${p2Dots}${nameLink(m.p2, p2cls)}</span>
       <span class="bo-tag">Bo${m.bo}</span>
     </div>
     ${lowerBody}

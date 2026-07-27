@@ -202,8 +202,15 @@ async function init(){
   }
 }
 
+function getViewedPlayerName(){
+  const params = new URLSearchParams(window.location.search);
+  const requested = params.get('jogador');
+  return requested || loggedInPlayerName;
+}
+
 function renderProfile(){
-  const name = loggedInPlayerName;
+  const name = getViewedPlayerName();
+  const isOwnProfile = name === loggedInPlayerName;
   const container = document.getElementById('profileContent');
   if(!name){ container.innerHTML = ''; return; }
 
@@ -233,6 +240,7 @@ function renderProfile(){
 
   container.innerHTML = `
     <div class="card">
+      ${!isOwnProfile ? `<div style="margin-bottom:12px;"><a class="nav-link" href="perfil.html">← Ver o meu perfil</a></div>` : ''}
       <div class="profile-head">
         ${avatar}
         <div>
@@ -241,6 +249,7 @@ function renderProfile(){
           ${st.titles > 0 ? `<div class="profile-champion-line">🏆 ${st.titles} título(s) conquistado(s)</div>` : ''}
         </div>
       </div>
+      ${profile.status_message ? `<div style="margin-top:12px;padding:10px 14px;background:var(--bg-card);border-left:3px solid var(--tera-cyan);border-radius:6px;font-size:13px;color:var(--text-dim);font-style:italic;">"${escapeHtml(profile.status_message)}"</div>` : ''}
       <div class="stat-grid">
         <div class="stat-box"><div class="n">${st.tournaments.length}</div><div class="l">Torneios</div></div>
         <div class="stat-box"><div class="n">${st.wins}</div><div class="l">Vitórias</div></div>
@@ -273,23 +282,28 @@ function renderProfile(){
       ${historyRows || '<div class="empty-state">Sem histórico.</div>'}
     </div>
 
+    ${isOwnProfile ? `
     <div class="card">
       <h2>Editar o meu perfil</h2>
       <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Apelido (opcional)</label>
       <input type="text" id="editNickname" placeholder="Ex: PeppaPig" value="${escapeHtml(profile.nickname || '')}">
       <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Link da foto de perfil (opcional)</label>
       <input type="text" id="editPhotoUrl" placeholder="Ex: link do teu avatar do Discord" value="${escapeHtml(profile.photo_url || '')}">
+      <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Mensagem de perfil (opcional)</label>
+      <input type="text" id="editMessage" placeholder="Ex: Main de Stall, não confiem em mim" value="${escapeHtml(profile.status_message || '')}">
       <button class="btn-primary" onclick="saveMyProfile()">Guardar</button>
     </div>
+    ` : ''}
   `;
 }
 
 async function saveMyProfile(){
   const nickname = document.getElementById('editNickname').value.trim();
   const photoUrl = document.getElementById('editPhotoUrl').value.trim();
-  const ok = await updatePlayerProfile(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, nickname, photoUrl);
+  const message = document.getElementById('editMessage').value.trim();
+  const ok = await updatePlayerProfile(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, nickname, photoUrl, message);
   if(ok){
-    playerProfiles[loggedInPlayerName] = { nickname: nickname || null, photo_url: photoUrl || null };
+    playerProfiles[loggedInPlayerName] = { nickname: nickname || null, photo_url: photoUrl || null, status_message: message || null };
     renderProfile();
   } else {
     alert('Não foi possível guardar o perfil. Tente novamente.');

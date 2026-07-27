@@ -180,22 +180,22 @@ async function fetchRegisteredPlayerNames(supabaseUrl, supabaseAnonKey){
   return rows.map(r=>r.name);
 }
 
-// ---------- Perfil: apelido e foto (por link) ----------
-// Devolve um mapa { nomeReal: {nickname, photo_url} } para todos os jogadores.
+// ---------- Perfil: apelido, foto (por link) e mensagem de estado ----------
+// Devolve um mapa { nomeReal: {nickname, photo_url, status_message} } para todos os jogadores.
 async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
-  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message`, {headers: sbAuthHeaders(supabaseAnonKey)});
   if(!res.ok) return {};
   const rows = await res.json();
   const map = {};
-  rows.forEach(r=>{ map[r.name] = { nickname: r.nickname || null, photo_url: r.photo_url || null }; });
+  rows.forEach(r=>{ map[r.name] = { nickname: r.nickname || null, photo_url: r.photo_url || null, status_message: r.status_message || null }; });
   return map;
 }
 
-async function updatePlayerProfile(supabaseUrl, supabaseAnonKey, name, nickname, photoUrl){
+async function updatePlayerProfile(supabaseUrl, supabaseAnonKey, name, nickname, photoUrl, statusMessage){
   const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
     method:'PATCH',
     headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-    body: JSON.stringify({ nickname: nickname || null, photo_url: photoUrl || null })
+    body: JSON.stringify({ nickname: nickname || null, photo_url: photoUrl || null, status_message: statusMessage || null })
   });
   return res.ok;
 }

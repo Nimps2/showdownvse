@@ -469,7 +469,7 @@ function renderPlayerList(){
         <span style="display:flex;align-items:center;gap:10px;">
           ${avatar}
           <span>
-            <span class="player-card-name">${escapeHtml(displayName)}</span>
+            <a class="player-card-name" style="color:var(--text-main);text-decoration:none;" href="perfil.html?jogador=${encodeURIComponent(name)}" onmouseover="this.style.color='var(--tera-cyan)'" onmouseout="this.style.color='var(--text-main)'">${escapeHtml(displayName)}</a>
             ${profile.nickname ? `<div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(name)}</div>` : ''}
           </span>
         </span>
