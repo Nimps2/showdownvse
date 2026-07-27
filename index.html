@@ -153,15 +153,36 @@
 			color: var(--text-faint);
 			font-size: 10.5px;
 			font-family: 'Chakra Petch', sans-serif;
+			flex-shrink: 0;
+		}
+
+		.p-group {
+			flex: 1;
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			min-width: 0;
+		}
+
+		.p-group.right {
+			justify-content: flex-end;
 		}
 
 		.match .p {
-			flex: 1;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
 		}
 
 		.match .p.winner {
 			color: var(--tera-cyan);
 			font-weight: 700;
+		}
+
+		.inline-dots {
+			display: flex;
+			gap: 4px;
+			flex-shrink: 0;
 		}
 
 		.match .bo-tag {
@@ -172,48 +193,18 @@
 			border-radius: 20px;
 			color: var(--tera-cyan);
 			font-family: 'Chakra Petch', sans-serif;
+			flex-shrink: 0;
 		}
 
 		.bo3-tracker {
 			margin-top: 8px;
-			background: var(--bg-void);
-			border: 1px solid var(--line);
-			border-radius: 8px;
-			padding: 9px 11px;
-		}
-
-		.bo3-summary-row {
-			display: flex;
-			align-items: center;
-			gap: 10px;
-			margin-bottom: 6px;
-		}
-
-		.bo3-summary-row:last-of-type {
-			margin-bottom: 8px;
-		}
-
-		.bo3-summary-name {
-			flex: 1;
-			font-size: 12px;
-			color: var(--text-dim);
-		}
-
-		.bo3-summary-name.winner {
-			color: var(--tera-cyan);
-			font-weight: 700;
-		}
-
-		.bo3-summary-dots {
-			display: flex;
-			gap: 6px;
 		}
 
 		.game-dot {
-			width: 14px;
-			height: 14px;
+			width: 9px;
+			height: 9px;
 			border-radius: 50%;
-			background: var(--bg-card);
+			background: var(--bg-void);
 			border: 1px solid var(--line);
 			display: inline-block;
 		}
@@ -226,7 +217,7 @@
 		.game-dot.lost {
 			background: #e0607a;
 			border-color: #e0607a;
-			opacity: 0.55;
+			opacity: 0.6;
 		}
 
 		.bo3-score {
@@ -235,8 +226,6 @@
 			font-size: 14px;
 			font-weight: 700;
 			color: var(--text-main);
-			border-top: 1px solid var(--line);
-			padding-top: 7px;
 			letter-spacing: 1px;
 		}
 
@@ -628,7 +617,7 @@
 			const p1cls = m.winner === m.p1 ? 'winner' : '';
 			const p2cls = m.winner === m.p2 ? 'winner' : '';
 
-			let body = '';
+			let p1Dots = '', p2Dots = '', lowerBody = '';
 			if (m.p1 && m.p2 && m.bo === 3 && m.games) {
 				const p1wins = m.games.filter(g => g === m.p1).length;
 				const p2wins = m.games.filter(g => g === m.p2).length;
@@ -646,21 +635,19 @@
 					}
 					return dots;
 				};
-				body = `<div class="bo3-tracker">
-      <div class="bo3-summary-row"><span class="bo3-summary-name ${p1cls}">${m.p1}</span><span class="bo3-summary-dots">${dotsFor(m.p1, m.p2)}</span></div>
-      <div class="bo3-summary-row"><span class="bo3-summary-name ${p2cls}">${m.p2}</span><span class="bo3-summary-dots">${dotsFor(m.p2, m.p1)}</span></div>
-      <div class="bo3-score">${p1wins} - ${p2wins}</div>
-    </div>`;
+				p1Dots = `<span class="inline-dots">${dotsFor(m.p1, m.p2)}</span>`;
+				p2Dots = `<span class="inline-dots">${dotsFor(m.p2, m.p1)}</span>`;
+				lowerBody = `<div class="bo3-tracker"><div class="bo3-score">${p1wins} - ${p2wins}</div></div>`;
 			}
 
 			return `<div class="match">
     <div class="match-row">
-      <span class="p ${p1cls}">${m.p1 || '—'}</span>
+      <span class="p-group"><span class="p ${p1cls}">${m.p1 || '—'}</span>${p1Dots}</span>
       <span class="vs">VS</span>
-      <span class="p ${p2cls}">${m.p2 || '—'}</span>
+      <span class="p-group right">${p2Dots}<span class="p ${p2cls}">${m.p2 || '—'}</span></span>
       <span class="bo-tag">Bo${m.bo}</span>
     </div>
-    ${body}
+    ${lowerBody}
   </div>`;
 		}
 
