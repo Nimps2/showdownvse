@@ -108,11 +108,6 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
   <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
   <div class="subtitle" style="margin-top:-14px;">Ligado como <b id="loggedInNameTop" style="color:var(--tera-cyan);"></b> — <a href="#" class="nav-link" onclick="doPlayerLogout(); return false;">Trocar jogador</a></div>
 
-  <div class="card">
-    <h2>Escolher jogador</h2>
-    <select id="playerSelect" onchange="renderProfile()"><option value="">— carregando —</option></select>
-  </div>
-
   <div id="profileContent"></div>
 
   <div class="footer-note">Estatísticas calculadas a partir de todos os torneios guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
@@ -198,44 +193,23 @@ async function init(){
     allRows = await res.json();
     setStatus(true, `Ligado — ${allRows.length} torneio(s) encontrados.`);
     playerStats = aggregatePlayers(allRows);
-    populatePlayerSelect();
+    renderProfile();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
     document.getElementById('profileContent').innerHTML = '<div class="card"><div class="empty-state">Erro ao carregar dados.</div></div>';
   }
 }
 
-function populatePlayerSelect(){
-  const sel = document.getElementById('playerSelect');
-  const names = Object.keys(playerStats).sort((a,b)=>a.localeCompare(b));
-  sel.innerHTML = '<option value="">— selecione um jogador —</option>';
-  names.forEach(n=>{
-    const opt = document.createElement('option');
-    opt.value = n;
-    opt.textContent = n;
-    sel.appendChild(opt);
-  });
-  if(!names.length){
-    document.getElementById('profileContent').innerHTML = '<div class="card"><div class="empty-state">Ainda não há jogadores com torneios registados.</div></div>';
-    return;
-  }
-  const urlParams = new URLSearchParams(window.location.search);
-  const preselect = urlParams.get('jogador');
-  if(preselect && names.includes(preselect)){
-    sel.value = preselect;
-    renderProfile();
-  } else {
-    sel.value = names[0];
-    renderProfile();
-  }
-}
-
 function renderProfile(){
-  const name = document.getElementById('playerSelect').value;
+  const name = loggedInPlayerName;
   const container = document.getElementById('profileContent');
   if(!name){ container.innerHTML = ''; return; }
 
   const st = playerStats[name];
+  if(!st){
+    container.innerHTML = '<div class="card"><div class="empty-state">Ainda não há torneios registados para este jogador.</div></div>';
+    return;
+  }
   const matchesPlayed = st.wins + st.losses;
   const winrate = matchesPlayed ? Math.round((st.wins/matchesPlayed)*100) : 0;
   const titleChips = Object.entries(st.titlesByTier).map(([tier,c])=>`<span class="title-chip">🏆 ${escapeHtml(tier)} x${c}</span>`).join('');
