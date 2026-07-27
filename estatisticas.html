@@ -37,6 +37,14 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0
 .card h2{font-family:'Chakra Petch',sans-serif;font-size:15px;margin:0 0 14px 0;color:var(--text-main);
   display:flex;align-items:center;gap:8px;}
 .card h2::before{content:'';width:4px;height:15px;background:var(--tera-violet);border-radius:2px;}
+select,input[type=text],input[type=password]{width:100%;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);
+  border-radius:8px;color:var(--text-main);font-family:'Inter',sans-serif;font-size:14px;margin-bottom:6px;}
+select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
+.btn-primary{
+  width:100%;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));color:#0a0c14;
+  border:none;padding:11px 20px;border-radius:8px;font-family:'Chakra Petch',sans-serif;font-weight:700;
+  font-size:13.5px;cursor:pointer;margin-top:4px;
+}
 
 .highlight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
 .highlight-box{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
@@ -111,11 +119,13 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0
 
 <div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
   <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
-    <h2>Acesso ao torneio</h2>
+    <h2>Entrar</h2>
+    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Nome</label>
+    <select id="gateNameSelect"><option value="">— a carregar jogadores —</option></select>
     <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Password</label>
-    <input type="password" id="authPassword" placeholder="Digite a password" style="width:100%;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);border-radius:8px;color:var(--text-main);font-size:14px;margin-bottom:12px;" onkeydown="if(event.key==='Enter') checkAuth()">
-    <button onclick="checkAuth()" style="width:100%;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));color:#0a0c14;border:none;padding:12px 20px;border-radius:8px;font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Entrar</button>
-    <div id="authError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;">Password incorreta. Tente novamente.</div>
+    <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()">
+    <button class="btn-primary" onclick="doGateLogin()">Entrar</button>
+    <div id="gateError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;"></div>
   </div>
 </div>
 
@@ -124,8 +134,9 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0
     <div class="crystal"></div>
     <div><h1>Estatísticas</h1></div>
   </div>
-  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="viewer.html">Ver bracket da semana →</a></div>
+  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="viewer.html">Ver bracket da semana</a> &nbsp;|&nbsp; <a class="nav-link" href="perfil.html">Perfil de jogador →</a></div>
   <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
+  <div class="subtitle" style="margin-top:-14px;">Ligado como <b id="loggedInNameTop" style="color:var(--tera-cyan);"></b> — <a href="#" class="nav-link" onclick="doPlayerLogout(); return false;">Trocar jogador</a></div>
 
   <div class="tabs">
     <button class="tab-btn active" onclick="switchStatsTab('pokemon')">Pokémon</button>
@@ -180,29 +191,64 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0
 
 <script src="showdown-utils.js"></script>
 <script>
-const AUTH_HASH = "5f61fb0f349bd4d0702909b4df02ab5e5ddc3f2e09ff020d9563bc2e9c134c06";
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
 
-async function sha256Hex(text){
-  const enc = new TextEncoder().encode(text);
-  const buf = await crypto.subtle.digest('SHA-256', enc);
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-async function checkAuth(){
-  const val = document.getElementById('authPassword').value;
-  const hash = await sha256Hex(val);
-  if(hash === AUTH_HASH){
-    localStorage.setItem('torneio_auth_ok', '1');
-    unlockContent();
-  } else {
-    document.getElementById('authError').style.display = 'block';
+let loggedInPlayerName = null;
+
+async function doGateLogin(){
+  const name = document.getElementById('gateNameSelect').value;
+  const password = document.getElementById('gatePassword').value;
+  const errEl = document.getElementById('gateError');
+  errEl.style.display = 'none';
+  if(!name){ errEl.textContent = 'Selecione o seu nome.'; errEl.style.display='block'; return; }
+  if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
+  const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
+  if(!result.ok){
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registado pelo organizador.'
+      : result.reason==='wrongpass' ? 'Password incorreta.'
+      : 'Erro ao ligar à base de dados.';
+    errEl.style.display = 'block';
+    return;
   }
+  localStorage.setItem('player_login_name', name);
+  loggedInPlayerName = name;
+  unlockContent();
 }
+
 function unlockContent(){
   document.getElementById('authGate').style.display = 'none';
   document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('loggedInNameTop').textContent = loggedInPlayerName;
   init();
+}
+
+function doPlayerLogout(){
+  localStorage.removeItem('player_login_name');
+  loggedInPlayerName = null;
+  document.getElementById('gatePassword').value = '';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('authGate').style.display = 'flex';
+}
+
+async function pageBoot(){
+  const sel = document.getElementById('gateNameSelect');
+  try{
+    const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
+    names.forEach(n=>{
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+    const saved = localStorage.getItem('player_login_name');
+    if(saved && names.includes(saved)){
+      loggedInPlayerName = saved;
+      unlockContent();
+    }
+  } catch(e){
+    sel.innerHTML = '<option value="">— erro ao carregar jogadores —</option>';
+  }
 }
 
 function sbHeaders(){
@@ -225,7 +271,7 @@ async function init(){
     const rows = await res.json();
     setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
     aggregate(rows);
-    aggregatePlayers(rows);
+    playerStats = aggregatePlayers(rows);
     renderHighlights();
     renderPokemonList();
     renderPlayerHighlights();
@@ -352,49 +398,7 @@ function renderPokemonList(){
 }
 
 let playerStats = {};
-
-function aggregatePlayers(rows){
-  playerStats = {};
-  rows.forEach(r=>{
-    const data = r.data || {};
-    const tier = data.tier || r.tier || '?';
-    const tName = data.name || null;
-    const createdAt = r.created_at;
-    const players = (data.players || []).filter(p=>p);
-    const matches = data.matches || [];
-    const champion = data.champion || null;
-
-    players.forEach(p=>{
-      if(!playerStats[p]) playerStats[p] = { wins:0, losses:0, titles:0, titlesByTier:{}, tournaments:[] };
-    });
-
-    matches.forEach(m=>{
-      if(!m.winner || !m.p1 || !m.p2) return;
-      const loser = m.winner === m.p1 ? m.p2 : m.p1;
-      if(playerStats[m.winner]) playerStats[m.winner].wins++;
-      if(playerStats[loser]) playerStats[loser].losses++;
-    });
-
-    players.forEach(p=>{
-      let resultLabel = 'Sem partidas registadas';
-      let isChamp = false;
-      if(champion === p){
-        resultLabel = 'Campeão';
-        isChamp = true;
-        playerStats[p].titles++;
-        playerStats[p].titlesByTier[tier] = (playerStats[p].titlesByTier[tier]||0)+1;
-      } else {
-        const lostMatch = matches.find(m=>m.winner && (m.p1===p || m.p2===p) && m.winner!==p);
-        if(lostMatch) resultLabel = `Eliminado — ${lostMatch.label}`;
-        else {
-          const anyMatch = matches.find(m=>m.p1===p||m.p2===p);
-          if(anyMatch && !anyMatch.winner) resultLabel = 'Em curso';
-        }
-      }
-      playerStats[p].tournaments.push({ name: tName, tier, createdAt, result: resultLabel, isChamp });
-    });
-  });
-}
+// aggregatePlayers(rows) agora vive em showdown-utils.js (partilhado com perfil.html)
 
 function renderPlayerHighlights(){
   const card = document.getElementById('playerHighlightsCard');
@@ -473,9 +477,7 @@ function renderPlayerList(){
   }).join('');
 }
 
-if(localStorage.getItem('torneio_auth_ok') === '1'){
-  unlockContent();
-}
+pageBoot();
 </script>
 </body>
 </html>

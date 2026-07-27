@@ -117,11 +117,13 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
 <body>
 <div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
   <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
-    <h2>Acesso ao torneio</h2>
+    <h2>Entrar</h2>
+    <label>Nome</label>
+    <select id="gateNameSelect"><option value="">— a carregar jogadores —</option></select>
     <label>Password</label>
-    <input type="password" id="authPassword" placeholder="Digite a password" onkeydown="if(event.key==='Enter') checkAuth()">
-    <button class="primary" onclick="checkAuth()" style="width:100%;">Entrar</button>
-    <div id="authError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;">Password incorreta. Tente novamente.</div>
+    <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()">
+    <button class="btn-primary" onclick="doGateLogin()">Entrar</button>
+    <div id="gateError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;"></div>
   </div>
 </div>
 
@@ -131,9 +133,10 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
     <div><h1>Torneio Showdown — Bracket & Sorteio</h1></div>
   </div>
   <div class="subtitle">Página só de visualização — vê o bracket ao vivo e os seus Pokémon sorteados.</div>
-  <div class="subtitle" style="margin-top:-14px;"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="estatisticas.html">Ver estatísticas →</a></div>
+  <div class="subtitle" style="margin-top:-14px;"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="estatisticas.html">Ver estatísticas</a> &nbsp;|&nbsp; <a class="nav-link" href="perfil.html">Perfil de jogador →</a></div>
 
   <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
+  <div class="subtitle" style="margin-top:-14px;">Ligado como <b id="loggedInNameTop" style="color:var(--tera-cyan);"></b> — <a href="#" class="nav-link" onclick="doPlayerLogout(); return false;">Trocar jogador</a></div>
 
   <div class="card">
     <h2>Torneio</h2>
@@ -143,22 +146,6 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
   <div class="card" id="bracketCard">
     <h2>Bracket</h2>
     <div class="empty-state">Escolha um torneio acima.</div>
-  </div>
-
-  <div class="card" id="loginCard">
-    <h2>Entrar como jogador</h2>
-    <div id="loginForm">
-      <select id="whoAmI"><option value="">— selecione o seu nome —</option></select>
-      <input type="password" id="playerPassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doPlayerLogin()">
-      <button class="btn-primary" onclick="doPlayerLogin()">Entrar</button>
-      <div class="login-error" id="loginError"></div>
-    </div>
-    <div id="loggedInInfo" style="display:none;">
-      <div class="logged-in-row">
-        <span class="logged-in-name" id="loggedInName"></span>
-        <button class="copy-btn" onclick="doPlayerLogout()">Trocar jogador</button>
-      </div>
-    </div>
   </div>
 
   <div class="card" id="drawCard">
@@ -171,30 +158,64 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
 
 <script src="showdown-utils.js"></script>
 <script>
-// Hash SHA-256 da password de acesso (a password em si nao fica visivel no codigo)
-const AUTH_HASH = "5f61fb0f349bd4d0702909b4df02ab5e5ddc3f2e09ff020d9563bc2e9c134c06";
+// SUPABASE_URL e SUPABASE_ANON_KEY são definidos no próximo bloco de script,
+// mas como scripts <script> no mesmo documento partilham o mesmo escopo global,
+// já estão disponíveis por altura em que estas funções correm (após o load).
+let loggedInPlayerName = null;
 
-async function sha256Hex(text){
-  const enc = new TextEncoder().encode(text);
-  const buf = await crypto.subtle.digest('SHA-256', enc);
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+async function pageBoot(){
+  const sel = document.getElementById('gateNameSelect');
+  try{
+    const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
+    names.forEach(n=>{
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+    const saved = localStorage.getItem('player_login_name');
+    if(saved && names.includes(saved)){
+      loggedInPlayerName = saved;
+      unlockContent();
+    }
+  } catch(e){
+    sel.innerHTML = '<option value="">— erro ao carregar jogadores —</option>';
+  }
 }
 
-async function checkAuth(){
-  const val = document.getElementById('authPassword').value;
-  const hash = await sha256Hex(val);
-  if(hash === AUTH_HASH){
-    localStorage.setItem('torneio_auth_ok', '1');
-    unlockContent();
-  } else {
-    document.getElementById('authError').style.display = 'block';
+async function doGateLogin(){
+  const name = document.getElementById('gateNameSelect').value;
+  const password = document.getElementById('gatePassword').value;
+  const errEl = document.getElementById('gateError');
+  errEl.style.display = 'none';
+  if(!name){ errEl.textContent = 'Selecione o seu nome.'; errEl.style.display='block'; return; }
+  if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
+  const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
+  if(!result.ok){
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registado pelo organizador.'
+      : result.reason==='wrongpass' ? 'Password incorreta.'
+      : 'Erro ao ligar à base de dados.';
+    errEl.style.display = 'block';
+    return;
   }
+  localStorage.setItem('player_login_name', name);
+  loggedInPlayerName = name;
+  unlockContent();
 }
 
 function unlockContent(){
   document.getElementById('authGate').style.display = 'none';
   document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('loggedInNameTop').textContent = loggedInPlayerName;
   init();
+}
+
+function doPlayerLogout(){
+  localStorage.removeItem('player_login_name');
+  loggedInPlayerName = null;
+  document.getElementById('gatePassword').value = '';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('authGate').style.display = 'flex';
 }
 </script>
 
@@ -269,8 +290,7 @@ function loadTournamentData(id){
   currentTournamentId = id;
   currentData = t.data || {};
   renderBracket();
-  renderWhoAmI();
-  checkPlayerLoginState();
+  renderMyDraw();
 }
 
 function matchRow(m){
@@ -335,76 +355,6 @@ function renderBracket(){
   const finalMatch = matches.find(m=>m.next===null);
   if(finalMatch && finalMatch.winner) html += `<div class="champion-banner">🏆 Campeão do torneio: ${finalMatch.winner}</div>`;
   card.innerHTML = html;
-}
-
-function renderWhoAmI(){
-  const sel = document.getElementById('whoAmI');
-  sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
-  const players = (currentData && currentData.players) || [];
-  players.forEach((p)=>{
-    if(!p) return;
-    const opt = document.createElement('option');
-    opt.value = p;
-    opt.textContent = p;
-    sel.appendChild(opt);
-  });
-}
-
-let loggedInPlayerName = null;
-
-function showLoggedInState(){
-  document.getElementById('loginForm').style.display = 'none';
-  document.getElementById('loggedInInfo').style.display = 'block';
-  document.getElementById('loggedInName').textContent = loggedInPlayerName;
-}
-function showLoginForm(){
-  document.getElementById('loginForm').style.display = 'block';
-  document.getElementById('loggedInInfo').style.display = 'none';
-  document.getElementById('playerPassword').value = '';
-  document.getElementById('loginError').style.display = 'none';
-}
-
-function checkPlayerLoginState(){
-  const savedName = localStorage.getItem('player_login_name');
-  const players = (currentData && currentData.players) || [];
-  if(savedName && players.includes(savedName)){
-    loggedInPlayerName = savedName;
-    showLoggedInState();
-    renderMyDraw();
-  } else {
-    loggedInPlayerName = null;
-    showLoginForm();
-    document.getElementById('drawCard').innerHTML = '<h2>Os seus Pokémon</h2><div class="empty-state">Entre com o seu nome e password acima para ver os seus Pokémon sorteados.</div>';
-  }
-}
-
-async function doPlayerLogin(){
-  const name = document.getElementById('whoAmI').value;
-  const password = document.getElementById('playerPassword').value;
-  const errEl = document.getElementById('loginError');
-  errEl.style.display = 'none';
-  if(!name){ errEl.textContent = 'Selecione o seu nome.'; errEl.style.display='block'; return; }
-  if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
-  try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=password_hash`, {headers: sbHeaders()});
-    const rows = await res.json();
-    if(!rows || !rows[0]){ errEl.textContent = 'Este jogador ainda não foi registado pelo organizador.'; errEl.style.display='block'; return; }
-    const hash = await sha256Hex(password);
-    if(hash !== rows[0].password_hash){ errEl.textContent = 'Password incorreta.'; errEl.style.display='block'; return; }
-    localStorage.setItem('player_login_name', name);
-    loggedInPlayerName = name;
-    showLoggedInState();
-    renderMyDraw();
-  } catch(e){
-    errEl.textContent = 'Erro ao ligar à base de dados.'; errEl.style.display='block';
-  }
-}
-
-function doPlayerLogout(){
-  localStorage.removeItem('player_login_name');
-  loggedInPlayerName = null;
-  showLoginForm();
-  document.getElementById('drawCard').innerHTML = '<h2>Os seus Pokémon</h2><div class="empty-state">Entre com o seu nome e password acima para ver os seus Pokémon sorteados.</div>';
 }
 
 // escapeHtml, parseStatString, parseShowdownImport e copyText agora vivem em
@@ -535,9 +485,7 @@ function showSaveFeedback(btn, text, isError){
   setTimeout(()=>msg.classList.remove('show'), 3000);
 }
 
-if(localStorage.getItem('torneio_auth_ok') === '1'){
-  unlockContent();
-}
+pageBoot();
 </script>
 </body>
 </html>

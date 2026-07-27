@@ -66,3 +66,116 @@ function parseShowdownImport(text){
   }
   return result;
 }
+
+// ---------- Estatísticas: agregação de resultados por jogador ----------
+// Usado por estatisticas.html e perfil.html. Recebe as linhas devolvidas pelo
+// Supabase (cada uma com tier/status/created_at/data) e devolve um objeto
+// { nomeDoJogador: { wins, losses, titles, titlesByTier, tournaments:[...] } }
+function aggregatePlayers(rows){
+  const playerStats = {};
+  rows.forEach(r=>{
+    const data = r.data || {};
+    const tier = data.tier || r.tier || '?';
+    const tName = data.name || null;
+    const createdAt = r.created_at;
+    const players = (data.players || []).filter(p=>p);
+    const matches = data.matches || [];
+    const champion = data.champion || null;
+
+    players.forEach(p=>{
+      if(!playerStats[p]) playerStats[p] = { wins:0, losses:0, titles:0, titlesByTier:{}, tournaments:[] };
+    });
+
+    matches.forEach(m=>{
+      if(!m.winner || !m.p1 || !m.p2) return;
+      const loser = m.winner === m.p1 ? m.p2 : m.p1;
+      if(playerStats[m.winner]) playerStats[m.winner].wins++;
+      if(playerStats[loser]) playerStats[loser].losses++;
+    });
+
+    players.forEach(p=>{
+      let resultLabel = 'Sem partidas registadas';
+      let isChamp = false;
+      if(champion === p){
+        resultLabel = 'Campeão';
+        isChamp = true;
+        playerStats[p].titles++;
+        playerStats[p].titlesByTier[tier] = (playerStats[p].titlesByTier[tier]||0)+1;
+      } else {
+        const lostMatch = matches.find(m=>m.winner && (m.p1===p || m.p2===p) && m.winner!==p);
+        if(lostMatch) resultLabel = `Eliminado — ${lostMatch.label}`;
+        else {
+          const anyMatch = matches.find(m=>m.p1===p||m.p2===p);
+          if(anyMatch && !anyMatch.winner) resultLabel = 'Em curso';
+        }
+      }
+      playerStats[p].tournaments.push({ name: tName, tier, createdAt, result: resultLabel, isChamp });
+    });
+  });
+  return playerStats;
+}
+
+// ---------- Estatísticas: Pokémon usados por UM jogador específico ----------
+// Devolve { mons: {nome: count}, moves: {golpe: count} } considerando os 4
+// sorteados + as 2 escolhas livres desse jogador em todos os torneios.
+function aggregatePlayerPokemon(rows, playerName){
+  const mons = {};
+  const moves = {};
+  function tally(name, item){
+    mons[name] = (mons[name]||0)+1;
+    let mv = item.moves;
+    if((!mv || !mv.length) && item.text){
+      const parsed = parseShowdownImport(item.text);
+      if(parsed) mv = parsed.moves;
+    }
+    (mv||[]).forEach(m=>{ moves[m] = (moves[m]||0)+1; });
+  }
+  rows.forEach(r=>{
+    const data = r.data || {};
+    const idx = (data.players||[]).indexOf(playerName);
+    if(idx === -1) return;
+    const entry = (data.draws||{})[idx];
+    if(!entry) return;
+    (entry.random||[]).forEach(item=>{ if(item.mon) tally(item.mon, item); });
+    (entry.free||[]).forEach(item=>{ if(item.name) tally(item.name, item); });
+  });
+  return { mons, moves };
+}
+
+// ---------- Login por jogador (nome + password) ----------
+// Partilhado por viewer.html, estatisticas.html e perfil.html.
+async function sha256Hex(text){
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function sbAuthHeaders(supabaseAnonKey){
+  return { 'apikey': supabaseAnonKey, 'Authorization': `Bearer ${supabaseAnonKey}` };
+}
+
+// Devolve {ok:true} ou {ok:false, reason:'notfound'|'wrongpass'|'network'}
+// Nota: a coluna "password_hash" na tabela players guarda a password em texto
+// simples (decisão deliberada — ver conversa sobre o botão "Revelar password"
+// no gestor). O nome da coluna ficou por compatibilidade, mas já não é um hash.
+async function verifyPlayerLogin(supabaseUrl, supabaseAnonKey, name, password){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=password_hash`, {
+      headers: sbAuthHeaders(supabaseAnonKey)
+    });
+    if(!res.ok) return {ok:false, reason:'network'};
+    const rows = await res.json();
+    if(!rows || !rows[0]) return {ok:false, reason:'notfound'};
+    if(password !== rows[0].password_hash) return {ok:false, reason:'wrongpass'};
+    return {ok:true};
+  } catch(e){
+    return {ok:false, reason:'network'};
+  }
+}
+
+async function fetchRegisteredPlayerNames(supabaseUrl, supabaseAnonKey){
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name&order=name.asc`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return [];
+  const rows = await res.json();
+  return rows.map(r=>r.name);
+}

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfil do Jogador — Torneio Showdown - VSE</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-void:#0a0c14; --bg-panel:#12151f; --bg-card:#171b28;
+  --line:#262c3e; --tera-cyan:#4fd8d0; --tera-violet:#a56bf0; --tera-amber:#f0b64f;
+  --text-main:#e9ecf5; --text-dim:#8b91a8; --text-faint:#565d78; --success:#5ed890; --danger:#e0607a;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;background:var(--bg-void);
+  background-image:radial-gradient(circle at 15% 8%, rgba(165,107,240,0.10), transparent 40%),
+    radial-gradient(circle at 85% 92%, rgba(79,216,208,0.08), transparent 40%);
+  color:var(--text-main);font-family:'Inter',sans-serif;min-height:100vh;padding:0 0 60px 0;
+}
+.wrap{max-width:820px;margin:0 auto;padding:32px 20px;}
+.header{display:flex;align-items:center;gap:16px;margin-bottom:8px;}
+.crystal{width:38px;height:38px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));
+  clip-path:polygon(50% 0%, 100% 30%, 82% 100%, 18% 100%, 0% 30%);}
+h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0;letter-spacing:0.5px;}
+.subtitle{color:var(--text-dim);font-size:13px;margin:14px 0 6px 0;}
+.nav-link{color:var(--tera-cyan);font-size:12.5px;text-decoration:none;font-family:'Chakra Petch',sans-serif;}
+.nav-link:hover{text-decoration:underline;}
+.status-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);margin:14px 0 20px 0;}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
+.status-dot.on{background:var(--success);}
+.status-dot.off{background:var(--danger);}
+
+.card{background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px;}
+.card h2{font-family:'Chakra Petch',sans-serif;font-size:15px;margin:0 0 14px 0;color:var(--text-main);
+  display:flex;align-items:center;gap:8px;}
+.card h2::before{content:'';width:4px;height:15px;background:var(--tera-violet);border-radius:2px;}
+select,input[type=text],input[type=password]{width:100%;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);
+  border-radius:8px;color:var(--text-main);font-family:'Inter',sans-serif;font-size:14px;margin-bottom:6px;}
+select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
+.btn-primary{
+  width:100%;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));color:#0a0c14;
+  border:none;padding:11px 20px;border-radius:8px;font-family:'Chakra Petch',sans-serif;font-weight:700;
+  font-size:13.5px;cursor:pointer;margin-top:4px;
+}
+
+.profile-head{display:flex;align-items:center;gap:16px;margin-bottom:6px;flex-wrap:wrap;}
+.profile-avatar{
+  width:56px;height:56px;border-radius:14px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--tera-violet),var(--tera-cyan));
+  display:flex;align-items:center;justify-content:center;font-family:'Chakra Petch',sans-serif;
+  font-size:22px;font-weight:700;color:#0a0c14;
+}
+.profile-name{font-family:'Chakra Petch',sans-serif;font-size:22px;font-weight:700;}
+.profile-champion-line{font-size:12.5px;color:var(--tera-amber);margin-top:2px;}
+
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:16px 0;}
+.stat-box{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-align:center;}
+.stat-box .n{font-family:'Chakra Petch',sans-serif;font-size:20px;font-weight:700;color:var(--tera-cyan);}
+.stat-box .l{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.4px;margin-top:3px;}
+
+.title-chip{
+  display:inline-block;font-size:11.5px;background:rgba(240,182,79,0.1);border:1px solid rgba(240,182,79,0.3);
+  border-radius:20px;padding:4px 11px;margin:0 6px 6px 0;color:var(--tera-amber);font-family:'Chakra Petch',sans-serif;
+}
+
+.fav-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media (max-width:560px){.fav-grid{grid-template-columns:1fr;}}
+.fav-list{display:flex;flex-direction:column;gap:6px;}
+.fav-row{display:flex;justify-content:space-between;align-items:center;background:var(--bg-card);
+  border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;}
+.fav-row .rank{color:var(--text-faint);font-family:'Chakra Petch',sans-serif;font-size:11px;margin-right:8px;}
+.fav-row b{color:var(--tera-cyan);}
+
+.history-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--text-dim);
+  padding:8px 0;gap:8px;border-bottom:1px solid var(--line);}
+.history-row:last-child{border-bottom:none;}
+.history-row .res{font-family:'Chakra Petch',sans-serif;font-weight:700;flex-shrink:0;}
+.history-row .res.champ{color:var(--tera-amber);}
+.history-row .res.elim{color:var(--text-faint);}
+
+.empty-state{color:var(--text-faint);font-size:13px;text-align:center;padding:30px 0;}
+.footer-note{color:var(--text-faint);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.5;}
+</style>
+</head>
+<body>
+
+<div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
+    <h2>Entrar</h2>
+    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Nome</label>
+    <select id="gateNameSelect"><option value="">— a carregar jogadores —</option></select>
+    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Password</label>
+    <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()">
+    <button class="btn-primary" onclick="doGateLogin()">Entrar</button>
+    <div id="gateError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;"></div>
+  </div>
+</div>
+
+<div id="mainContent" class="wrap" style="display:none;">
+  <div class="header">
+    <div class="crystal"></div>
+    <div><h1>Perfil do Jogador</h1></div>
+  </div>
+  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="estatisticas.html">Ver estatísticas gerais →</a></div>
+  <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
+  <div class="subtitle" style="margin-top:-14px;">Ligado como <b id="loggedInNameTop" style="color:var(--tera-cyan);"></b> — <a href="#" class="nav-link" onclick="doPlayerLogout(); return false;">Trocar jogador</a></div>
+
+  <div class="card">
+    <h2>Escolher jogador</h2>
+    <select id="playerSelect" onchange="renderProfile()"><option value="">— carregando —</option></select>
+  </div>
+
+  <div id="profileContent"></div>
+
+  <div class="footer-note">Estatísticas calculadas a partir de todos os torneios guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
+</div>
+
+<script src="showdown-utils.js"></script>
+<script>
+const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+
+let loggedInPlayerName = null;
+
+async function doGateLogin(){
+  const name = document.getElementById('gateNameSelect').value;
+  const password = document.getElementById('gatePassword').value;
+  const errEl = document.getElementById('gateError');
+  errEl.style.display = 'none';
+  if(!name){ errEl.textContent = 'Selecione o seu nome.'; errEl.style.display='block'; return; }
+  if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
+  const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
+  if(!result.ok){
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registado pelo organizador.'
+      : result.reason==='wrongpass' ? 'Password incorreta.'
+      : 'Erro ao ligar à base de dados.';
+    errEl.style.display = 'block';
+    return;
+  }
+  localStorage.setItem('player_login_name', name);
+  loggedInPlayerName = name;
+  unlockContent();
+}
+
+function unlockContent(){
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('loggedInNameTop').textContent = loggedInPlayerName;
+  init();
+}
+
+function doPlayerLogout(){
+  localStorage.removeItem('player_login_name');
+  loggedInPlayerName = null;
+  document.getElementById('gatePassword').value = '';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('authGate').style.display = 'flex';
+}
+
+async function pageBoot(){
+  const sel = document.getElementById('gateNameSelect');
+  try{
+    const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
+    names.forEach(n=>{
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+    const saved = localStorage.getItem('player_login_name');
+    if(saved && names.includes(saved)){
+      loggedInPlayerName = saved;
+      unlockContent();
+    }
+  } catch(e){
+    sel.innerHTML = '<option value="">— erro ao carregar jogadores —</option>';
+  }
+}
+
+function sbHeaders(){
+  return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+}
+function setStatus(ok, text){
+  document.getElementById('statusDot').className = 'status-dot ' + (ok?'on':'off');
+  document.getElementById('statusText').textContent = text;
+}
+
+let allRows = [];
+let playerStats = {};
+
+async function init(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    allRows = await res.json();
+    setStatus(true, `Ligado — ${allRows.length} torneio(s) encontrados.`);
+    playerStats = aggregatePlayers(allRows);
+    populatePlayerSelect();
+  } catch(e){
+    setStatus(false, 'Não foi possível ligar à base de dados.');
+    document.getElementById('profileContent').innerHTML = '<div class="card"><div class="empty-state">Erro ao carregar dados.</div></div>';
+  }
+}
+
+function populatePlayerSelect(){
+  const sel = document.getElementById('playerSelect');
+  const names = Object.keys(playerStats).sort((a,b)=>a.localeCompare(b));
+  sel.innerHTML = '<option value="">— selecione um jogador —</option>';
+  names.forEach(n=>{
+    const opt = document.createElement('option');
+    opt.value = n;
+    opt.textContent = n;
+    sel.appendChild(opt);
+  });
+  if(!names.length){
+    document.getElementById('profileContent').innerHTML = '<div class="card"><div class="empty-state">Ainda não há jogadores com torneios registados.</div></div>';
+    return;
+  }
+  const urlParams = new URLSearchParams(window.location.search);
+  const preselect = urlParams.get('jogador');
+  if(preselect && names.includes(preselect)){
+    sel.value = preselect;
+    renderProfile();
+  } else {
+    sel.value = names[0];
+    renderProfile();
+  }
+}
+
+function renderProfile(){
+  const name = document.getElementById('playerSelect').value;
+  const container = document.getElementById('profileContent');
+  if(!name){ container.innerHTML = ''; return; }
+
+  const st = playerStats[name];
+  const matchesPlayed = st.wins + st.losses;
+  const winrate = matchesPlayed ? Math.round((st.wins/matchesPlayed)*100) : 0;
+  const titleChips = Object.entries(st.titlesByTier).map(([tier,c])=>`<span class="title-chip">🏆 ${escapeHtml(tier)} x${c}</span>`).join('');
+
+  const { mons, moves } = aggregatePlayerPokemon(allRows, name);
+  const topMons = Object.entries(mons).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const topMoves = Object.entries(moves).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  const historyRows = st.tournaments.slice().sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)).map(t=>{
+    const label = t.name || (t.createdAt ? new Date(t.createdAt).toLocaleDateString('pt-BR') : 'Torneio');
+    const cls = t.isChamp ? 'champ' : (t.result.startsWith('Eliminado') ? 'elim' : '');
+    return `<div class="history-row"><span>${escapeHtml(label)} <span style="color:var(--text-faint);">(${escapeHtml(t.tier)})</span></span><span class="res ${cls}">${t.isChamp?'🏆 ':''}${escapeHtml(t.result)}</span></div>`;
+  }).join('');
+
+  const initials = name.slice(0,2).toUpperCase();
+
+  container.innerHTML = `
+    <div class="card">
+      <div class="profile-head">
+        <div class="profile-avatar">${escapeHtml(initials)}</div>
+        <div>
+          <div class="profile-name">${escapeHtml(name)}</div>
+          ${st.titles > 0 ? `<div class="profile-champion-line">🏆 ${st.titles} título(s) conquistado(s)</div>` : ''}
+        </div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="n">${st.tournaments.length}</div><div class="l">Torneios</div></div>
+        <div class="stat-box"><div class="n">${st.wins}</div><div class="l">Vitórias</div></div>
+        <div class="stat-box"><div class="n">${st.losses}</div><div class="l">Derrotas</div></div>
+        <div class="stat-box"><div class="n">${winrate}%</div><div class="l">Winrate</div></div>
+      </div>
+      ${titleChips ? `<div>${titleChips}</div>` : ''}
+    </div>
+
+    <div class="card">
+      <h2>Favoritos</h2>
+      <div class="fav-grid">
+        <div>
+          <div style="font-size:11.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Pokémon mais escolhidos</div>
+          <div class="fav-list">
+            ${topMons.length ? topMons.map(([n,c],i)=>`<div class="fav-row"><span><span class="rank">#${i+1}</span>${escapeHtml(n)}</span><b>${c}x</b></div>`).join('') : '<div class="empty-state">Sem dados.</div>'}
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Golpes mais usados</div>
+          <div class="fav-list">
+            ${topMoves.length ? topMoves.map(([n,c],i)=>`<div class="fav-row"><span><span class="rank">#${i+1}</span>${escapeHtml(n)}</span><b>${c}x</b></div>`).join('') : '<div class="empty-state">Sem dados.</div>'}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Histórico de participação</h2>
+      ${historyRows || '<div class="empty-state">Sem histórico.</div>'}
+    </div>
+  `;
+}
+
+pageBoot();
+</script>
+</body>
+</html>
