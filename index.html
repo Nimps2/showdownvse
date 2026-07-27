@@ -74,6 +74,8 @@ select:focus{outline:none;border-color:var(--tera-cyan);}
 .copy-btn:hover{border-color:var(--tera-cyan);color:var(--tera-cyan);}
 .copied-msg{color:var(--tera-cyan);font-size:10.5px;margin-left:6px;opacity:0;transition:opacity .2s;}
 .copied-msg.show{opacity:1;}
+.save-msg{font-size:11px;margin-left:8px;opacity:0;transition:opacity .2s;font-weight:600;}
+.save-msg.show{opacity:1;}
 .empty-state{color:var(--text-faint);font-size:13px;text-align:center;padding:26px 0;}
 .footer-note{color:var(--text-faint);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.5;}
 .status-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);margin-bottom:18px;}
@@ -407,7 +409,7 @@ function renderMyDraw(){
         <summary>Importar set do Showdown</summary>
         <div class="hint">Cole aqui o import completo do Showdown (item, ability, EVs, moves...)</div>
         <textarea id="${pasteId}" rows="5" placeholder="${r.mon} @ Leftovers&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2"></textarea>
-        <button class="copy-btn" onclick="importMyMon(${pIdx},${i},'random')">Importar e salvar</button>
+        <button class="copy-btn" onclick="importMyMon(${pIdx},${i},'random', this)">Importar e salvar</button><span class="save-msg"></span>
       </details>
     </div>`;
   });
@@ -421,7 +423,7 @@ function renderMyDraw(){
           <summary>Importar set do Showdown</summary>
           <div class="hint">Cole aqui o import completo do Showdown — o nome do Pokémon é preenchido automaticamente</div>
           <textarea id="${pasteId}" rows="5" placeholder="Pokémon @ Item&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2"></textarea>
-          <button class="copy-btn" onclick="importMyMon(${pIdx},${i},'free')">Importar e salvar</button>
+          <button class="copy-btn" onclick="importMyMon(${pIdx},${i},'free', this)">Importar e salvar</button><span class="save-msg"></span>
         </details>
       </div>`;
       return;
@@ -436,7 +438,7 @@ function renderMyDraw(){
         <summary>Importar set do Showdown</summary>
         <div class="hint">Cole aqui o import completo do Showdown (item, ability, EVs, moves...)</div>
         <textarea id="${pasteId}" rows="5" placeholder="${f.name} @ Leftovers&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2"></textarea>
-        <button class="copy-btn" onclick="importMyMon(${pIdx},${i},'free')">Importar e salvar</button>
+        <button class="copy-btn" onclick="importMyMon(${pIdx},${i},'free', this)">Importar e salvar</button><span class="save-msg"></span>
       </details>
     </div>`;
   });
@@ -444,12 +446,12 @@ function renderMyDraw(){
   card.innerHTML = html;
 }
 
-function importMyMon(pIdx, idx, kind){
+function importMyMon(pIdx, idx, kind, btn){
   const taId = kind==='random' ? `paste-r-${idx}` : `paste-f-${idx}`;
   const raw = document.getElementById(taId).value.trim();
-  if(!raw){ alert('Cole o import do Showdown na caixa de texto primeiro.'); return; }
+  if(!raw){ showSaveFeedback(btn, 'Cole o import antes de clicar', true); return; }
   const parsed = parseShowdownImport(raw);
-  if(!parsed || !parsed.name){ alert('Não consegui reconhecer o import. Confirme o formato (nome do Pokémon na primeira linha).'); return; }
+  if(!parsed || !parsed.name){ showSaveFeedback(btn, 'Não reconheci o import — confira o formato', true); return; }
 
   if(!currentData.draws) currentData.draws = {};
   if(!currentData.draws[pIdx]) currentData.draws[pIdx] = { random:[{},{},{},{}], free:[{name:'',text:''},{name:'',text:''}] };
@@ -460,27 +462,42 @@ function importMyMon(pIdx, idx, kind){
   } else {
     currentData.draws[pIdx].free[idx] = { name: parsed.name, text: raw, src:'manual', moves: parsed.moves, item: parsed.item, ability: parsed.ability };
   }
-  saveMyDraws(pIdx);
+  saveMyDraws(pIdx, btn);
 }
 
-async function saveMyDraws(pIdx){
+async function saveMyDraws(pIdx, btn){
   if(!currentTournamentId){ alert('Nenhum torneio carregado.'); return; }
   try{
     const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}&select=data`, {headers: sbHeaders()});
+    if(!res.ok) throw new Error('Falha ao ler dados atuais (HTTP '+res.status+')');
     const rows = await res.json();
     const freshData = (rows && rows[0] && rows[0].data) || {};
     if(!freshData.draws) freshData.draws = {};
     freshData.draws[pIdx] = currentData.draws[pIdx];
-    currentData = freshData;
-    await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}`, {
+
+    const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}`, {
       method:'PATCH',
       headers: Object.assign(sbHeaders(), {'Content-Type':'application/json','Prefer':'return=minimal'}),
       body: JSON.stringify({ data: freshData })
     });
+    if(!patchRes.ok) throw new Error('Falha ao gravar (HTTP '+patchRes.status+')');
+
+    currentData = freshData;
     renderMyDraw();
+    showSaveFeedback(btn, 'Guardado ✓', false);
   } catch(e){
-    alert('Não foi possível salvar o set. Verifique a conexão e tente novamente.');
+    showSaveFeedback(btn, 'Erro ao guardar — tente de novo', true);
   }
+}
+
+function showSaveFeedback(btn, text, isError){
+  if(!btn) return;
+  const msg = btn.nextElementSibling;
+  if(!msg || !msg.classList.contains('save-msg')) return;
+  msg.textContent = text;
+  msg.style.color = isError ? '#e0607a' : 'var(--success)';
+  msg.classList.add('show');
+  setTimeout(()=>msg.classList.remove('show'), 3000);
 }
 
 if(localStorage.getItem('torneio_auth_ok') === '1'){
