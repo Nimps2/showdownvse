@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estatísticas — Torneio Showdown - VSE</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-void:#0a0c14; --bg-panel:#12151f; --bg-card:#171b28; --bg-code:#0d0f18;
+  --line:#262c3e; --tera-cyan:#4fd8d0; --tera-violet:#a56bf0; --tera-amber:#f0b64f;
+  --text-main:#e9ecf5; --text-dim:#8b91a8; --text-faint:#565d78; --success:#5ed890; --danger:#e0607a;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;background:var(--bg-void);
+  background-image:radial-gradient(circle at 15% 8%, rgba(165,107,240,0.10), transparent 40%),
+    radial-gradient(circle at 85% 92%, rgba(79,216,208,0.08), transparent 40%);
+  color:var(--text-main);font-family:'Inter',sans-serif;min-height:100vh;padding:0 0 60px 0;
+}
+.wrap{max-width:900px;margin:0 auto;padding:32px 20px;}
+.header{display:flex;align-items:center;gap:16px;margin-bottom:8px;}
+.crystal{width:38px;height:38px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));
+  clip-path:polygon(50% 0%, 100% 30%, 82% 100%, 18% 100%, 0% 30%);}
+h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0;letter-spacing:0.5px;}
+.subtitle{color:var(--text-dim);font-size:13px;margin:14px 0 6px 0;}
+.nav-link{color:var(--tera-cyan);font-size:12.5px;text-decoration:none;font-family:'Chakra Petch',sans-serif;}
+.nav-link:hover{text-decoration:underline;}
+.status-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);margin:14px 0 20px 0;}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
+.status-dot.on{background:var(--success);}
+.status-dot.off{background:var(--danger);}
+
+.card{background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px;}
+.card h2{font-family:'Chakra Petch',sans-serif;font-size:15px;margin:0 0 14px 0;color:var(--text-main);
+  display:flex;align-items:center;gap:8px;}
+.card h2::before{content:'';width:4px;height:15px;background:var(--tera-violet);border-radius:2px;}
+
+.highlight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
+.highlight-box{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+.highlight-box .label{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+.highlight-box .value{font-family:'Chakra Petch',sans-serif;font-size:18px;font-weight:700;color:var(--tera-cyan);}
+.highlight-box .sub{font-size:11.5px;color:var(--text-dim);margin-top:2px;}
+
+.controls{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.controls input[type=text]{
+  flex:1;min-width:180px;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);
+  border-radius:8px;color:var(--text-main);font-family:'Inter',sans-serif;font-size:14px;
+}
+.controls select{
+  padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);border-radius:8px;
+  color:var(--text-main);font-family:'Inter',sans-serif;font-size:13px;
+}
+.controls input:focus,.controls select:focus{outline:none;border-color:var(--tera-cyan);}
+
+.poke-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+.poke-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+.poke-name{font-family:'Chakra Petch',sans-serif;font-size:15px;font-weight:700;margin-bottom:8px;}
+.poke-stat-row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-dim);margin-bottom:4px;}
+.poke-stat-row b{color:var(--text-main);}
+.poke-moves{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);}
+.poke-moves .label{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;}
+.move-chip{
+  display:inline-block;font-size:11px;background:var(--bg-panel);border:1px solid var(--line);
+  border-radius:20px;padding:3px 9px;margin:0 5px 5px 0;color:var(--text-dim);
+}
+.move-chip b{color:var(--tera-cyan);font-weight:600;}
+.free-bar{
+  height:5px;border-radius:3px;background:var(--bg-panel);overflow:hidden;margin-top:6px;
+}
+.free-bar-fill{height:100%;background:linear-gradient(90deg,var(--tera-amber),var(--tera-violet));}
+
+.empty-state{color:var(--text-faint);font-size:13px;text-align:center;padding:30px 0;}
+.footer-note{color:var(--text-faint);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.5;}
+</style>
+</head>
+<body>
+
+<div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
+    <h2>Acesso ao torneio</h2>
+    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Password</label>
+    <input type="password" id="authPassword" placeholder="Digite a password" style="width:100%;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);border-radius:8px;color:var(--text-main);font-size:14px;margin-bottom:12px;" onkeydown="if(event.key==='Enter') checkAuth()">
+    <button onclick="checkAuth()" style="width:100%;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));color:#0a0c14;border:none;padding:12px 20px;border-radius:8px;font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Entrar</button>
+    <div id="authError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;">Password incorreta. Tente novamente.</div>
+  </div>
+</div>
+
+<div id="mainContent" class="wrap" style="display:none;">
+  <div class="header">
+    <div class="crystal"></div>
+    <div><h1>Estatísticas</h1></div>
+  </div>
+  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="viewer.html">Ver bracket da semana →</a></div>
+  <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
+
+  <div class="card" id="highlightsCard">
+    <h2>Resumo geral</h2>
+    <div class="empty-state">A carregar dados de todos os torneios…</div>
+  </div>
+
+  <div class="card">
+    <h2>Pokémon</h2>
+    <div class="controls">
+      <input type="text" id="searchBox" placeholder="Procurar Pokémon..." oninput="renderPokemonList()">
+      <select id="sortSelect" onchange="renderPokemonList()">
+        <option value="total_desc">Mais usados</option>
+        <option value="total_asc">Menos usados</option>
+        <option value="free_desc">Mais como escolha livre</option>
+        <option value="az">Ordem alfabética</option>
+      </select>
+    </div>
+    <div id="pokeGrid" class="poke-grid"></div>
+  </div>
+
+  <div class="footer-note">Estatísticas calculadas a partir de todos os torneios guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
+</div>
+
+<script src="showdown-utils.js"></script>
+<script>
+const AUTH_HASH = "5f61fb0f349bd4d0702909b4df02ab5e5ddc3f2e09ff020d9563bc2e9c134c06";
+const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+
+async function sha256Hex(text){
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function checkAuth(){
+  const val = document.getElementById('authPassword').value;
+  const hash = await sha256Hex(val);
+  if(hash === AUTH_HASH){
+    localStorage.setItem('torneio_auth_ok', '1');
+    unlockContent();
+  } else {
+    document.getElementById('authError').style.display = 'block';
+  }
+}
+function unlockContent(){
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  init();
+}
+
+function sbHeaders(){
+  return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+}
+function setStatus(ok, text){
+  document.getElementById('statusDot').className = 'status-dot ' + (ok?'on':'off');
+  document.getElementById('statusText').textContent = text;
+}
+
+let pokeStats = {};
+let globalMoves = {};
+let totalTournaments = 0;
+let totalSlots = 0;
+
+async function init(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,data&order=created_at.desc`, {headers: sbHeaders()});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const rows = await res.json();
+    setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
+    aggregate(rows);
+    renderHighlights();
+    renderPokemonList();
+  } catch(e){
+    setStatus(false, 'Não foi possível ligar à base de dados.');
+    document.getElementById('highlightsCard').innerHTML = '<h2>Resumo geral</h2><div class="empty-state">Erro ao carregar dados.</div>';
+  }
+}
+
+function getOrCreate(name){
+  if(!pokeStats[name]) pokeStats[name] = { total:0, free:0, abilities:{}, moves:{} };
+  return pokeStats[name];
+}
+
+function processItem(name, item){
+  const st = getOrCreate(name);
+  st.total++;
+  if(item.__isFree) st.free++;
+  let ability = item.ability;
+  let moves = item.moves;
+  if((!ability || !moves || !moves.length) && item.text){
+    const parsed = parseShowdownImport(item.text);
+    if(parsed){
+      if(!ability) ability = parsed.ability;
+      if(!moves || !moves.length) moves = parsed.moves;
+    }
+  }
+  if(ability){ st.abilities[ability] = (st.abilities[ability]||0)+1; }
+  (moves||[]).forEach(mv=>{
+    st.moves[mv] = (st.moves[mv]||0)+1;
+    globalMoves[mv] = (globalMoves[mv]||0)+1;
+  });
+}
+
+function aggregate(rows){
+  pokeStats = {};
+  globalMoves = {};
+  totalTournaments = rows.length;
+  totalSlots = 0;
+  rows.forEach(r=>{
+    const data = r.data || {};
+    const numPlayers = (data.players||[]).length;
+    totalSlots += numPlayers * 6;
+    Object.values(data.draws||{}).forEach(entry=>{
+      (entry.random||[]).forEach(item=>{
+        if(!item.mon) return;
+        processItem(item.mon, Object.assign({}, item, {__isFree:false}));
+      });
+      (entry.free||[]).forEach(item=>{
+        if(!item.name) return;
+        processItem(item.name, Object.assign({}, item, {__isFree:true}));
+      });
+    });
+  });
+}
+
+function renderHighlights(){
+  const card = document.getElementById('highlightsCard');
+  const distinctCount = Object.keys(pokeStats).length;
+  const topMoveEntry = Object.entries(globalMoves).sort((a,b)=>b[1]-a[1])[0];
+  const topPokeEntry = Object.entries(pokeStats).sort((a,b)=>b[1].total-a[1].total)[0];
+
+  let html = `<h2>Resumo geral</h2><div class="highlight-grid">`;
+  html += `<div class="highlight-box"><div class="label">Torneios</div><div class="value">${totalTournaments}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Pokémon distintos</div><div class="value">${distinctCount}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Pokémon mais usado</div><div class="value">${topPokeEntry?topPokeEntry[0]:'—'}</div><div class="sub">${topPokeEntry?topPokeEntry[1].total+' vezes':''}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Golpe mais visto</div><div class="value">${topMoveEntry?topMoveEntry[0]:'—'}</div><div class="sub">${topMoveEntry?topMoveEntry[1]+' vezes':''}</div></div>`;
+  html += `</div>`;
+  if(!totalTournaments){
+    html += '<div class="empty-state" style="margin-top:16px;">Ainda não há torneios guardados.</div>';
+  }
+  card.innerHTML = html;
+}
+
+function renderPokemonList(){
+  const grid = document.getElementById('pokeGrid');
+  const search = document.getElementById('searchBox').value.trim().toLowerCase();
+  const sortBy = document.getElementById('sortSelect').value;
+
+  let entries = Object.entries(pokeStats);
+  if(search) entries = entries.filter(([name])=>name.toLowerCase().includes(search));
+
+  if(sortBy === 'total_desc') entries.sort((a,b)=>b[1].total - a[1].total);
+  else if(sortBy === 'total_asc') entries.sort((a,b)=>a[1].total - b[1].total);
+  else if(sortBy === 'free_desc') entries.sort((a,b)=>(b[1].free/b[1].total) - (a[1].free/a[1].total));
+  else if(sortBy === 'az') entries.sort((a,b)=>a[0].localeCompare(b[0]));
+
+  if(!entries.length){
+    grid.innerHTML = '<div class="empty-state">Nenhum Pokémon encontrado.</div>';
+    return;
+  }
+
+  grid.innerHTML = entries.map(([name, st])=>{
+    const freePct = Math.round((st.free/st.total)*100);
+    const overallPct = totalSlots ? ((st.total/totalSlots)*100).toFixed(1) : '0';
+    const topAbility = Object.entries(st.abilities).sort((a,b)=>b[1]-a[1])[0];
+    const topMoves = Object.entries(st.moves).sort((a,b)=>b[1]-a[1]).slice(0,4);
+    const movesHtml = topMoves.length
+      ? topMoves.map(([mv,c])=>`<span class="move-chip">${escapeHtml(mv)} <b>${c}x</b></span>`).join('')
+      : '<span style="font-size:11.5px;color:var(--text-faint);">Sem golpes registados</span>';
+
+    return `<div class="poke-card">
+      <div class="poke-name">${escapeHtml(name)}</div>
+      <div class="poke-stat-row"><span>Apareceu</span><b>${st.total}x (${overallPct}% dos sorteios)</b></div>
+      <div class="poke-stat-row"><span>Como escolha livre</span><b>${freePct}%</b></div>
+      <div class="free-bar"><div class="free-bar-fill" style="width:${freePct}%"></div></div>
+      <div class="poke-stat-row" style="margin-top:8px;"><span>Ability mais comum</span><b>${topAbility ? escapeHtml(topAbility[0]) : '—'}</b></div>
+      <div class="poke-moves">
+        <div class="label">Golpes mais usados</div>
+        ${movesHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+if(localStorage.getItem('torneio_auth_ok') === '1'){
+  unlockContent();
+}
+</script>
+</body>
+</html>
