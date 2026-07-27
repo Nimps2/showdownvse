@@ -74,6 +74,37 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0
 
 .empty-state{color:var(--text-faint);font-size:13px;text-align:center;padding:30px 0;}
 .footer-note{color:var(--text-faint);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.5;}
+
+.tabs{display:flex;gap:2px;margin-bottom:20px;border-bottom:1px solid var(--line);}
+.tab-btn{
+  flex:1;padding:12px 10px;background:none;border:none;color:var(--text-faint);
+  font-family:'Chakra Petch',sans-serif;font-size:14px;font-weight:600;
+  cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;letter-spacing:0.3px;
+}
+.tab-btn:hover{color:var(--text-dim);}
+.tab-btn.active{color:var(--tera-cyan);border-bottom-color:var(--tera-cyan);}
+.stats-panel{display:none;}
+.stats-panel.active{display:block;}
+
+.player-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;}
+.player-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+.player-card-name{font-family:'Chakra Petch',sans-serif;font-size:16px;font-weight:700;}
+.player-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:10px;}
+.player-stat-box{background:var(--bg-panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;text-align:center;}
+.player-stat-box .n{font-family:'Chakra Petch',sans-serif;font-size:15px;font-weight:700;color:var(--tera-cyan);}
+.player-stat-box .l{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.4px;margin-top:2px;}
+.title-chip{
+  display:inline-block;font-size:11px;background:rgba(240,182,79,0.1);border:1px solid rgba(240,182,79,0.3);
+  border-radius:20px;padding:3px 10px;margin:0 5px 5px 0;color:var(--tera-amber);font-family:'Chakra Petch',sans-serif;
+}
+.history-toggle{cursor:pointer;font-family:'Chakra Petch',sans-serif;font-size:11.5px;color:var(--tera-cyan);
+  list-style:none;user-select:none;padding:2px 0;}
+.history-toggle::-webkit-details-marker{display:none;}
+.history-list{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);}
+.history-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-dim);padding:5px 0;gap:8px;}
+.history-row .res{font-family:'Chakra Petch',sans-serif;font-weight:700;flex-shrink:0;}
+.history-row .res.champ{color:var(--tera-amber);}
+.history-row .res.elim{color:var(--text-faint);}
 </style>
 </head>
 <body>
@@ -96,23 +127,52 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0
   <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="viewer.html">Ver bracket da semana →</a></div>
   <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
 
-  <div class="card" id="highlightsCard">
-    <h2>Resumo geral</h2>
-    <div class="empty-state">A carregar dados de todos os torneios…</div>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchStatsTab('pokemon')">Pokémon</button>
+    <button class="tab-btn" onclick="switchStatsTab('players')">Jogadores</button>
   </div>
 
-  <div class="card">
-    <h2>Pokémon</h2>
-    <div class="controls">
-      <input type="text" id="searchBox" placeholder="Procurar Pokémon..." oninput="renderPokemonList()">
-      <select id="sortSelect" onchange="renderPokemonList()">
-        <option value="total_desc">Mais usados</option>
-        <option value="total_asc">Menos usados</option>
-        <option value="free_desc">Mais como escolha livre</option>
-        <option value="az">Ordem alfabética</option>
-      </select>
+  <div id="panel-pokemon" class="stats-panel active">
+    <div class="card" id="highlightsCard">
+      <h2>Resumo geral</h2>
+      <div class="empty-state">A carregar dados de todos os torneios…</div>
     </div>
-    <div id="pokeGrid" class="poke-grid"></div>
+
+    <div class="card">
+      <h2>Pokémon</h2>
+      <div class="controls">
+        <input type="text" id="searchBox" placeholder="Procurar Pokémon..." oninput="renderPokemonList()">
+        <select id="sortSelect" onchange="renderPokemonList()">
+          <option value="total_desc">Mais usados</option>
+          <option value="total_asc">Menos usados</option>
+          <option value="free_desc">Mais como escolha livre</option>
+          <option value="az">Ordem alfabética</option>
+        </select>
+      </div>
+      <div id="pokeGrid" class="poke-grid"></div>
+    </div>
+  </div>
+
+  <div id="panel-players" class="stats-panel">
+    <div class="card" id="playerHighlightsCard">
+      <h2>Resumo geral</h2>
+      <div class="empty-state">A carregar dados de todos os torneios…</div>
+    </div>
+
+    <div class="card">
+      <h2>Jogadores</h2>
+      <div class="controls">
+        <input type="text" id="playerSearchBox" placeholder="Procurar jogador..." oninput="renderPlayerList()">
+        <select id="playerSortSelect" onchange="renderPlayerList()">
+          <option value="wins_desc">Mais vitórias</option>
+          <option value="winrate_desc">Melhor winrate</option>
+          <option value="titles_desc">Mais títulos</option>
+          <option value="matches_desc">Mais partidas jogadas</option>
+          <option value="az">Ordem alfabética</option>
+        </select>
+      </div>
+      <div id="playerGrid"></div>
+    </div>
   </div>
 
   <div class="footer-note">Estatísticas calculadas a partir de todos os torneios guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
@@ -160,17 +220,29 @@ let totalSlots = 0;
 
 async function init(){
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,data&order=created_at.desc`, {headers: sbHeaders()});
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows = await res.json();
     setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
     aggregate(rows);
+    aggregatePlayers(rows);
     renderHighlights();
     renderPokemonList();
+    renderPlayerHighlights();
+    renderPlayerList();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
     document.getElementById('highlightsCard').innerHTML = '<h2>Resumo geral</h2><div class="empty-state">Erro ao carregar dados.</div>';
+    document.getElementById('playerHighlightsCard').innerHTML = '<h2>Resumo geral</h2><div class="empty-state">Erro ao carregar dados.</div>';
   }
+}
+
+function switchStatsTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.stats-panel').forEach(p=>p.classList.remove('active'));
+  const map = {pokemon:0, players:1};
+  document.querySelectorAll('.tab-btn')[map[tab]].classList.add('active');
+  document.getElementById('panel-'+tab).classList.add('active');
 }
 
 function getOrCreate(name){
@@ -275,6 +347,128 @@ function renderPokemonList(){
         <div class="label">Golpes mais usados</div>
         ${movesHtml}
       </div>
+    </div>`;
+  }).join('');
+}
+
+let playerStats = {};
+
+function aggregatePlayers(rows){
+  playerStats = {};
+  rows.forEach(r=>{
+    const data = r.data || {};
+    const tier = data.tier || r.tier || '?';
+    const tName = data.name || null;
+    const createdAt = r.created_at;
+    const players = (data.players || []).filter(p=>p);
+    const matches = data.matches || [];
+    const champion = data.champion || null;
+
+    players.forEach(p=>{
+      if(!playerStats[p]) playerStats[p] = { wins:0, losses:0, titles:0, titlesByTier:{}, tournaments:[] };
+    });
+
+    matches.forEach(m=>{
+      if(!m.winner || !m.p1 || !m.p2) return;
+      const loser = m.winner === m.p1 ? m.p2 : m.p1;
+      if(playerStats[m.winner]) playerStats[m.winner].wins++;
+      if(playerStats[loser]) playerStats[loser].losses++;
+    });
+
+    players.forEach(p=>{
+      let resultLabel = 'Sem partidas registadas';
+      let isChamp = false;
+      if(champion === p){
+        resultLabel = 'Campeão';
+        isChamp = true;
+        playerStats[p].titles++;
+        playerStats[p].titlesByTier[tier] = (playerStats[p].titlesByTier[tier]||0)+1;
+      } else {
+        const lostMatch = matches.find(m=>m.winner && (m.p1===p || m.p2===p) && m.winner!==p);
+        if(lostMatch) resultLabel = `Eliminado — ${lostMatch.label}`;
+        else {
+          const anyMatch = matches.find(m=>m.p1===p||m.p2===p);
+          if(anyMatch && !anyMatch.winner) resultLabel = 'Em curso';
+        }
+      }
+      playerStats[p].tournaments.push({ name: tName, tier, createdAt, result: resultLabel, isChamp });
+    });
+  });
+}
+
+function renderPlayerHighlights(){
+  const card = document.getElementById('playerHighlightsCard');
+  const entries = Object.entries(playerStats);
+  const distinctCount = entries.length;
+  const topWins = entries.slice().sort((a,b)=>b[1].wins-a[1].wins)[0];
+  const topTitles = entries.slice().sort((a,b)=>b[1].titles-a[1].titles)[0];
+  const eligibleForWinrate = entries.filter(([,s])=>(s.wins+s.losses)>=3);
+  const topWinrate = eligibleForWinrate.sort((a,b)=>(b[1].wins/(b[1].wins+b[1].losses)) - (a[1].wins/(a[1].wins+a[1].losses)))[0];
+
+  let html = `<h2>Resumo geral</h2><div class="highlight-grid">`;
+  html += `<div class="highlight-box"><div class="label">Torneios</div><div class="value">${totalTournaments}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Jogadores distintos</div><div class="value">${distinctCount}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Mais vitórias</div><div class="value">${topWins?topWins[0]:'—'}</div><div class="sub">${topWins?topWins[1].wins+' vitórias':''}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Mais títulos</div><div class="value">${topTitles&&topTitles[1].titles>0?topTitles[0]:'—'}</div><div class="sub">${topTitles&&topTitles[1].titles>0?topTitles[1].titles+' título(s)':''}</div></div>`;
+  html += `</div>`;
+  if(topWinrate){
+    const wr = ((topWinrate[1].wins/(topWinrate[1].wins+topWinrate[1].losses))*100).toFixed(0);
+    html += `<div style="margin-top:10px;font-size:12px;color:var(--text-dim);">Melhor winrate (mín. 3 partidas): <b style="color:var(--tera-cyan);">${topWinrate[0]}</b> — ${wr}%</div>`;
+  }
+  if(!totalTournaments){
+    html += '<div class="empty-state" style="margin-top:16px;">Ainda não há torneios guardados.</div>';
+  }
+  card.innerHTML = html;
+}
+
+function renderPlayerList(){
+  const grid = document.getElementById('playerGrid');
+  const search = document.getElementById('playerSearchBox').value.trim().toLowerCase();
+  const sortBy = document.getElementById('playerSortSelect').value;
+
+  let entries = Object.entries(playerStats);
+  if(search) entries = entries.filter(([name])=>name.toLowerCase().includes(search));
+
+  if(sortBy === 'wins_desc') entries.sort((a,b)=>b[1].wins - a[1].wins);
+  else if(sortBy === 'winrate_desc') entries.sort((a,b)=>{
+    const wa = a[1].wins+a[1].losses ? a[1].wins/(a[1].wins+a[1].losses) : 0;
+    const wb = b[1].wins+b[1].losses ? b[1].wins/(b[1].wins+b[1].losses) : 0;
+    return wb - wa;
+  });
+  else if(sortBy === 'titles_desc') entries.sort((a,b)=>b[1].titles - a[1].titles);
+  else if(sortBy === 'matches_desc') entries.sort((a,b)=>(b[1].wins+b[1].losses) - (a[1].wins+a[1].losses));
+  else if(sortBy === 'az') entries.sort((a,b)=>a[0].localeCompare(b[0]));
+
+  if(!entries.length){
+    grid.innerHTML = '<div class="empty-state">Nenhum jogador encontrado.</div>';
+    return;
+  }
+
+  grid.innerHTML = entries.map(([name, st])=>{
+    const matchesPlayed = st.wins + st.losses;
+    const winrate = matchesPlayed ? Math.round((st.wins/matchesPlayed)*100) : 0;
+    const titleChips = Object.entries(st.titlesByTier).map(([tier,c])=>`<span class="title-chip">🏆 ${escapeHtml(tier)} x${c}</span>`).join('');
+    const historyRows = st.tournaments.slice().sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)).map(t=>{
+      const label = t.name || (t.createdAt ? new Date(t.createdAt).toLocaleDateString('pt-BR') : 'Torneio');
+      const cls = t.isChamp ? 'champ' : (t.result.startsWith('Eliminado') ? 'elim' : '');
+      return `<div class="history-row"><span>${escapeHtml(label)} <span style="color:var(--text-faint);">(${escapeHtml(t.tier)})</span></span><span class="res ${cls}">${t.isChamp?'🏆 ':''}${escapeHtml(t.result)}</span></div>`;
+    }).join('');
+
+    return `<div class="player-card">
+      <div class="player-card-head">
+        <span class="player-card-name">${escapeHtml(name)}</span>
+        ${titleChips || ''}
+      </div>
+      <div class="player-stat-grid">
+        <div class="player-stat-box"><div class="n">${st.tournaments.length}</div><div class="l">Torneios</div></div>
+        <div class="player-stat-box"><div class="n">${st.wins}</div><div class="l">Vitórias</div></div>
+        <div class="player-stat-box"><div class="n">${st.losses}</div><div class="l">Derrotas</div></div>
+        <div class="player-stat-box"><div class="n">${winrate}%</div><div class="l">Winrate</div></div>
+      </div>
+      <details>
+        <summary class="history-toggle">Ver histórico de participação</summary>
+        <div class="history-list">${historyRows || '<div class="empty-state">Sem histórico.</div>'}</div>
+      </details>
     </div>`;
   }).join('');
 }
