@@ -179,3 +179,33 @@ async function fetchRegisteredPlayerNames(supabaseUrl, supabaseAnonKey){
   const rows = await res.json();
   return rows.map(r=>r.name);
 }
+
+// ---------- Perfil: apelido e foto (por link) ----------
+// Devolve um mapa { nomeReal: {nickname, photo_url} } para todos os jogadores.
+async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return {};
+  const rows = await res.json();
+  const map = {};
+  rows.forEach(r=>{ map[r.name] = { nickname: r.nickname || null, photo_url: r.photo_url || null }; });
+  return map;
+}
+
+async function updatePlayerProfile(supabaseUrl, supabaseAnonKey, name, nickname, photoUrl){
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+    method:'PATCH',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify({ nickname: nickname || null, photo_url: photoUrl || null })
+  });
+  return res.ok;
+}
+
+// Devolve HTML de um avatar: <img> se houver photo_url, senão um círculo com as iniciais.
+function avatarHtml(name, photoUrl, sizePx){
+  const size = sizePx || 44;
+  if(photoUrl){
+    return `<img src="${photoUrl.replace(/"/g,'&quot;')}" alt="${(name||'').replace(/"/g,'&quot;')}" style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none';">`;
+  }
+  const initials = (name||'?').slice(0,2).toUpperCase();
+  return `<div style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-violet),var(--tera-cyan));display:flex;align-items:center;justify-content:center;font-family:'Chakra Petch',sans-serif;font-size:${Math.round(size*0.4)}px;font-weight:700;color:#0a0c14;">${initials}</div>`;
+}

@@ -272,6 +272,7 @@ async function init(){
     setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
     aggregate(rows);
     playerStats = aggregatePlayers(rows);
+    playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     renderHighlights();
     renderPokemonList();
     renderPlayerHighlights();
@@ -398,6 +399,7 @@ function renderPokemonList(){
 }
 
 let playerStats = {};
+let playerProfiles = {};
 // aggregatePlayers(rows) agora vive em showdown-utils.js (partilhado com perfil.html)
 
 function renderPlayerHighlights(){
@@ -458,9 +460,19 @@ function renderPlayerList(){
       return `<div class="history-row"><span>${escapeHtml(label)} <span style="color:var(--text-faint);">(${escapeHtml(t.tier)})</span></span><span class="res ${cls}">${t.isChamp?'🏆 ':''}${escapeHtml(t.result)}</span></div>`;
     }).join('');
 
+    const profile = playerProfiles[name] || {};
+    const displayName = profile.nickname ? profile.nickname : name;
+    const avatar = avatarHtml(name, profile.photo_url, 34);
+
     return `<div class="player-card">
       <div class="player-card-head">
-        <span class="player-card-name">${escapeHtml(name)}</span>
+        <span style="display:flex;align-items:center;gap:10px;">
+          ${avatar}
+          <span>
+            <span class="player-card-name">${escapeHtml(displayName)}</span>
+            ${profile.nickname ? `<div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(name)}</div>` : ''}
+          </span>
+        </span>
         ${titleChips || ''}
       </div>
       <div class="player-stat-grid">
