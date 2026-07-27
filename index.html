@@ -1,283 +1,659 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Torneio Showdown — Bracket & Sorteio</title>
-<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-:root{
-  --bg-void:#0a0c14; --bg-panel:#12151f; --bg-card:#171b28; --bg-code:#0d0f18;
-  --line:#262c3e; --tera-cyan:#4fd8d0; --tera-violet:#a56bf0; --tera-amber:#f0b64f;
-  --text-main:#e9ecf5; --text-dim:#8b91a8; --text-faint:#565d78; --success:#5ed890;
-}
-*{box-sizing:border-box;}
-body{
-  margin:0;background:var(--bg-void);
-  background-image:radial-gradient(circle at 15% 8%, rgba(165,107,240,0.10), transparent 40%),
-    radial-gradient(circle at 85% 92%, rgba(79,216,208,0.08), transparent 40%);
-  color:var(--text-main);font-family:'Inter',sans-serif;min-height:100vh;padding:0 0 60px 0;
-}
-.wrap{max-width:820px;margin:0 auto;padding:32px 20px;}
-.header{display:flex;align-items:center;gap:16px;margin-bottom:8px;}
-.crystal{width:38px;height:38px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));
-  clip-path:polygon(50% 0%, 100% 30%, 82% 100%, 18% 100%, 0% 30%);}
-h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0;letter-spacing:0.5px;}
-.subtitle{color:var(--text-dim);font-size:13px;margin:16px 0 20px 0;}
-.card{background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px;}
-.card h2{font-family:'Chakra Petch',sans-serif;font-size:15px;margin:0 0 14px 0;color:var(--text-main);
-  display:flex;align-items:center;gap:8px;}
-.card h2::before{content:'';width:4px;height:15px;background:var(--tera-violet);border-radius:2px;}
-select{width:100%;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);border-radius:8px;
-  color:var(--text-main);font-family:'Inter',sans-serif;font-size:14px;margin-bottom:6px;}
-select:focus{outline:none;border-color:var(--tera-cyan);}
-.bracket-round{margin-bottom:18px;}
-.round-label{font-family:'Chakra Petch',sans-serif;font-size:11px;color:var(--tera-amber);
-  text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-weight:600;}
-.match{background:var(--bg-card);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13.5px;}
-.match-row{display:flex;align-items:center;gap:10px;}
-.match .vs{color:var(--text-faint);font-size:10.5px;font-family:'Chakra Petch',sans-serif;}
-.match .p{flex:1;}
-.match .p.winner{color:var(--tera-cyan);font-weight:700;}
-.match .bo-tag{font-size:10px;background:var(--bg-panel);border:1px solid var(--line);
-  padding:2px 8px;border-radius:20px;color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;}
-.bo3-tracker{margin-top:8px;background:var(--bg-void);border:1px solid var(--line);border-radius:8px;padding:9px 11px;}
-.bo3-summary-row{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
-.bo3-summary-row:last-of-type{margin-bottom:8px;}
-.bo3-summary-name{flex:1;font-size:12px;color:var(--text-dim);}
-.bo3-summary-name.winner{color:var(--tera-cyan);font-weight:700;}
-.bo3-summary-dots{display:flex;gap:6px;}
-.game-dot{width:14px;height:14px;border-radius:50%;background:var(--bg-card);border:1px solid var(--line);display:inline-block;}
-.game-dot.won{background:var(--success);border-color:var(--success);}
-.game-dot.lost{background:#e0607a;border-color:#e0607a;opacity:0.55;}
-.bo3-score{text-align:center;font-family:'Chakra Petch',sans-serif;font-size:14px;font-weight:700;
-  color:var(--text-main);border-top:1px solid var(--line);padding-top:7px;letter-spacing:1px;}
-.champion-banner{margin-top:10px;padding:14px;text-align:center;border-radius:10px;
-  background:linear-gradient(90deg, rgba(240,182,79,0.12), rgba(165,107,240,0.12));
-  border:1px solid rgba(240,182,79,0.3);font-family:'Chakra Petch',sans-serif;font-size:15px;color:var(--tera-amber);font-weight:700;}
-.player-result{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;}
-.player-result .pname{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;color:var(--tera-cyan);
-  margin-bottom:10px;display:flex;align-items:center;gap:8px;}
-.player-result .pname::before{content:'';width:7px;height:7px;background:var(--tera-violet);
-  clip-path:polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%);}
-.mon-block{background:var(--bg-panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;}
-.mon-block.free{border-color:rgba(240,182,79,0.3);}
-.mon-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;flex-wrap:wrap;}
-.mon-name{font-family:'Chakra Petch',sans-serif;font-weight:600;font-size:13.5px;}
-.mon-name.free-label{color:var(--tera-amber);}
-.import-box{background:var(--bg-code);border:1px solid var(--line);border-radius:6px;padding:9px 11px;
-  font-family:'JetBrains Mono',monospace;font-size:12px;color:#c3c9de;white-space:pre-wrap;margin-top:5px;line-height:1.5;}
-.copy-btn{background:none;border:1px solid var(--line);color:var(--text-dim);padding:4px 9px;border-radius:6px;
-  font-family:'Chakra Petch',sans-serif;font-size:10.5px;cursor:pointer;}
-.copy-btn:hover{border-color:var(--tera-cyan);color:var(--tera-cyan);}
-.copied-msg{color:var(--tera-cyan);font-size:10.5px;margin-left:6px;opacity:0;transition:opacity .2s;}
-.copied-msg.show{opacity:1;}
-.save-msg{font-size:11px;margin-left:8px;opacity:0;transition:opacity .2s;font-weight:600;}
-.save-msg.show{opacity:1;}
-.empty-state{color:var(--text-faint);font-size:13px;text-align:center;padding:26px 0;}
-.footer-note{color:var(--text-faint);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.5;}
-.status-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);margin-bottom:18px;}
-.status-dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
-.status-dot.on{background:var(--success);}
-.status-dot.off{background:#e0607a;}
-.tier-pill{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--bg-panel);border:1px solid var(--line);
-  color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;margin-left:8px;}
-textarea{
-  width:100%;padding:8px 10px;background:var(--bg-code);border:1px solid var(--line);
-  border-radius:6px;color:#c3c9de;font-family:'JetBrains Mono',monospace;font-size:12px;
-  resize:vertical;margin-bottom:6px;
-}
-textarea:focus{outline:none;border-color:var(--tera-cyan);}
-.set-details{margin-top:6px;}
-.set-details summary{
-  cursor:pointer;font-family:'Chakra Petch',sans-serif;font-size:11px;
-  color:var(--tera-cyan);list-style:none;user-select:none;padding:2px 0;
-}
-.set-details summary::-webkit-details-marker{display:none;}
-.set-details summary::before{content:'▸ ';}
-.set-details[open] summary::before{content:'▾ ';}
-.hint{font-size:11px;color:var(--text-faint);margin-bottom:4px;}
-</style>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Torneio Showdown — Bracket & Sorteio</title>
+	<link rel="icon"
+		href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link
+		href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+		rel="stylesheet">
+	<style>
+		:root {
+			--bg-void: #0a0c14;
+			--bg-panel: #12151f;
+			--bg-card: #171b28;
+			--bg-code: #0d0f18;
+			--line: #262c3e;
+			--tera-cyan: #4fd8d0;
+			--tera-violet: #a56bf0;
+			--tera-amber: #f0b64f;
+			--text-main: #e9ecf5;
+			--text-dim: #8b91a8;
+			--text-faint: #565d78;
+			--success: #5ed890;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		body {
+			margin: 0;
+			background: var(--bg-void);
+			background-image: radial-gradient(circle at 15% 8%, rgba(165, 107, 240, 0.10), transparent 40%),
+				radial-gradient(circle at 85% 92%, rgba(79, 216, 208, 0.08), transparent 40%);
+			color: var(--text-main);
+			font-family: 'Inter', sans-serif;
+			min-height: 100vh;
+			padding: 0 0 60px 0;
+		}
+
+		.wrap {
+			max-width: 820px;
+			margin: 0 auto;
+			padding: 32px 20px;
+		}
+
+		.header {
+			display: flex;
+			align-items: center;
+			gap: 16px;
+			margin-bottom: 8px;
+		}
+
+		.crystal {
+			width: 38px;
+			height: 38px;
+			flex-shrink: 0;
+			background: linear-gradient(135deg, var(--tera-cyan), var(--tera-violet));
+			clip-path: polygon(50% 0%, 100% 30%, 82% 100%, 18% 100%, 0% 30%);
+		}
+
+		h1 {
+			font-family: 'Chakra Petch', sans-serif;
+			font-size: 23px;
+			font-weight: 700;
+			margin: 0;
+			letter-spacing: 0.5px;
+		}
+
+		.subtitle {
+			color: var(--text-dim);
+			font-size: 13px;
+			margin: 16px 0 20px 0;
+		}
+
+		.card {
+			background: var(--bg-panel);
+			border: 1px solid var(--line);
+			border-radius: 12px;
+			padding: 22px;
+			margin-bottom: 18px;
+		}
+
+		.card h2 {
+			font-family: 'Chakra Petch', sans-serif;
+			font-size: 15px;
+			margin: 0 0 14px 0;
+			color: var(--text-main);
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		}
+
+		.card h2::before {
+			content: '';
+			width: 4px;
+			height: 15px;
+			background: var(--tera-violet);
+			border-radius: 2px;
+		}
+
+		select {
+			width: 100%;
+			padding: 10px 12px;
+			background: var(--bg-card);
+			border: 1px solid var(--line);
+			border-radius: 8px;
+			color: var(--text-main);
+			font-family: 'Inter', sans-serif;
+			font-size: 14px;
+			margin-bottom: 6px;
+		}
+
+		select:focus {
+			outline: none;
+			border-color: var(--tera-cyan);
+		}
+
+		.bracket-round {
+			margin-bottom: 18px;
+		}
+
+		.round-label {
+			font-family: 'Chakra Petch', sans-serif;
+			font-size: 11px;
+			color: var(--tera-amber);
+			text-transform: uppercase;
+			letter-spacing: 1px;
+			margin-bottom: 8px;
+			font-weight: 600;
+		}
+
+		.match {
+			background: var(--bg-card);
+			border: 1px solid var(--line);
+			border-radius: 8px;
+			padding: 10px 14px;
+			margin-bottom: 8px;
+			font-size: 13.5px;
+		}
+
+		.match-row {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+		}
+
+		.match .vs {
+			color: var(--text-faint);
+			font-size: 10.5px;
+			font-family: 'Chakra Petch', sans-serif;
+		}
+
+		.match .p {
+			flex: 1;
+		}
+
+		.match .p.winner {
+			color: var(--tera-cyan);
+			font-weight: 700;
+		}
+
+		.match .bo-tag {
+			font-size: 10px;
+			background: var(--bg-panel);
+			border: 1px solid var(--line);
+			padding: 2px 8px;
+			border-radius: 20px;
+			color: var(--tera-cyan);
+			font-family: 'Chakra Petch', sans-serif;
+		}
+
+		.bo3-tracker {
+			margin-top: 8px;
+			background: var(--bg-void);
+			border: 1px solid var(--line);
+			border-radius: 8px;
+			padding: 9px 11px;
+		}
+
+		.bo3-summary-row {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			margin-bottom: 6px;
+		}
+
+		.bo3-summary-row:last-of-type {
+			margin-bottom: 8px;
+		}
+
+		.bo3-summary-name {
+			flex: 1;
+			font-size: 12px;
+			color: var(--text-dim);
+		}
+
+		.bo3-summary-name.winner {
+			color: var(--tera-cyan);
+			font-weight: 700;
+		}
+
+		.bo3-summary-dots {
+			display: flex;
+			gap: 6px;
+		}
+
+		.game-dot {
+			width: 14px;
+			height: 14px;
+			border-radius: 50%;
+			background: var(--bg-card);
+			border: 1px solid var(--line);
+			display: inline-block;
+		}
+
+		.game-dot.won {
+			background: var(--success);
+			border-color: var(--success);
+		}
+
+		.game-dot.lost {
+			background: #e0607a;
+			border-color: #e0607a;
+			opacity: 0.55;
+		}
+
+		.bo3-score {
+			text-align: center;
+			font-family: 'Chakra Petch', sans-serif;
+			font-size: 14px;
+			font-weight: 700;
+			color: var(--text-main);
+			border-top: 1px solid var(--line);
+			padding-top: 7px;
+			letter-spacing: 1px;
+		}
+
+		.champion-banner {
+			margin-top: 10px;
+			padding: 14px;
+			text-align: center;
+			border-radius: 10px;
+			background: linear-gradient(90deg, rgba(240, 182, 79, 0.12), rgba(165, 107, 240, 0.12));
+			border: 1px solid rgba(240, 182, 79, 0.3);
+			font-family: 'Chakra Petch', sans-serif;
+			font-size: 15px;
+			color: var(--tera-amber);
+			font-weight: 700;
+		}
+
+		.player-result {
+			background: var(--bg-card);
+			border: 1px solid var(--line);
+			border-radius: 10px;
+			padding: 14px 16px;
+			margin-bottom: 12px;
+		}
+
+		.player-result .pname {
+			font-family: 'Chakra Petch', sans-serif;
+			font-weight: 700;
+			font-size: 14px;
+			color: var(--tera-cyan);
+			margin-bottom: 10px;
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		}
+
+		.player-result .pname::before {
+			content: '';
+			width: 7px;
+			height: 7px;
+			background: var(--tera-violet);
+			clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+		}
+
+		.mon-block {
+			background: var(--bg-panel);
+			border: 1px solid var(--line);
+			border-radius: 8px;
+			padding: 10px 12px;
+			margin-bottom: 8px;
+		}
+
+		.mon-block.free {
+			border-color: rgba(240, 182, 79, 0.3);
+		}
+
+		.mon-head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 8px;
+			margin-bottom: 5px;
+			flex-wrap: wrap;
+		}
+
+		.mon-name {
+			font-family: 'Chakra Petch', sans-serif;
+			font-weight: 600;
+			font-size: 13.5px;
+		}
+
+		.mon-name.free-label {
+			color: var(--tera-amber);
+		}
+
+		.import-box {
+			background: var(--bg-code);
+			border: 1px solid var(--line);
+			border-radius: 6px;
+			padding: 9px 11px;
+			font-family: 'JetBrains Mono', monospace;
+			font-size: 12px;
+			color: #c3c9de;
+			white-space: pre-wrap;
+			margin-top: 5px;
+			line-height: 1.5;
+		}
+
+		.copy-btn {
+			background: none;
+			border: 1px solid var(--line);
+			color: var(--text-dim);
+			padding: 4px 9px;
+			border-radius: 6px;
+			font-family: 'Chakra Petch', sans-serif;
+			font-size: 10.5px;
+			cursor: pointer;
+		}
+
+		.copy-btn:hover {
+			border-color: var(--tera-cyan);
+			color: var(--tera-cyan);
+		}
+
+		.copied-msg {
+			color: var(--tera-cyan);
+			font-size: 10.5px;
+			margin-left: 6px;
+			opacity: 0;
+			transition: opacity .2s;
+		}
+
+		.copied-msg.show {
+			opacity: 1;
+		}
+
+		.save-msg {
+			font-size: 11px;
+			margin-left: 8px;
+			opacity: 0;
+			transition: opacity .2s;
+			font-weight: 600;
+		}
+
+		.save-msg.show {
+			opacity: 1;
+		}
+
+		.empty-state {
+			color: var(--text-faint);
+			font-size: 13px;
+			text-align: center;
+			padding: 26px 0;
+		}
+
+		.footer-note {
+			color: var(--text-faint);
+			font-size: 11.5px;
+			text-align: center;
+			margin-top: 20px;
+			line-height: 1.5;
+		}
+
+		.status-line {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			font-size: 12.5px;
+			color: var(--text-dim);
+			margin-bottom: 18px;
+		}
+
+		.status-dot {
+			width: 7px;
+			height: 7px;
+			border-radius: 50%;
+			background: var(--text-faint);
+		}
+
+		.status-dot.on {
+			background: var(--success);
+		}
+
+		.status-dot.off {
+			background: #e0607a;
+		}
+
+		.tier-pill {
+			font-size: 11px;
+			padding: 2px 8px;
+			border-radius: 20px;
+			background: var(--bg-panel);
+			border: 1px solid var(--line);
+			color: var(--tera-cyan);
+			font-family: 'Chakra Petch', sans-serif;
+			margin-left: 8px;
+		}
+
+		textarea {
+			width: 100%;
+			padding: 8px 10px;
+			background: var(--bg-code);
+			border: 1px solid var(--line);
+			border-radius: 6px;
+			color: #c3c9de;
+			font-family: 'JetBrains Mono', monospace;
+			font-size: 12px;
+			resize: vertical;
+			margin-bottom: 6px;
+		}
+
+		textarea:focus {
+			outline: none;
+			border-color: var(--tera-cyan);
+		}
+
+		.set-details {
+			margin-top: 6px;
+		}
+
+		.set-details summary {
+			cursor: pointer;
+			font-family: 'Chakra Petch', sans-serif;
+			font-size: 11px;
+			color: var(--tera-cyan);
+			list-style: none;
+			user-select: none;
+			padding: 2px 0;
+		}
+
+		.set-details summary::-webkit-details-marker {
+			display: none;
+		}
+
+		.set-details summary::before {
+			content: '▸ ';
+		}
+
+		.set-details[open] summary::before {
+			content: '▾ ';
+		}
+
+		.hint {
+			font-size: 11px;
+			color: var(--text-faint);
+			margin-bottom: 4px;
+		}
+	</style>
 </head>
+
 <body>
-<div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
-  <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
-    <h2>Acesso ao torneio</h2>
-    <label>Password</label>
-    <input type="password" id="authPassword" placeholder="Digite a password" onkeydown="if(event.key==='Enter') checkAuth()">
-    <button class="primary" onclick="checkAuth()" style="width:100%;">Entrar</button>
-    <div id="authError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;">Password incorreta. Tente novamente.</div>
-  </div>
-</div>
+	<div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+		<div class="card" style="max-width:340px;width:100%;margin:0 20px;">
+			<h2>Acesso ao torneio</h2>
+			<label>Password</label>
+			<input type="password" id="authPassword" placeholder="Digite a password"
+				onkeydown="if(event.key==='Enter') checkAuth()">
+			<button class="primary" onclick="checkAuth()" style="width:100%;">Entrar</button>
+			<div id="authError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;">Password
+				incorreta. Tente novamente.</div>
+		</div>
+	</div>
 
-<div id="mainContent" class="wrap" style="display:none;">
-  <div class="header">
-    <div class="crystal"></div>
-    <div><h1>Torneio Showdown — Bracket & Sorteio</h1></div>
-  </div>
-  <div class="subtitle">Página só de visualização — vê o bracket ao vivo e os seus Pokémon sorteados.</div>
+	<div id="mainContent" class="wrap" style="display:none;">
+		<div class="header">
+			<div class="crystal"></div>
+			<div>
+				<h1>Torneio Showdown — Bracket & Sorteio</h1>
+			</div>
+		</div>
+		<div class="subtitle">Página só de visualização — vê o bracket ao vivo e os seus Pokémon sorteados.</div>
 
-  <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
+		<div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span>
+		</div>
 
-  <div class="card">
-    <h2>Torneio</h2>
-    <select id="tournamentSelect" onchange="onSelectTournament()"><option value="">— carregando —</option></select>
-  </div>
+		<div class="card">
+			<h2>Torneio</h2>
+			<select id="tournamentSelect" onchange="onSelectTournament()">
+				<option value="">— carregando —</option>
+			</select>
+		</div>
 
-  <div class="card" id="bracketCard">
-    <h2>Bracket</h2>
-    <div class="empty-state">Escolha um torneio acima.</div>
-  </div>
+		<div class="card" id="bracketCard">
+			<h2>Bracket</h2>
+			<div class="empty-state">Escolha um torneio acima.</div>
+		</div>
 
-  <div class="card">
-    <h2>Nome do jogador</h2>
-    <select id="whoAmI" onchange="renderMyDraw()"><option value="">— selecione o seu nome —</option></select>
-  </div>
+		<div class="card">
+			<h2>Nome do jogador</h2>
+			<select id="whoAmI" onchange="renderMyDraw()">
+				<option value="">— selecione o seu nome —</option>
+			</select>
+		</div>
 
-  <div class="card" id="drawCard">
-    <h2>Os seus Pokémon</h2>
-    <div class="empty-state">Selecione o seu nome acima para ver os seus Pokémon sorteados.</div>
-  </div>
+		<div class="card" id="drawCard">
+			<h2>Os seus Pokémon</h2>
+			<div class="empty-state">Selecione o seu nome acima para ver os seus Pokémon sorteados.</div>
+		</div>
 
-  <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company. Pokémon e nomes relacionados são marcas registradas dos seus respectivos donos.</div>
-</div>
+		<div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon
+			Company. Pokémon e nomes relacionados são marcas registradas dos seus respectivos donos.</div>
+	</div>
 
-<script>
-// Hash SHA-256 da password de acesso (a password em si nao fica visivel no codigo)
-const AUTH_HASH = "5f61fb0f349bd4d0702909b4df02ab5e5ddc3f2e09ff020d9563bc2e9c134c06";
+	<script src="showdown-utils.js"></script>
+	<script>
+		// Hash SHA-256 da password de acesso (a password em si nao fica visivel no codigo)
+		const AUTH_HASH = "5f61fb0f349bd4d0702909b4df02ab5e5ddc3f2e09ff020d9563bc2e9c134c06";
 
-async function sha256Hex(text){
-  const enc = new TextEncoder().encode(text);
-  const buf = await crypto.subtle.digest('SHA-256', enc);
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
+		async function sha256Hex(text) {
+			const enc = new TextEncoder().encode(text);
+			const buf = await crypto.subtle.digest('SHA-256', enc);
+			return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+		}
 
-async function checkAuth(){
-  const val = document.getElementById('authPassword').value;
-  const hash = await sha256Hex(val);
-  if(hash === AUTH_HASH){
-    localStorage.setItem('torneio_auth_ok', '1');
-    unlockContent();
-  } else {
-    document.getElementById('authError').style.display = 'block';
-  }
-}
+		async function checkAuth() {
+			const val = document.getElementById('authPassword').value;
+			const hash = await sha256Hex(val);
+			if (hash === AUTH_HASH) {
+				localStorage.setItem('torneio_auth_ok', '1');
+				unlockContent();
+			} else {
+				document.getElementById('authError').style.display = 'block';
+			}
+		}
 
-function unlockContent(){
-  document.getElementById('authGate').style.display = 'none';
-  document.getElementById('mainContent').style.display = 'block';
-  init();
-}
-</script>
+		function unlockContent() {
+			document.getElementById('authGate').style.display = 'none';
+			document.getElementById('mainContent').style.display = 'block';
+			init();
+		}
+	</script>
 
-<script>
-// ⚠️ Preenche estes dois valores com o Project URL e a anon public key do seu projeto Supabase
-// (Project Settings → API). São seguros para colocar aqui — a anon key é feita para ser pública,
-// as regras de acesso reais estão definidas no lado da base de dados.
-const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+	<script>
+		// ⚠️ Preenche estes dois valores com o Project URL e a anon public key do seu projeto Supabase
+		// (Project Settings → API). São seguros para colocar aqui — a anon key é feita para ser pública,
+		// as regras de acesso reais estão definidas no lado da base de dados.
+		const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+		const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
 
-let tournaments = [];
-let currentData = null;
-let currentTournamentId = null;
+		let tournaments = [];
+		let currentData = null;
+		let currentTournamentId = null;
 
-function sbHeaders(){
-  return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
-}
+		function sbHeaders() {
+			return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+		}
 
-function setStatus(ok, text){
-  document.getElementById('statusDot').className = 'status-dot ' + (ok?'on':'off');
-  document.getElementById('statusText').textContent = text;
-}
+		function setStatus(ok, text) {
+			document.getElementById('statusDot').className = 'status-dot ' + (ok ? 'on' : 'off');
+			document.getElementById('statusText').textContent = text;
+		}
 
-async function init(){
-  if(SUPABASE_URL.startsWith('COLA_AQUI') || SUPABASE_ANON_KEY.startsWith('COLA_AQUI')){
-    setStatus(false, 'Esta página ainda não foi configurada — falta o URL e a chave da base de dados.');
-    return;
-  }
-  try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=id,created_at,tier,status,data&order=created_at.desc`, {headers: sbHeaders()});
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    tournaments = await res.json();
-    setStatus(true, `Conectado — ${tournaments.length} torneio(s) encontrados.`);
-    renderTournamentSelect();
-    const active = tournaments.find(t=>t.status==='em_curso') || tournaments[0];
-    if(active){
-      document.getElementById('tournamentSelect').value = active.id;
-      loadTournamentData(active.id);
-    }
-  } catch(e){
-    setStatus(false, 'Não foi possível ligar à base de dados.');
-  }
-}
+		async function init() {
+			if (SUPABASE_URL.startsWith('COLA_AQUI') || SUPABASE_ANON_KEY.startsWith('COLA_AQUI')) {
+				setStatus(false, 'Esta página ainda não foi configurada — falta o URL e a chave da base de dados.');
+				return;
+			}
+			try {
+				const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=id,created_at,tier,status,data&order=created_at.desc`, { headers: sbHeaders() });
+				if (!res.ok) throw new Error('HTTP ' + res.status);
+				tournaments = await res.json();
+				setStatus(true, `Conectado — ${tournaments.length} torneio(s) encontrados.`);
+				renderTournamentSelect();
+				const active = tournaments.find(t => t.status === 'em_curso') || tournaments[0];
+				if (active) {
+					document.getElementById('tournamentSelect').value = active.id;
+					loadTournamentData(active.id);
+				}
+			} catch (e) {
+				setStatus(false, 'Não foi possível ligar à base de dados.');
+			}
+		}
 
-function renderTournamentSelect(){
-  const sel = document.getElementById('tournamentSelect');
-  sel.innerHTML = '';
-  if(!tournaments.length){
-    sel.innerHTML = '<option value="">— nenhum torneio ainda —</option>';
-    return;
-  }
-  tournaments.forEach(t=>{
-    const opt = document.createElement('option');
-    opt.value = t.id;
-    const d = new Date(t.created_at);
-    const name = (t.data && t.data.name) ? t.data.name : null;
-    opt.textContent = name
-      ? `${name} — ${t.tier||'?'} (${t.status==='concluido'?'Concluído':'Em curso'})`
-      : `${d.toLocaleDateString('pt-BR')} — ${t.tier||'?'} (${t.status==='concluido'?'Concluído':'Em curso'})`;
-    sel.appendChild(opt);
-  });
-}
+		function renderTournamentSelect() {
+			const sel = document.getElementById('tournamentSelect');
+			sel.innerHTML = '';
+			if (!tournaments.length) {
+				sel.innerHTML = '<option value="">— nenhum torneio ainda —</option>';
+				return;
+			}
+			tournaments.forEach(t => {
+				const opt = document.createElement('option');
+				opt.value = t.id;
+				const d = new Date(t.created_at);
+				const name = (t.data && t.data.name) ? t.data.name : null;
+				opt.textContent = name
+					? `${name} — ${t.tier || '?'} (${t.status === 'concluido' ? 'Concluído' : 'Em curso'})`
+					: `${d.toLocaleDateString('pt-BR')} — ${t.tier || '?'} (${t.status === 'concluido' ? 'Concluído' : 'Em curso'})`;
+				sel.appendChild(opt);
+			});
+		}
 
-function onSelectTournament(){
-  const id = document.getElementById('tournamentSelect').value;
-  if(id) loadTournamentData(id);
-}
+		function onSelectTournament() {
+			const id = document.getElementById('tournamentSelect').value;
+			if (id) loadTournamentData(id);
+		}
 
-function loadTournamentData(id){
-  const t = tournaments.find(x=>x.id===id);
-  if(!t) return;
-  currentTournamentId = id;
-  currentData = t.data || {};
-  renderBracket();
-  renderWhoAmI();
-  document.getElementById('drawCard').innerHTML = '<h2>Os seus Pokémon</h2><div class="empty-state">Selecione o seu nome acima para ver os seus Pokémon sorteados.</div>';
-}
+		function loadTournamentData(id) {
+			const t = tournaments.find(x => x.id === id);
+			if (!t) return;
+			currentTournamentId = id;
+			currentData = t.data || {};
+			renderBracket();
+			renderWhoAmI();
+			document.getElementById('drawCard').innerHTML = '<h2>Os seus Pokémon</h2><div class="empty-state">Selecione o seu nome acima para ver os seus Pokémon sorteados.</div>';
+		}
 
-function matchRow(m){
-  if(!m) return '';
-  const p1cls = m.winner===m.p1 ? 'winner' : '';
-  const p2cls = m.winner===m.p2 ? 'winner' : '';
+		function matchRow(m) {
+			if (!m) return '';
+			const p1cls = m.winner === m.p1 ? 'winner' : '';
+			const p2cls = m.winner === m.p2 ? 'winner' : '';
 
-  let body = '';
-  if(m.p1 && m.p2 && m.bo === 3 && m.games){
-    const p1wins = m.games.filter(g=>g===m.p1).length;
-    const p2wins = m.games.filter(g=>g===m.p2).length;
-    const lastPlayedIdx = m.games.reduce((acc,g,i)=> g ? i : acc, -1);
-    let numGamesToShow = (p1wins===1 && p2wins===1) ? 3 : 2;
-    if(lastPlayedIdx + 1 > numGamesToShow) numGamesToShow = lastPlayedIdx + 1;
-    const dotsFor = (player, opponent) => {
-      let dots = '';
-      for(let i=0;i<numGamesToShow;i++){
-        const g = m.games[i];
-        let cls = 'game-dot';
-        if(g === player) cls += ' won';
-        else if(g === opponent) cls += ' lost';
-        dots += `<span class="${cls}"></span>`;
-      }
-      return dots;
-    };
-    body = `<div class="bo3-tracker">
+			let body = '';
+			if (m.p1 && m.p2 && m.bo === 3 && m.games) {
+				const p1wins = m.games.filter(g => g === m.p1).length;
+				const p2wins = m.games.filter(g => g === m.p2).length;
+				const lastPlayedIdx = m.games.reduce((acc, g, i) => g ? i : acc, -1);
+				let numGamesToShow = (p1wins === 1 && p2wins === 1) ? 3 : 2;
+				if (lastPlayedIdx + 1 > numGamesToShow) numGamesToShow = lastPlayedIdx + 1;
+				const dotsFor = (player, opponent) => {
+					let dots = '';
+					for (let i = 0; i < numGamesToShow; i++) {
+						const g = m.games[i];
+						let cls = 'game-dot';
+						if (g === player) cls += ' won';
+						else if (g === opponent) cls += ' lost';
+						dots += `<span class="${cls}"></span>`;
+					}
+					return dots;
+				};
+				body = `<div class="bo3-tracker">
       <div class="bo3-summary-row"><span class="bo3-summary-name ${p1cls}">${m.p1}</span><span class="bo3-summary-dots">${dotsFor(m.p1, m.p2)}</span></div>
       <div class="bo3-summary-row"><span class="bo3-summary-name ${p2cls}">${m.p2}</span><span class="bo3-summary-dots">${dotsFor(m.p2, m.p1)}</span></div>
       <div class="bo3-score">${p1wins} - ${p2wins}</div>
     </div>`;
-  }
+			}
 
-  return `<div class="match">
+			return `<div class="match">
     <div class="match-row">
       <span class="p ${p1cls}">${m.p1 || '—'}</span>
       <span class="vs">VS</span>
@@ -286,120 +662,68 @@ function matchRow(m){
     </div>
     ${body}
   </div>`;
-}
+		}
 
-function renderBracket(){
-  const card = document.getElementById('bracketCard');
-  const matches = (currentData && currentData.matches) || [];
-  if(!matches.length){
-    card.innerHTML = '<h2>Bracket</h2><div class="empty-state">Este torneio ainda não tem bracket gerado.</div>';
-    return;
-  }
-  const nameLabel = currentData.name ? escapeHtml(currentData.name) + ' ' : '';
-  let html = `<h2>${nameLabel}<span class="tier-pill">${currentData.tier||''}</span></h2>`;
-  let lastLabel = null;
-  matches.forEach(m=>{
-    if(m.label !== lastLabel){
-      if(lastLabel !== null) html += '</div>';
-      html += `<div class="bracket-round"><div class="round-label">${m.label}</div>`;
-      lastLabel = m.label;
-    }
-    html += matchRow(m);
-  });
-  html += '</div>';
+		function renderBracket() {
+			const card = document.getElementById('bracketCard');
+			const matches = (currentData && currentData.matches) || [];
+			if (!matches.length) {
+				card.innerHTML = '<h2>Bracket</h2><div class="empty-state">Este torneio ainda não tem bracket gerado.</div>';
+				return;
+			}
+			const nameLabel = currentData.name ? escapeHtml(currentData.name) + ' ' : '';
+			let html = `<h2>${nameLabel}<span class="tier-pill">${currentData.tier || ''}</span></h2>`;
+			let lastLabel = null;
+			matches.forEach(m => {
+				if (m.label !== lastLabel) {
+					if (lastLabel !== null) html += '</div>';
+					html += `<div class="bracket-round"><div class="round-label">${m.label}</div>`;
+					lastLabel = m.label;
+				}
+				html += matchRow(m);
+			});
+			html += '</div>';
 
-  const finalMatch = matches.find(m=>m.next===null);
-  if(finalMatch && finalMatch.winner) html += `<div class="champion-banner">🏆 Campeão do torneio: ${finalMatch.winner}</div>`;
-  card.innerHTML = html;
-}
+			const finalMatch = matches.find(m => m.next === null);
+			if (finalMatch && finalMatch.winner) html += `<div class="champion-banner">🏆 Campeão do torneio: ${finalMatch.winner}</div>`;
+			card.innerHTML = html;
+		}
 
-function renderWhoAmI(){
-  const sel = document.getElementById('whoAmI');
-  sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
-  const players = (currentData && currentData.players) || [];
-  players.forEach((p,i)=>{
-    if(!p) return;
-    const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = p;
-    sel.appendChild(opt);
-  });
-}
+		function renderWhoAmI() {
+			const sel = document.getElementById('whoAmI');
+			sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
+			const players = (currentData && currentData.players) || [];
+			players.forEach((p, i) => {
+				if (!p) return;
+				const opt = document.createElement('option');
+				opt.value = i;
+				opt.textContent = p;
+				sel.appendChild(opt);
+			});
+		}
 
-function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+		// escapeHtml, parseStatString, parseShowdownImport e copyText agora vivem em
+		// showdown-utils.js (carregado no <head>), partilhado com o gestor.
 
-// ---------- Parser: importar texto colado no formato do Showdown ----------
-function parseStatString(str){
-  const out = {};
-  str.split('/').forEach(part=>{
-    const m = part.trim().match(/^(\d+)\s+(HP|Atk|Def|SpA|SpD|Spe)$/i);
-    if(m) out[m[2].toLowerCase()] = parseInt(m[1],10);
-  });
-  return out;
-}
-
-function parseShowdownImport(text){
-  const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
-  if(!lines.length) return null;
-  const result = { name:null, item:null, ability:null, nature:null, evs:{}, ivs:{}, teraType:null, moves:[] };
-
-  const first = lines[0];
-  let namePart = first, item = null;
-  const atIdx = first.indexOf(' @ ');
-  if(atIdx !== -1){
-    namePart = first.slice(0, atIdx).trim();
-    item = first.slice(atIdx+3).trim();
-  }
-  const nickMatch = namePart.match(/^(.*?)\s*\(([^)]+)\)\s*(?:\((?:M|F)\))?$/i);
-  let species = namePart;
-  if(nickMatch && nickMatch[2] && !/^(M|F)$/i.test(nickMatch[2])){
-    species = nickMatch[2].trim();
-  }
-  species = species.replace(/\s*\((M|F)\)\s*$/i,'').trim();
-  result.name = species;
-  result.item = item;
-
-  for(let i=1;i<lines.length;i++){
-    const line = lines[i];
-    let m;
-    if((m = line.match(/^Ability:\s*(.+)$/i))){ result.ability = m[1].trim(); continue; }
-    if((m = line.match(/^EVs:\s*(.+)$/i))){ result.evs = parseStatString(m[1]); continue; }
-    if((m = line.match(/^IVs:\s*(.+)$/i))){ result.ivs = parseStatString(m[1]); continue; }
-    if((m = line.match(/^Tera Type:\s*(.+)$/i))){ result.teraType = m[1].trim(); continue; }
-    if((m = line.match(/^([A-Za-z]+)\s+Nature$/i))){ result.nature = m[1].trim(); continue; }
-    if(/^Level:/i.test(line) || /^Shiny:/i.test(line) || /^Happiness:/i.test(line)){ continue; }
-    if((m = line.match(/^-\s*(.+)$/))){ result.moves.push(m[1].trim()); continue; }
-  }
-  return result;
-}
-
-function copyText(id, btn){
-  const txt = document.getElementById(id).innerText;
-  navigator.clipboard.writeText(txt).then(()=>{
-    const msg = btn.nextElementSibling;
-    if(msg){ msg.classList.add('show'); setTimeout(()=>msg.classList.remove('show'), 1500); }
-  });
-}
-
-function renderMyDraw(){
-  const pIdx = document.getElementById('whoAmI').value;
-  const card = document.getElementById('drawCard');
-  if(pIdx === ''){
-    card.innerHTML = '<h2>Os seus Pokémon</h2><div class="empty-state">Selecione o seu nome acima para ver os seus Pokémon sorteados.</div>';
-    return;
-  }
-  const draws = (currentData && currentData.draws) || {};
-  const d = draws[pIdx];
-  const playerName = currentData.players[pIdx];
-  if(!d){
-    card.innerHTML = `<h2>Os seus Pokémon</h2><div class="empty-state">O sorteio para ${playerName} ainda não foi feito.</div>`;
-    return;
-  }
-  let html = `<h2>Os seus Pokémon</h2><div class="player-result"><div class="pname">${playerName}</div>`;
-  (d.random||[]).forEach((r,i)=>{
-    const boxId = `box-r-${i}`;
-    const pasteId = `paste-r-${i}`;
-    html += `<div class="mon-block">
+		function renderMyDraw() {
+			const pIdx = document.getElementById('whoAmI').value;
+			const card = document.getElementById('drawCard');
+			if (pIdx === '') {
+				card.innerHTML = '<h2>Os seus Pokémon</h2><div class="empty-state">Selecione o seu nome acima para ver os seus Pokémon sorteados.</div>';
+				return;
+			}
+			const draws = (currentData && currentData.draws) || {};
+			const d = draws[pIdx];
+			const playerName = currentData.players[pIdx];
+			if (!d) {
+				card.innerHTML = `<h2>Os seus Pokémon</h2><div class="empty-state">O sorteio para ${playerName} ainda não foi feito.</div>`;
+				return;
+			}
+			let html = `<h2>Os seus Pokémon</h2><div class="player-result"><div class="pname">${playerName}</div>`;
+			(d.random || []).forEach((r, i) => {
+				const boxId = `box-r-${i}`;
+				const pasteId = `paste-r-${i}`;
+				html += `<div class="mon-block">
       <div class="mon-head">
         <span class="mon-name">${r.mon}</span>
         <span><button class="copy-btn" onclick="copyText('${boxId}', this)">Copiar</button><span class="copied-msg">Copiado!</span></span>
@@ -412,13 +736,13 @@ function renderMyDraw(){
         <button class="copy-btn" onclick="importMyMon(${pIdx},${i},'random', this)">Importar e salvar</button><span class="save-msg"></span>
       </details>
     </div>`;
-  });
-  (d.free||[]).forEach((f,i)=>{
-    const boxId = `box-f-${i}`;
-    const pasteId = `paste-f-${i}`;
-    if(!f.name){
-      html += `<div class="mon-block free">
-        <div class="mon-head"><span class="mon-name free-label">Escolha livre ${i+1}: (ainda não escolhida)</span></div>
+			});
+			(d.free || []).forEach((f, i) => {
+				const boxId = `box-f-${i}`;
+				const pasteId = `paste-f-${i}`;
+				if (!f.name) {
+					html += `<div class="mon-block free">
+        <div class="mon-head"><span class="mon-name free-label">Escolha livre ${i + 1}: (ainda não escolhida)</span></div>
         <details class="set-details">
           <summary>Importar set do Showdown</summary>
           <div class="hint">Cole aqui o import completo do Showdown — o nome do Pokémon é preenchido automaticamente</div>
@@ -426,11 +750,11 @@ function renderMyDraw(){
           <button class="copy-btn" onclick="importMyMon(${pIdx},${i},'free', this)">Importar e salvar</button><span class="save-msg"></span>
         </details>
       </div>`;
-      return;
-    }
-    html += `<div class="mon-block free">
+					return;
+				}
+				html += `<div class="mon-block free">
       <div class="mon-head">
-        <span class="mon-name free-label">Escolha livre ${i+1}: ${f.name}</span>
+        <span class="mon-name free-label">Escolha livre ${i + 1}: ${f.name}</span>
         <span><button class="copy-btn" onclick="copyText('${boxId}', this)">Copiar</button><span class="copied-msg">Copiado!</span></span>
       </div>
       <div class="import-box" id="${boxId}">${escapeHtml(f.text || f.name)}</div>
@@ -441,68 +765,69 @@ function renderMyDraw(){
         <button class="copy-btn" onclick="importMyMon(${pIdx},${i},'free', this)">Importar e salvar</button><span class="save-msg"></span>
       </details>
     </div>`;
-  });
-  html += `</div>`;
-  card.innerHTML = html;
-}
+			});
+			html += `</div>`;
+			card.innerHTML = html;
+		}
 
-function importMyMon(pIdx, idx, kind, btn){
-  const taId = kind==='random' ? `paste-r-${idx}` : `paste-f-${idx}`;
-  const raw = document.getElementById(taId).value.trim();
-  if(!raw){ showSaveFeedback(btn, 'Cole o import antes de clicar', true); return; }
-  const parsed = parseShowdownImport(raw);
-  if(!parsed || !parsed.name){ showSaveFeedback(btn, 'Não reconheci o import — confira o formato', true); return; }
+		function importMyMon(pIdx, idx, kind, btn) {
+			const taId = kind === 'random' ? `paste-r-${idx}` : `paste-f-${idx}`;
+			const raw = document.getElementById(taId).value.trim();
+			if (!raw) { showSaveFeedback(btn, 'Cole o import antes de clicar', true); return; }
+			const parsed = parseShowdownImport(raw);
+			if (!parsed || !parsed.name) { showSaveFeedback(btn, 'Não reconheci o import — confira o formato', true); return; }
 
-  if(!currentData.draws) currentData.draws = {};
-  if(!currentData.draws[pIdx]) currentData.draws[pIdx] = { random:[{},{},{},{}], free:[{name:'',text:''},{name:'',text:''}] };
+			if (!currentData.draws) currentData.draws = {};
+			if (!currentData.draws[pIdx]) currentData.draws[pIdx] = { random: [{}, {}, {}, {}], free: [{ name: '', text: '' }, { name: '', text: '' }] };
 
-  if(kind === 'random'){
-    const existingMon = currentData.draws[pIdx].random[idx] ? currentData.draws[pIdx].random[idx].mon : parsed.name;
-    currentData.draws[pIdx].random[idx] = { mon: existingMon, text: raw, src:'manual', moves: parsed.moves, item: parsed.item, ability: parsed.ability };
-  } else {
-    currentData.draws[pIdx].free[idx] = { name: parsed.name, text: raw, src:'manual', moves: parsed.moves, item: parsed.item, ability: parsed.ability };
-  }
-  saveMyDraws(pIdx, btn);
-}
+			if (kind === 'random') {
+				const existingMon = currentData.draws[pIdx].random[idx] ? currentData.draws[pIdx].random[idx].mon : parsed.name;
+				currentData.draws[pIdx].random[idx] = { mon: existingMon, text: raw, src: 'manual', moves: parsed.moves, item: parsed.item, ability: parsed.ability };
+			} else {
+				currentData.draws[pIdx].free[idx] = { name: parsed.name, text: raw, src: 'manual', moves: parsed.moves, item: parsed.item, ability: parsed.ability };
+			}
+			saveMyDraws(pIdx, btn);
+		}
 
-async function saveMyDraws(pIdx, btn){
-  if(!currentTournamentId){ alert('Nenhum torneio carregado.'); return; }
-  try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}&select=data`, {headers: sbHeaders()});
-    if(!res.ok) throw new Error('Falha ao ler dados atuais (HTTP '+res.status+')');
-    const rows = await res.json();
-    const freshData = (rows && rows[0] && rows[0].data) || {};
-    if(!freshData.draws) freshData.draws = {};
-    freshData.draws[pIdx] = currentData.draws[pIdx];
+		async function saveMyDraws(pIdx, btn) {
+			if (!currentTournamentId) { alert('Nenhum torneio carregado.'); return; }
+			try {
+				const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}&select=data`, { headers: sbHeaders() });
+				if (!res.ok) throw new Error('Falha ao ler dados atuais (HTTP ' + res.status + ')');
+				const rows = await res.json();
+				const freshData = (rows && rows[0] && rows[0].data) || {};
+				if (!freshData.draws) freshData.draws = {};
+				freshData.draws[pIdx] = currentData.draws[pIdx];
 
-    const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}`, {
-      method:'PATCH',
-      headers: Object.assign(sbHeaders(), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-      body: JSON.stringify({ data: freshData })
-    });
-    if(!patchRes.ok) throw new Error('Falha ao gravar (HTTP '+patchRes.status+')');
+				const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}`, {
+					method: 'PATCH',
+					headers: Object.assign(sbHeaders(), { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+					body: JSON.stringify({ data: freshData })
+				});
+				if (!patchRes.ok) throw new Error('Falha ao gravar (HTTP ' + patchRes.status + ')');
 
-    currentData = freshData;
-    renderMyDraw();
-    showSaveFeedback(btn, 'Guardado ✓', false);
-  } catch(e){
-    showSaveFeedback(btn, 'Erro ao guardar — tente de novo', true);
-  }
-}
+				currentData = freshData;
+				renderMyDraw();
+				showSaveFeedback(btn, 'Guardado ✓', false);
+			} catch (e) {
+				showSaveFeedback(btn, 'Erro ao guardar — tente de novo', true);
+			}
+		}
 
-function showSaveFeedback(btn, text, isError){
-  if(!btn) return;
-  const msg = btn.nextElementSibling;
-  if(!msg || !msg.classList.contains('save-msg')) return;
-  msg.textContent = text;
-  msg.style.color = isError ? '#e0607a' : 'var(--success)';
-  msg.classList.add('show');
-  setTimeout(()=>msg.classList.remove('show'), 3000);
-}
+		function showSaveFeedback(btn, text, isError) {
+			if (!btn) return;
+			const msg = btn.nextElementSibling;
+			if (!msg || !msg.classList.contains('save-msg')) return;
+			msg.textContent = text;
+			msg.style.color = isError ? '#e0607a' : 'var(--success)';
+			msg.classList.add('show');
+			setTimeout(() => msg.classList.remove('show'), 3000);
+		}
 
-if(localStorage.getItem('torneio_auth_ok') === '1'){
-  unlockContent();
-}
-</script>
+		if (localStorage.getItem('torneio_auth_ok') === '1') {
+			unlockContent();
+		}
+	</script>
 </body>
+
 </html>
