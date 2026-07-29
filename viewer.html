@@ -62,6 +62,12 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 .game-dot.lost{background:#e0607a;border-color:#e0607a;opacity:0.6;}
 .bo3-score{text-align:center;font-family:'Chakra Petch',sans-serif;font-size:14px;font-weight:700;
   color:var(--text-main);letter-spacing:1px;}
+.hover-card{
+  position:fixed;z-index:1000;background:var(--bg-panel);border:1px solid var(--line);
+  border-radius:10px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.5);
+  min-width:220px;max-width:280px;pointer-events:none;display:none;
+}
+.hover-card.show{display:block;}
 .champion-banner{margin-top:10px;padding:14px;text-align:center;border-radius:10px;
   background:linear-gradient(90deg, rgba(240,182,79,0.12), rgba(165,107,240,0.12));
   border:1px solid rgba(240,182,79,0.3);font-family:'Chakra Petch',sans-serif;font-size:15px;color:var(--tera-amber);font-weight:700;}
@@ -156,6 +162,8 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
   <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company. Pokémon e nomes relacionados são marcas registradas dos seus respectivos donos.</div>
 </div>
 
+<div class="hover-card" id="hoverCard"></div>
+
 <script src="showdown-utils.js"></script>
 <script>
 // SUPABASE_URL e SUPABASE_ANON_KEY são definidos no próximo bloco de script,
@@ -227,11 +235,36 @@ const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
 
 let tournaments = [];
+let playerStats = {};
+let playerProfiles = {};
+let currentTrophies = null;
+let eloRatings = {};
 let currentData = null;
 let currentTournamentId = null;
 
 function sbHeaders(){
   return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+}
+
+function showHoverCard(evt, name){
+  const card = document.getElementById('hoverCard');
+  card.innerHTML = buildHoverCardHtml(name, playerStats, playerProfiles, currentTrophies, eloRatings);
+  card.classList.add('show');
+  positionHoverCard(evt);
+}
+function positionHoverCard(evt){
+  const card = document.getElementById('hoverCard');
+  const pad = 14;
+  let x = evt.clientX + pad;
+  let y = evt.clientY + pad;
+  const rect = card.getBoundingClientRect();
+  if(x + rect.width > window.innerWidth) x = evt.clientX - rect.width - pad;
+  if(y + rect.height > window.innerHeight) y = evt.clientY - rect.height - pad;
+  card.style.left = x + 'px';
+  card.style.top = y + 'px';
+}
+function hideHoverCard(){
+  document.getElementById('hoverCard').classList.remove('show');
 }
 
 function setStatus(ok, text){
@@ -249,6 +282,10 @@ async function init(){
     if(!res.ok) throw new Error('HTTP '+res.status);
     tournaments = await res.json();
     setStatus(true, `Conectado — ${tournaments.length} torneio(s) encontrados.`);
+    playerStats = aggregatePlayers(tournaments);
+    playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    currentTrophies = computeCurrentTrophies(tournaments);
+    eloRatings = computeEloRatings(tournaments);
     renderTournamentSelect();
     const active = tournaments.find(t=>t.status==='em_curso') || tournaments[0];
     if(active){
@@ -322,7 +359,7 @@ function matchRow(m){
   }
 
   const nameLink = (n, cls) => n
-    ? `<a class="p ${cls}" style="text-decoration:none;color:inherit;" href="perfil.html?jogador=${encodeURIComponent(n)}">${escapeHtml(n)}</a>`
+    ? `<a class="p ${cls}" style="text-decoration:none;color:inherit;" href="perfil.html?jogador=${encodeURIComponent(n)}" onmouseover="showHoverCard(event,'${n.replace(/'/g,"\\'")}')" onmousemove="positionHoverCard(event)" onmouseout="hideHoverCard()">${escapeHtml(n)}</a>`
     : `<span class="p">—</span>`;
 
   return `<div class="match">

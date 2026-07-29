@@ -186,6 +186,8 @@ function setStatus(ok, text){
 let allRows = [];
 let playerStats = {};
 let playerProfiles = {};
+let currentTrophies = null;
+let eloRatings = {};
 
 async function init(){
   try{
@@ -195,6 +197,8 @@ async function init(){
     setStatus(true, `Ligado — ${allRows.length} torneio(s) encontrados.`);
     playerStats = aggregatePlayers(allRows);
     playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    currentTrophies = computeCurrentTrophies(allRows);
+    eloRatings = computeEloRatings(allRows);
     renderProfile();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
@@ -226,6 +230,7 @@ function renderProfile(){
   const { mons, moves } = aggregatePlayerPokemon(allRows, name);
   const topMons = Object.entries(mons).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const topMoves = Object.entries(moves).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const h2h = computeHeadToHead(allRows, name);
 
   const historyRows = st.tournaments.slice().sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)).map(t=>{
     const label = t.name || (t.createdAt ? new Date(t.createdAt).toLocaleDateString('pt-BR') : 'Torneio');
@@ -244,13 +249,15 @@ function renderProfile(){
       <div class="profile-head">
         ${avatar}
         <div>
-          <div class="profile-name">${escapeHtml(displayName)}</div>
+          <div class="profile-name">${trophyEmojiFor(name, currentTrophies)} ${escapeHtml(displayName)}</div>
           ${profile.nickname ? `<div style="font-size:11.5px;color:var(--text-faint);">${escapeHtml(name)}</div>` : ''}
-          ${st.titles > 0 ? `<div class="profile-champion-line">🏆 ${st.titles} título(s) conquistado(s)</div>` : ''}
+          ${trophyEmojiFor(name, currentTrophies) ? `<div class="profile-champion-line">${trophyEmojiFor(name, currentTrophies)} ${currentTrophies.gold===name?'Campeão':currentTrophies.silver===name?'Vice-campeão':'3º lugar'} do último torneio (${escapeHtml(currentTrophies.tier)})</div>` : ''}
+          ${st.titles > 0 ? `<div class="profile-champion-line">🏆 ${st.titles} título(s) conquistado(s) no total</div>` : ''}
         </div>
       </div>
       ${profile.status_message ? `<div style="margin-top:12px;padding:10px 14px;background:var(--bg-card);border-left:3px solid var(--tera-cyan);border-radius:6px;font-size:13px;color:var(--text-dim);font-style:italic;">"${escapeHtml(profile.status_message)}"</div>` : ''}
       <div class="stat-grid">
+        <div class="stat-box"><div class="n" style="color:var(--tera-amber);">${eloRatings[name] || 1000}</div><div class="l">Elo</div></div>
         <div class="stat-box"><div class="n">${st.tournaments.length}</div><div class="l">Torneios</div></div>
         <div class="stat-box"><div class="n">${st.wins}</div><div class="l">Vitórias</div></div>
         <div class="stat-box"><div class="n">${st.losses}</div><div class="l">Derrotas</div></div>
@@ -275,6 +282,37 @@ function renderProfile(){
           </div>
         </div>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>Confrontos & Sequências</h2>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="n">${h2h.currentStreak ? h2h.currentStreak.count : 0}</div><div class="l">${h2h.currentStreak && h2h.currentStreak.type==='win' ? 'Vitórias seguidas' : 'Derrotas seguidas'}</div></div>
+        <div class="stat-box"><div class="n">${h2h.bestTier ? Math.round(h2h.bestTier.winrate*100)+'%' : '—'}</div><div class="l">Melhor tier${h2h.bestTier ? ' ('+escapeHtml(h2h.bestTier.tier)+')' : ''}</div></div>
+      </div>
+      <div class="fav-grid" style="margin-top:8px;">
+        <div class="fav-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
+          <span style="font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">😈 Nemesis</span>
+          <span>${h2h.nemesis ? `<b>${escapeHtml(h2h.nemesis.name)}</b> — venceu-te ${h2h.nemesis.losses}x` : 'Ainda sem nemesis — bom sinal!'}</span>
+        </div>
+        <div class="fav-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
+          <span style="font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">🎯 Vítima favorita</span>
+          <span>${h2h.favoriteVictim ? `<b>${escapeHtml(h2h.favoriteVictim.name)}</b> — venceste ${h2h.favoriteVictim.wins}x` : 'Ainda sem vítima favorita.'}</span>
+        </div>
+        <div class="fav-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
+          <span style="font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">🔁 Adversário mais frequente</span>
+          <span>${h2h.mostFrequent ? `<b>${escapeHtml(h2h.mostFrequent.name)}</b> — ${h2h.mostFrequent.total} jogo(s)` : 'Sem dados.'}</span>
+        </div>
+      </div>
+      ${Object.keys(h2h.opponents).length ? `
+      <details style="margin-top:12px;">
+        <summary class="history-toggle">Ver tabela de confrontos completa</summary>
+        <div class="history-list">
+          ${Object.entries(h2h.opponents).sort((a,b)=>(b[1].wins+b[1].losses)-(a[1].wins+a[1].losses)).map(([opp,rec])=>
+            `<div class="history-row"><span>${escapeHtml(opp)}</span><span class="res">${rec.wins}V - ${rec.losses}D</span></div>`
+          ).join('')}
+        </div>
+      </details>` : ''}
     </div>
 
     <div class="card">

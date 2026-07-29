@@ -209,3 +209,169 @@ function avatarHtml(name, photoUrl, sizePx){
   const initials = (name||'?').slice(0,2).toUpperCase();
   return `<div style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-violet),var(--tera-cyan));display:flex;align-items:center;justify-content:center;font-family:'Chakra Petch',sans-serif;font-size:${Math.round(size*0.4)}px;font-weight:700;color:#0a0c14;">${initials}</div>`;
 }
+
+// ---------- Troféus do último torneio concluído (Ouro/Prata/Bronze) ----------
+// Recalculado sempre a partir do torneio concluído mais recente — os troféus
+// "trocam de dono" sozinhos assim que outro torneio terminar.
+// Devolve { tournamentName, tier, gold, silver, bronze:[...] } ou null se não
+// houver nenhum torneio concluído ainda.
+function computeCurrentTrophies(rows){
+  const concluded = rows
+    .filter(r => r.data && r.data.champion)
+    .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+  if(!concluded.length) return null;
+
+  const r = concluded[0];
+  const data = r.data;
+  const matches = data.matches || [];
+  const finalMatch = matches.find(m => m.next === null);
+  if(!finalMatch) return { tournamentName: data.name, tier: data.tier, gold: data.champion, silver: null, bronze: [] };
+
+  const silver = finalMatch.winner === finalMatch.p1 ? finalMatch.p2 : finalMatch.p1;
+  const bronze = matches
+    .filter(m => m.next === finalMatch.id && m.winner)
+    .map(m => m.winner === m.p1 ? m.p2 : m.p1);
+
+  return { tournamentName: data.name, tier: data.tier, gold: data.champion, silver, bronze };
+}
+
+// Devolve o emoji de troféu para um jogador dado o objeto de computeCurrentTrophies(), ou '' se não tiver nenhum.
+function trophyEmojiFor(name, trophies){
+  if(!trophies || !name) return '';
+  if(trophies.gold === name) return '🥇';
+  if(trophies.silver === name) return '🥈';
+  if(trophies.bronze && trophies.bronze.includes(name)) return '🥉';
+  return '';
+}
+
+// ---------- Confrontos diretos e sequências ----------
+// Devolve { opponents:{nome:{wins,losses}}, nemesis, favoriteVictim, mostFrequent,
+// currentStreak:{type,count}, bestTier:{tier,winrate,wins,losses} } para um jogador.
+function computeHeadToHead(rows, playerName){
+  const opponents = {};
+  const matchSequence = [];
+  const tierRecord = {};
+
+  const sorted = rows.slice().sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+  sorted.forEach(r=>{
+    const data = r.data || {};
+    const tier = data.tier || r.tier || '?';
+    const matches = data.matches || [];
+    matches.forEach(m=>{
+      if(!m.winner || !m.p1 || !m.p2) return;
+      if(m.p1 !== playerName && m.p2 !== playerName) return;
+      const opponent = m.p1 === playerName ? m.p2 : m.p1;
+      const won = m.winner === playerName;
+      if(!opponents[opponent]) opponents[opponent] = {wins:0, losses:0};
+      if(won) opponents[opponent].wins++; else opponents[opponent].losses++;
+      if(!tierRecord[tier]) tierRecord[tier] = {wins:0, losses:0};
+      if(won) tierRecord[tier].wins++; else tierRecord[tier].losses++;
+      matchSequence.push({ result: won ? 'win' : 'loss' });
+    });
+  });
+
+  let nemesis = null;
+  Object.entries(opponents).forEach(([opp, rec])=>{
+    if(rec.losses > 0 && (!nemesis || rec.losses > nemesis.losses)) nemesis = {name:opp, losses:rec.losses, wins:rec.wins};
+  });
+
+  let favoriteVictim = null;
+  Object.entries(opponents).forEach(([opp, rec])=>{
+    if(rec.wins > 0 && (!favoriteVictim || rec.wins > favoriteVictim.wins)) favoriteVictim = {name:opp, wins:rec.wins, losses:rec.losses};
+  });
+
+  let mostFrequent = null;
+  Object.entries(opponents).forEach(([opp, rec])=>{
+    const total = rec.wins + rec.losses;
+    if(!mostFrequent || total > mostFrequent.total) mostFrequent = {name:opp, total, wins:rec.wins, losses:rec.losses};
+  });
+
+  let currentStreak = null;
+  if(matchSequence.length){
+    const last = matchSequence[matchSequence.length-1];
+    let count = 0;
+    for(let i=matchSequence.length-1;i>=0;i--){
+      if(matchSequence[i].result === last.result) count++;
+      else break;
+    }
+    currentStreak = { type: last.result, count };
+  }
+
+  let bestTier = null;
+  Object.entries(tierRecord).forEach(([tier, rec])=>{
+    const total = rec.wins + rec.losses;
+    if(total < 2) return;
+    const winrate = rec.wins / total;
+    if(!bestTier || winrate > bestTier.winrate) bestTier = {tier, winrate, wins:rec.wins, losses:rec.losses};
+  });
+
+  return { opponents, nemesis, favoriteVictim, mostFrequent, currentStreak, bestTier };
+}
+
+// ---------- Mini-perfil (hover) ----------
+// Devolve o HTML de dentro do mini-cartão que aparece ao passar o rato sobre
+// o nome/avatar de um jogador. Usado por viewer.html e estatisticas.html.
+function buildHoverCardHtml(name, playerStats, playerProfiles, currentTrophies, eloRatings){
+  const st = (playerStats && playerStats[name]) || null;
+  const profile = (playerProfiles && playerProfiles[name]) || {};
+  const displayName = profile.nickname ? profile.nickname : name;
+  const avatar = avatarHtml(name, profile.photo_url, 40);
+  const trophy = trophyEmojiFor(name, currentTrophies);
+  const elo = eloRatings ? (eloRatings[name] || 1000) : null;
+
+  let statsLine = 'Ainda sem torneios registados.';
+  if(st){
+    const total = st.wins + st.losses;
+    const wr = total ? Math.round((st.wins/total)*100) : 0;
+    statsLine = `${st.wins}V - ${st.losses}D (${wr}%) · ${st.titles} título(s)`;
+  }
+
+  return `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      ${avatar}
+      <div>
+        <div style="font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;color:var(--text-main);">${trophy} ${escapeHtml(displayName)}</div>
+        ${profile.nickname ? `<div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(name)}</div>` : ''}
+      </div>
+    </div>
+    ${elo!==null ? `<div style="font-size:11.5px;color:var(--tera-amber);margin-bottom:4px;">Elo: ${elo}</div>` : ''}
+    <div style="font-size:12px;color:var(--text-dim);">${statsLine}</div>
+    ${profile.status_message ? `<div style="font-size:11.5px;color:var(--text-dim);font-style:italic;margin-top:6px;">"${escapeHtml(profile.status_message)}"</div>` : ''}
+  `;
+}
+
+// ---------- Elo (classificação de força) ----------
+// Calcula a classificação Elo de cada jogador a partir de todo o histórico de
+// partidas, em ordem cronológica. Base = 1000, K-factor = 32 (valor padrão
+// usado em muitos sistemas de xadrez/jogos competitivos).
+// Devolve um mapa { nome: pontuação (arredondada) }.
+function computeEloRatings(rows){
+  const ratings = {};
+  const K = 32;
+  const BASE = 1000;
+
+  function getRating(name){
+    if(!(name in ratings)) ratings[name] = BASE;
+    return ratings[name];
+  }
+
+  const sorted = rows.slice().sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  sorted.forEach(r=>{
+    const data = r.data || {};
+    const matches = data.matches || [];
+    matches.forEach(m=>{
+      if(!m.winner || !m.p1 || !m.p2) return;
+      const winner = m.winner;
+      const loser = winner === m.p1 ? m.p2 : m.p1;
+      const rWinner = getRating(winner);
+      const rLoser = getRating(loser);
+      const expectedWinner = 1 / (1 + Math.pow(10, (rLoser - rWinner) / 400));
+      ratings[winner] = rWinner + K * (1 - expectedWinner);
+      ratings[loser] = rLoser + K * (0 - (1 - expectedWinner));
+    });
+  });
+
+  const rounded = {};
+  Object.entries(ratings).forEach(([name, r]) => { rounded[name] = Math.round(r); });
+  return rounded;
+}
