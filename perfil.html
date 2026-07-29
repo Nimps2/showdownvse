@@ -91,7 +91,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
   <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
     <h2>Entrar</h2>
     <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Nome</label>
-    <select id="gateNameSelect"><option value="">— a carregar jogadores —</option></select>
+    <select id="gateNameSelect"><option value="">— carregando jogadores —</option></select>
     <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Password</label>
     <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()">
     <button class="btn-primary" onclick="doGateLogin()">Entrar</button>
@@ -235,7 +235,18 @@ function renderProfile(){
   const historyRows = st.tournaments.slice().sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)).map(t=>{
     const label = t.name || (t.createdAt ? new Date(t.createdAt).toLocaleDateString('pt-BR') : 'Torneio');
     const cls = t.isChamp ? 'champ' : (t.result.startsWith('Eliminado') ? 'elim' : '');
-    return `<div class="history-row"><span>${escapeHtml(label)} <span style="color:var(--text-faint);">(${escapeHtml(t.tier)})</span></span><span class="res ${cls}">${t.isChamp?'🏆 ':''}${escapeHtml(t.result)}</span></div>`;
+    const matchLines = (t.matches || []).map(m=>{
+      const resultTxt = m.won ? 'Venceu' : 'Perdeu';
+      const replayHtml = m.replayUrl ? ` · <a href="${escapeHtml(m.replayUrl)}" target="_blank" style="color:var(--tera-cyan);text-decoration:none;">▶ replay</a>` : '';
+      return `<div style="font-size:11px;color:var(--text-faint);padding-left:8px;margin-top:2px;">${escapeHtml(m.label)}: ${resultTxt} vs ${escapeHtml(m.opponent)}${replayHtml}</div>`;
+    }).join('');
+    return `<div class="history-row" style="flex-direction:column;align-items:stretch;gap:2px;">
+      <div style="display:flex;justify-content:space-between;">
+        <span>${escapeHtml(label)} <span style="color:var(--text-faint);">(${escapeHtml(t.tier)})</span></span>
+        <span class="res ${cls}">${t.isChamp?'🏆 ':''}${escapeHtml(t.result)}</span>
+      </div>
+      ${matchLines}
+    </div>`;
   }).join('');
 
   const initials = name.slice(0,2).toUpperCase();

@@ -109,7 +109,15 @@ function aggregatePlayers(rows){
           if(anyMatch && !anyMatch.winner) resultLabel = 'Em curso';
         }
       }
-      playerStats[p].tournaments.push({ name: tName, tier, createdAt, result: resultLabel, isChamp });
+      const playerMatches = matches
+        .filter(m => m.winner && (m.p1===p || m.p2===p))
+        .map(m => ({
+          label: m.label,
+          opponent: m.p1===p ? m.p2 : m.p1,
+          won: m.winner === p,
+          replayUrl: m.replayUrl || null
+        }));
+      playerStats[p].tournaments.push({ name: tName, tier, createdAt, result: resultLabel, isChamp, matches: playerMatches });
     });
   });
   return playerStats;

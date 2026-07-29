@@ -125,7 +125,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
   <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
     <h2>Entrar</h2>
     <label>Nome</label>
-    <select id="gateNameSelect"><option value="">— a carregar jogadores —</option></select>
+    <select id="gateNameSelect"><option value="">— carregando jogadores —</option></select>
     <label>Password</label>
     <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()">
     <button class="btn-primary" onclick="doGateLogin()">Entrar</button>
@@ -228,7 +228,7 @@ function doPlayerLogout(){
 </script>
 
 <script>
-// ⚠️ Preenche estes dois valores com o Project URL e a anon public key do seu projeto Supabase
+// ⚠️ Preencha estes dois valores com o Project URL e a anon public key do seu projeto Supabase
 // (Project Settings → API). São seguros para colocar aqui — a anon key é feita para ser pública,
 // as regras de acesso reais estão definidas no lado da base de dados.
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -362,6 +362,10 @@ function matchRow(m){
     ? `<a class="p ${cls}" style="text-decoration:none;color:inherit;" href="perfil.html?jogador=${encodeURIComponent(n)}" onmouseover="showHoverCard(event,'${n.replace(/'/g,"\\'")}')" onmousemove="positionHoverCard(event)" onmouseout="hideHoverCard()">${escapeHtml(n)}</a>`
     : `<span class="p">—</span>`;
 
+  const replayLink = m.replayUrl
+    ? `<div style="margin-top:8px;"><a href="${escapeHtml(m.replayUrl)}" target="_blank" style="font-size:11px;color:var(--tera-cyan);text-decoration:none;font-family:'Chakra Petch',sans-serif;border:1px solid var(--line);padding:5px 10px;border-radius:6px;">▶ Ver replay</a></div>`
+    : '';
+
   return `<div class="match">
     <div class="match-row">
       <span class="p-group">${nameLink(m.p1, p1cls)}${p1Dots}</span>
@@ -370,6 +374,7 @@ function matchRow(m){
       <span class="bo-tag">Bo${m.bo}</span>
     </div>
     ${lowerBody}
+    ${replayLink}
   </div>`;
 }
 
