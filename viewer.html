@@ -200,7 +200,7 @@ async function doGateLogin(){
   if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
   const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
   if(!result.ok){
-    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registado pelo organizador.'
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registrado pelo organizador.'
       : result.reason==='wrongpass' ? 'Password incorreta.'
       : 'Erro ao ligar à base de dados.';
     errEl.style.display = 'block';
@@ -362,8 +362,9 @@ function matchRow(m){
     ? `<a class="p ${cls}" style="text-decoration:none;color:inherit;" href="perfil.html?jogador=${encodeURIComponent(n)}" onmouseover="showHoverCard(event,'${n.replace(/'/g,"\\'")}')" onmousemove="positionHoverCard(event)" onmouseout="hideHoverCard()">${escapeHtml(n)}</a>`
     : `<span class="p">—</span>`;
 
-  const replayLink = m.replayUrl
-    ? `<div style="margin-top:8px;"><a href="${escapeHtml(m.replayUrl)}" target="_blank" style="font-size:11px;color:var(--tera-cyan);text-decoration:none;font-family:'Chakra Petch',sans-serif;border:1px solid var(--line);padding:5px 10px;border-radius:6px;">▶ Ver replay</a></div>`
+  const replayUrls = m.replayUrls || (m.replayUrl ? [m.replayUrl] : []);
+  const replayLink = replayUrls.some(u=>u)
+    ? `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">${replayUrls.map((u,i)=> u ? `<a href="${escapeHtml(u)}" target="_blank" style="font-size:11px;color:var(--tera-cyan);text-decoration:none;font-family:'Chakra Petch',sans-serif;border:1px solid var(--line);padding:5px 10px;border-radius:6px;">▶ ${replayUrls.length>1 ? 'Jogo '+(i+1) : 'Ver replay'}</a>` : '').join('')}</div>`
     : '';
 
   return `<div class="match">

@@ -64,6 +64,14 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 .controls input:focus,.controls select:focus{outline:none;border-color:var(--tera-cyan);}
 
 .poke-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+.pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:18px;}
+.page-btn{
+  background:var(--bg-card);border:1px solid var(--line);color:var(--text-dim);
+  padding:8px 14px;border-radius:8px;cursor:pointer;font-family:'Chakra Petch',sans-serif;font-size:13px;
+}
+.page-btn:hover:not(:disabled){border-color:var(--tera-cyan);color:var(--tera-cyan);}
+.page-btn:disabled{opacity:0.35;cursor:not-allowed;}
+.page-info{font-size:12.5px;color:var(--text-dim);font-family:'Chakra Petch',sans-serif;}
 .poke-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
 .poke-name{font-family:'Chakra Petch',sans-serif;font-size:15px;font-weight:700;margin-bottom:8px;}
 .poke-stat-row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-dim);margin-bottom:4px;}
@@ -159,8 +167,8 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
     <div class="card">
       <h2>Pokémon</h2>
       <div class="controls">
-        <input type="text" id="searchBox" placeholder="Procurar Pokémon..." oninput="renderPokemonList()">
-        <select id="sortSelect" onchange="renderPokemonList()">
+        <input type="text" id="searchBox" placeholder="Procurar Pokémon..." oninput="onPokemonFilterChange()">
+        <select id="sortSelect" onchange="onPokemonFilterChange()">
           <option value="total_desc">Mais usados</option>
           <option value="total_asc">Menos usados</option>
           <option value="free_desc">Mais como escolha livre</option>
@@ -168,6 +176,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
         </select>
       </div>
       <div id="pokeGrid" class="poke-grid"></div>
+      <div id="pokePagination" class="pagination"></div>
     </div>
   </div>
 
@@ -180,8 +189,8 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
     <div class="card">
       <h2>Jogadores</h2>
       <div class="controls">
-        <input type="text" id="playerSearchBox" placeholder="Procurar jogador..." oninput="renderPlayerList()">
-        <select id="playerSortSelect" onchange="renderPlayerList()">
+        <input type="text" id="playerSearchBox" placeholder="Procurar jogador..." oninput="onPlayerFilterChange()">
+        <select id="playerSortSelect" onchange="onPlayerFilterChange()">
           <option value="elo_desc">Ranking (Elo)</option>
           <option value="wins_desc">Mais vitórias</option>
           <option value="winrate_desc">Melhor winrate</option>
@@ -191,6 +200,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
         </select>
       </div>
       <div id="playerGrid"></div>
+      <div id="playerPagination" class="pagination"></div>
     </div>
   </div>
 
@@ -215,7 +225,7 @@ async function doGateLogin(){
   if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
   const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
   if(!result.ok){
-    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registado pelo organizador.'
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registrado pelo organizador.'
       : result.reason==='wrongpass' ? 'Password incorreta.'
       : 'Erro ao ligar à base de dados.';
     errEl.style.display = 'block';
@@ -390,8 +400,22 @@ function renderHighlights(){
   card.innerHTML = html;
 }
 
+const POKEMON_PAGE_SIZE = 12;
+let pokemonPage = 1;
+
+function onPokemonFilterChange(){
+  pokemonPage = 1;
+  renderPokemonList();
+}
+
+function changePokemonPage(delta){
+  pokemonPage += delta;
+  renderPokemonList();
+}
+
 function renderPokemonList(){
   const grid = document.getElementById('pokeGrid');
+  const pagination = document.getElementById('pokePagination');
   const search = document.getElementById('searchBox').value.trim().toLowerCase();
   const sortBy = document.getElementById('sortSelect').value;
 
@@ -405,17 +429,23 @@ function renderPokemonList(){
 
   if(!entries.length){
     grid.innerHTML = '<div class="empty-state">Nenhum Pokémon encontrado.</div>';
+    pagination.innerHTML = '';
     return;
   }
 
-  grid.innerHTML = entries.map(([name, st])=>{
+  const totalPages = Math.max(1, Math.ceil(entries.length / POKEMON_PAGE_SIZE));
+  if(pokemonPage > totalPages) pokemonPage = totalPages;
+  if(pokemonPage < 1) pokemonPage = 1;
+  const pageEntries = entries.slice((pokemonPage-1)*POKEMON_PAGE_SIZE, pokemonPage*POKEMON_PAGE_SIZE);
+
+  grid.innerHTML = pageEntries.map(([name, st])=>{
     const freePct = Math.round((st.free/st.total)*100);
     const overallPct = totalSlots ? ((st.total/totalSlots)*100).toFixed(1) : '0';
     const topAbility = Object.entries(st.abilities).sort((a,b)=>b[1]-a[1])[0];
     const topMoves = Object.entries(st.moves).sort((a,b)=>b[1]-a[1]).slice(0,4);
     const movesHtml = topMoves.length
       ? topMoves.map(([mv,c])=>`<span class="move-chip">${escapeHtml(mv)} <b>${c}x</b></span>`).join('')
-      : '<span style="font-size:11.5px;color:var(--text-faint);">Sem golpes registados</span>';
+      : '<span style="font-size:11.5px;color:var(--text-faint);">Sem golpes registrados</span>';
 
     return `<div class="poke-card">
       <div class="poke-name">${escapeHtml(name)}</div>
@@ -429,6 +459,12 @@ function renderPokemonList(){
       </div>
     </div>`;
   }).join('');
+
+  pagination.innerHTML = `
+    <button class="page-btn" onclick="changePokemonPage(-1)" ${pokemonPage<=1 ? 'disabled' : ''}>← Anterior</button>
+    <span class="page-info">Página ${pokemonPage} de ${totalPages} (${entries.length} Pokémon)</span>
+    <button class="page-btn" onclick="changePokemonPage(1)" ${pokemonPage>=totalPages ? 'disabled' : ''}>Próxima →</button>
+  `;
 }
 
 let playerStats = {};
@@ -464,8 +500,22 @@ function renderPlayerHighlights(){
   card.innerHTML = html;
 }
 
+const PLAYER_PAGE_SIZE = 12;
+let playerPage = 1;
+
+function onPlayerFilterChange(){
+  playerPage = 1;
+  renderPlayerList();
+}
+
+function changePlayerPage(delta){
+  playerPage += delta;
+  renderPlayerList();
+}
+
 function renderPlayerList(){
   const grid = document.getElementById('playerGrid');
+  const pagination = document.getElementById('playerPagination');
   const search = document.getElementById('playerSearchBox').value.trim().toLowerCase();
   const sortBy = document.getElementById('playerSortSelect').value;
 
@@ -485,10 +535,16 @@ function renderPlayerList(){
 
   if(!entries.length){
     grid.innerHTML = '<div class="empty-state">Nenhum jogador encontrado.</div>';
+    pagination.innerHTML = '';
     return;
   }
 
-  grid.innerHTML = entries.map(([name, st])=>{
+  const totalPages = Math.max(1, Math.ceil(entries.length / PLAYER_PAGE_SIZE));
+  if(playerPage > totalPages) playerPage = totalPages;
+  if(playerPage < 1) playerPage = 1;
+  const pageEntries = entries.slice((playerPage-1)*PLAYER_PAGE_SIZE, playerPage*PLAYER_PAGE_SIZE);
+
+  grid.innerHTML = pageEntries.map(([name, st])=>{
     const matchesPlayed = st.wins + st.losses;
     const winrate = matchesPlayed ? Math.round((st.wins/matchesPlayed)*100) : 0;
     const titleChips = Object.entries(st.titlesByTier).map(([tier,c])=>`<span class="title-chip">🏆 ${escapeHtml(tier)} x${c}</span>`).join('');
@@ -526,6 +582,12 @@ function renderPlayerList(){
       </details>
     </div>`;
   }).join('');
+
+  pagination.innerHTML = `
+    <button class="page-btn" onclick="changePlayerPage(-1)" ${playerPage<=1 ? 'disabled' : ''}>← Anterior</button>
+    <span class="page-info">Página ${playerPage} de ${totalPages} (${entries.length} jogador(es))</span>
+    <button class="page-btn" onclick="changePlayerPage(1)" ${playerPage>=totalPages ? 'disabled' : ''}>Próxima →</button>
+  `;
 }
 
 pageBoot();

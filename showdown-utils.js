@@ -94,7 +94,7 @@ function aggregatePlayers(rows){
     });
 
     players.forEach(p=>{
-      let resultLabel = 'Sem partidas registadas';
+      let resultLabel = 'Sem partidas registradas';
       let isChamp = false;
       if(champion === p){
         resultLabel = 'Campeão';
@@ -115,7 +115,7 @@ function aggregatePlayers(rows){
           label: m.label,
           opponent: m.p1===p ? m.p2 : m.p1,
           won: m.winner === p,
-          replayUrl: m.replayUrl || null
+          replayUrls: m.replayUrls || (m.replayUrl ? [m.replayUrl] : [])
         }));
       playerStats[p].tournaments.push({ name: tName, tier, createdAt, result: resultLabel, isChamp, matches: playerMatches });
     });
@@ -327,7 +327,7 @@ function buildHoverCardHtml(name, playerStats, playerProfiles, currentTrophies, 
   const trophy = trophyEmojiFor(name, currentTrophies);
   const elo = eloRatings ? (eloRatings[name] || 1000) : null;
 
-  let statsLine = 'Ainda sem torneios registados.';
+  let statsLine = 'Ainda sem torneios registrados.';
   if(st){
     const total = st.wins + st.losses;
     const wr = total ? Math.round((st.wins/total)*100) : 0;

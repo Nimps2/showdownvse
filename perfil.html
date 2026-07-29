@@ -129,7 +129,7 @@ async function doGateLogin(){
   if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
   const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
   if(!result.ok){
-    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registado pelo organizador.'
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registrado pelo organizador.'
       : result.reason==='wrongpass' ? 'Password incorreta.'
       : 'Erro ao ligar à base de dados.';
     errEl.style.display = 'block';
@@ -220,7 +220,7 @@ function renderProfile(){
 
   const st = playerStats[name];
   if(!st){
-    container.innerHTML = '<div class="card"><div class="empty-state">Ainda não há torneios registados para este jogador.</div></div>';
+    container.innerHTML = '<div class="card"><div class="empty-state">Ainda não há torneios registrados para este jogador.</div></div>';
     return;
   }
   const matchesPlayed = st.wins + st.losses;
@@ -237,7 +237,9 @@ function renderProfile(){
     const cls = t.isChamp ? 'champ' : (t.result.startsWith('Eliminado') ? 'elim' : '');
     const matchLines = (t.matches || []).map(m=>{
       const resultTxt = m.won ? 'Venceu' : 'Perdeu';
-      const replayHtml = m.replayUrl ? ` · <a href="${escapeHtml(m.replayUrl)}" target="_blank" style="color:var(--tera-cyan);text-decoration:none;">▶ replay</a>` : '';
+      const replayHtml = (m.replayUrls||[]).some(u=>u)
+        ? ' · ' + m.replayUrls.map((u,i)=> u ? `<a href="${escapeHtml(u)}" target="_blank" style="color:var(--tera-cyan);text-decoration:none;">▶ ${m.replayUrls.length>1 ? 'jogo '+(i+1) : 'replay'}</a>` : '').join(' ')
+        : '';
       return `<div style="font-size:11px;color:var(--text-faint);padding-left:8px;margin-top:2px;">${escapeHtml(m.label)}: ${resultTxt} vs ${escapeHtml(m.opponent)}${replayHtml}</div>`;
     }).join('');
     return `<div class="history-row" style="flex-direction:column;align-items:stretch;gap:2px;">
