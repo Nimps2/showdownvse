@@ -13,6 +13,16 @@
   --line:#262c3e; --tera-cyan:#4fd8d0; --tera-violet:#a56bf0; --tera-amber:#f0b64f;
   --text-main:#e9ecf5; --text-dim:#8b91a8; --text-faint:#565d78; --success:#5ed890;
 }
+body.light-theme{
+  --bg-void:#f5f6fa; --bg-panel:#ffffff; --bg-card:#eef0f6; --bg-code:#e4e7f0;
+  --line:#dcdfe8; --tera-cyan:#0e9488; --tera-violet:#7c4dc4; --tera-amber:#b8860b;
+  --text-main:#1a1d29; --text-dim:#4a5068; --text-faint:#8890a8; --success:#1a9d5c;
+}
+.theme-toggle{
+  position:fixed;top:16px;right:16px;z-index:900;background:var(--bg-panel);border:1px solid var(--line);
+  color:var(--text-main);width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:16px;
+}
+.theme-toggle:hover{border-color:var(--tera-cyan);}
 *{box-sizing:border-box;}
 body{
   margin:0;background:var(--bg-void);
@@ -121,6 +131,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
 </style>
 </head>
 <body>
+<button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro">🌙</button>
 <div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
   <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
     <h2>Entrar</h2>
@@ -139,7 +150,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
     <div><h1>Torneio Showdown — Bracket & Sorteio</h1></div>
   </div>
   <div class="subtitle">Página só de visualização — vê o bracket ao vivo e os seus Pokémon sorteados.</div>
-  <div class="subtitle" style="margin-top:-14px;"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="estatisticas.html">Ver estatísticas</a> &nbsp;|&nbsp; <a class="nav-link" href="perfil.html">Perfil de jogador →</a></div>
+  <div class="subtitle" style="margin-top:-14px;"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="estatisticas.html">Ver estatísticas</a> &nbsp;|&nbsp; <a class="nav-link" href="perfil.html">Perfil de jogador</a> &nbsp;|&nbsp; <a class="nav-link" href="hall-da-fama.html">Hall da Fama →</a></div>
 
   <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
   <div class="subtitle" style="margin-top:-14px;">Ligado como <b id="loggedInNameTop" style="color:var(--tera-cyan);"></b> — <a href="#" class="nav-link" onclick="doPlayerLogout(); return false;">Trocar jogador</a></div>
@@ -166,6 +177,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
 
 <script src="showdown-utils.js"></script>
 <script>
+initTheme();
 // SUPABASE_URL e SUPABASE_ANON_KEY são definidos no próximo bloco de script,
 // mas como scripts <script> no mesmo documento partilham o mesmo escopo global,
 // já estão disponíveis por altura em que estas funções correm (após o load).

@@ -348,6 +348,26 @@ function buildHoverCardHtml(name, playerStats, playerProfiles, currentTrophies, 
   `;
 }
 
+// ---------- Tema claro/escuro ----------
+// Compartilhado por todas as páginas hospedadas. A preferência fica guardada
+// no browser (localStorage), por isso persiste entre visitas e entre páginas
+// do mesmo site.
+function updateThemeIcon(){
+  const btn = document.getElementById('themeToggleBtn');
+  if(btn) btn.textContent = document.body.classList.contains('light-theme') ? '☀️' : '🌙';
+}
+function initTheme(){
+  if(localStorage.getItem('site_theme') === 'light'){
+    document.body.classList.add('light-theme');
+  }
+  updateThemeIcon();
+}
+function toggleTheme(){
+  document.body.classList.toggle('light-theme');
+  localStorage.setItem('site_theme', document.body.classList.contains('light-theme') ? 'light' : 'dark');
+  updateThemeIcon();
+}
+
 // ---------- Elo (classificação de força) ----------
 // Calcula a classificação Elo de cada jogador a partir de todo o histórico de
 // partidas, em ordem cronológica. Base = 1000, K-factor = 32 (valor padrão

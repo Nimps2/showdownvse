@@ -13,6 +13,16 @@
   --line:#262c3e; --tera-cyan:#4fd8d0; --tera-violet:#a56bf0; --tera-amber:#f0b64f;
   --text-main:#e9ecf5; --text-dim:#8b91a8; --text-faint:#565d78; --success:#5ed890; --danger:#e0607a;
 }
+body.light-theme{
+  --bg-void:#f5f6fa; --bg-panel:#ffffff; --bg-card:#eef0f6; --bg-code:#e4e7f0;
+  --line:#dcdfe8; --tera-cyan:#0e9488; --tera-violet:#7c4dc4; --tera-amber:#b8860b;
+  --text-main:#1a1d29; --text-dim:#4a5068; --text-faint:#8890a8; --success:#1a9d5c; --danger:#c23f5a;
+}
+.theme-toggle{
+  position:fixed;top:16px;right:16px;z-index:900;background:var(--bg-panel);border:1px solid var(--line);
+  color:var(--text-main);width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:16px;
+}
+.theme-toggle:hover{border-color:var(--tera-cyan);}
 *{box-sizing:border-box;}
 body{
   margin:0;background:var(--bg-void);
@@ -131,7 +141,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 </style>
 </head>
 <body>
-
+<button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro">🌙</button>
 <div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
   <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
     <h2>Entrar</h2>
@@ -149,7 +159,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
     <div class="crystal"></div>
     <div><h1>Estatísticas</h1></div>
   </div>
-  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="viewer.html">Ver bracket da semana</a> &nbsp;|&nbsp; <a class="nav-link" href="perfil.html">Perfil de jogador →</a></div>
+  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="viewer.html">Ver bracket da semana</a> &nbsp;|&nbsp; <a class="nav-link" href="perfil.html">Perfil de jogador</a> &nbsp;|&nbsp; <a class="nav-link" href="hall-da-fama.html">Hall da Fama →</a></div>
   <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
   <div class="subtitle" style="margin-top:-14px;">Ligado como <b id="loggedInNameTop" style="color:var(--tera-cyan);"></b> — <a href="#" class="nav-link" onclick="doPlayerLogout(); return false;">Trocar jogador</a></div>
 
@@ -167,6 +177,9 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
     <div class="card">
       <h2>Pokémon</h2>
       <div class="controls">
+        <select id="tierFilterSelect" onchange="onPokemonTierFilterChange()">
+          <option value="">Todos os tiers</option>
+        </select>
         <input type="text" id="searchBox" placeholder="Procurar Pokémon..." oninput="onPokemonFilterChange()">
         <select id="sortSelect" onchange="onPokemonFilterChange()">
           <option value="total_desc">Mais usados</option>
@@ -211,6 +224,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 
 <script src="showdown-utils.js"></script>
 <script>
+initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
 
@@ -305,12 +319,16 @@ let globalMoves = {};
 let totalTournaments = 0;
 let totalSlots = 0;
 
+let allTournamentRows = [];
+
 async function init(){
   try{
     const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows = await res.json();
+    allTournamentRows = rows;
     setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
+    populateTierFilter(rows);
     aggregate(rows);
     playerStats = aggregatePlayers(rows);
     playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -325,6 +343,22 @@ async function init(){
     document.getElementById('highlightsCard').innerHTML = '<h2>Resumo geral</h2><div class="empty-state">Erro ao carregar dados.</div>';
     document.getElementById('playerHighlightsCard').innerHTML = '<h2>Resumo geral</h2><div class="empty-state">Erro ao carregar dados.</div>';
   }
+}
+
+function populateTierFilter(rows){
+  const sel = document.getElementById('tierFilterSelect');
+  if(!sel) return;
+  const tiers = Array.from(new Set(rows.map(r=>r.tier).filter(t=>t))).sort();
+  sel.innerHTML = '<option value="">Todos os tiers</option>' + tiers.map(t=>`<option value="${t}">${t}</option>`).join('');
+}
+
+function onPokemonTierFilterChange(){
+  const tier = document.getElementById('tierFilterSelect').value;
+  const filtered = tier ? allTournamentRows.filter(r=>r.tier===tier) : allTournamentRows;
+  aggregate(filtered);
+  pokemonPage = 1;
+  renderHighlights();
+  renderPokemonList();
 }
 
 function switchStatsTab(tab){
