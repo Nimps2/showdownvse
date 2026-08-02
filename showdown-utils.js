@@ -188,14 +188,20 @@ async function fetchRegisteredPlayerNames(supabaseUrl, supabaseAnonKey){
   return rows.map(r=>r.name);
 }
 
-// ---------- Perfil: apelido, foto (por link) e mensagem de estado ----------
-// Devolve um mapa { nomeReal: {nickname, photo_url, status_message} } para todos os jogadores.
+// ---------- Perfil: apelido, foto (por link), mensagem de estado, moedas e personalização ----------
+// Devolve um mapa { nomeReal: {nickname, photo_url, status_message, coins, ownedCosmetics, equippedBackground, equippedAccent} }.
 async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
-  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent`, {headers: sbAuthHeaders(supabaseAnonKey)});
   if(!res.ok) return {};
   const rows = await res.json();
   const map = {};
-  rows.forEach(r=>{ map[r.name] = { nickname: r.nickname || null, photo_url: r.photo_url || null, status_message: r.status_message || null }; });
+  rows.forEach(r=>{
+    map[r.name] = {
+      nickname: r.nickname || null, photo_url: r.photo_url || null, status_message: r.status_message || null,
+      coins: r.coins || 0, ownedCosmetics: r.owned_cosmetics || [],
+      equippedBackground: r.equipped_background || null, equippedAccent: r.equipped_accent || null
+    };
+  });
   return map;
 }
 
@@ -208,14 +214,72 @@ async function updatePlayerProfile(supabaseUrl, supabaseAnonKey, name, nickname,
   return res.ok;
 }
 
-// Devolve HTML de um avatar: <img> se houver photo_url, senão um círculo com as iniciais.
-function avatarHtml(name, photoUrl, sizePx){
+// ---------- Loja de personalização (fundos e cores) ----------
+const COSMETIC_CATALOG = {
+  backgrounds: [
+    { id:'bg_default',  name:'Padrão',       price:0,   css:'linear-gradient(135deg,#a56bf0,#4fd8d0)' },
+    { id:'bg_sunset',   name:'Pôr do Sol',   price:50,  css:'linear-gradient(135deg,#f0b64f,#e0607a)' },
+    { id:'bg_ocean',    name:'Oceano',       price:50,  css:'linear-gradient(135deg,#0e9488,#4fd8d0)' },
+    { id:'bg_galaxy',   name:'Galáxia',      price:80,  css:'linear-gradient(135deg,#7c4dc4,#1a1d29)' },
+    { id:'bg_fire',     name:'Fogo',         price:80,  css:'linear-gradient(135deg,#e0607a,#f0b64f)' },
+    { id:'bg_gold',     name:'Ouro Puro',    price:150, css:'linear-gradient(135deg,#f0b64f,#b8860b)' }
+  ],
+  accents: [
+    { id:'accent_default', name:'Ciano (padrão)', price:0,  color:'#4fd8d0' },
+    { id:'accent_violet',  name:'Violeta',        price:30, color:'#a56bf0' },
+    { id:'accent_amber',   name:'Âmbar',          price:30, color:'#f0b64f' },
+    { id:'accent_rose',    name:'Rosa',           price:30, color:'#e0607a' },
+    { id:'accent_emerald', name:'Esmeralda',      price:50, color:'#5ed890' }
+  ]
+};
+
+function getCosmeticById(id){
+  if(!id) return null;
+  return COSMETIC_CATALOG.backgrounds.find(c=>c.id===id) || COSMETIC_CATALOG.accents.find(c=>c.id===id) || null;
+}
+
+// Devolve {ok, reason} — 'insufficient' (moedas a menos) | 'alreadyowned' | 'notfound' | true
+async function buyCosmetic(supabaseUrl, supabaseAnonKey, name, cosmeticId){
+  const item = getCosmeticById(cosmeticId);
+  if(!item) return {ok:false, reason:'notfound'};
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins,owned_cosmetics`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const rows = await res.json();
+  if(!rows || !rows[0]) return {ok:false, reason:'notfound'};
+  const current = rows[0];
+  const owned = current.owned_cosmetics || [];
+  if(owned.includes(cosmeticId)) return {ok:false, reason:'alreadyowned'};
+  if((current.coins||0) < item.price) return {ok:false, reason:'insufficient'};
+
+  const newCoins = (current.coins||0) - item.price;
+  const newOwned = owned.concat([cosmeticId]);
+  const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+    method:'PATCH',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify({ coins: newCoins, owned_cosmetics: newOwned })
+  });
+  return {ok: patchRes.ok};
+}
+
+async function equipCosmetic(supabaseUrl, supabaseAnonKey, name, type, cosmeticId){
+  const field = type === 'background' ? 'equipped_background' : 'equipped_accent';
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+    method:'PATCH',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify({ [field]: cosmeticId })
+  });
+  return res.ok;
+}
+
+// Devolve HTML de um avatar: <img> se houver photo_url, senão um círculo com
+// as iniciais, usando o fundo personalizado equipado (se existir).
+function avatarHtml(name, photoUrl, sizePx, backgroundCss){
   const size = sizePx || 44;
   if(photoUrl){
     return `<img src="${photoUrl.replace(/"/g,'&quot;')}" alt="${(name||'').replace(/"/g,'&quot;')}" style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none';">`;
   }
   const initials = (name||'?').slice(0,2).toUpperCase();
-  return `<div style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-violet),var(--tera-cyan));display:flex;align-items:center;justify-content:center;font-family:'Chakra Petch',sans-serif;font-size:${Math.round(size*0.4)}px;font-weight:700;color:#0a0c14;">${initials}</div>`;
+  const bg = backgroundCss || 'linear-gradient(135deg,var(--tera-violet),var(--tera-cyan))';
+  return `<div style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;flex-shrink:0;background:${bg};display:flex;align-items:center;justify-content:center;font-family:'Chakra Petch',sans-serif;font-size:${Math.round(size*0.4)}px;font-weight:700;color:#0a0c14;">${initials}</div>`;
 }
 
 // ---------- Troféus do último torneio concluído (Ouro/Prata/Bronze) ----------
@@ -402,4 +466,24 @@ function computeEloRatings(rows){
   const rounded = {};
   Object.entries(ratings).forEach(([name, r]) => { rounded[name] = Math.round(r); });
   return rounded;
+}
+
+// ---------- Moedas: ajuste genérico (usado pelo Palpiteiro) ----------
+// amount pode ser negativo (para descontar, ex: ao apostar).
+async function adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, amount){
+  if(!name || !amount) return false;
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const rows = await res.json();
+    if(!rows || !rows[0]) return false;
+    const newCoins = Math.max(0, (rows[0].coins || 0) + amount);
+    const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+      method:'PATCH',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify({ coins: newCoins })
+    });
+    return patchRes.ok;
+  } catch(e){
+    return false;
+  }
 }

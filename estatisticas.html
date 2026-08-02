@@ -159,7 +159,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
     <div class="crystal"></div>
     <div><h1>Estatísticas</h1></div>
   </div>
-  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="viewer.html">Ver bracket da semana</a> &nbsp;|&nbsp; <a class="nav-link" href="perfil.html">Perfil de jogador</a> &nbsp;|&nbsp; <a class="nav-link" href="hall-da-fama.html">Hall da Fama →</a></div>
+  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="viewer.html">Ver bracket da semana</a> &nbsp;|&nbsp; <a class="nav-link" href="perfil.html">Perfil de jogador</a> &nbsp;|&nbsp; <a class="nav-link" href="hall-da-fama.html">Hall da Fama</a> &nbsp;|&nbsp; <a class="nav-link" href="palpites.html">Palpiteiro →</a></div>
   <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
   <div class="subtitle" style="margin-top:-14px;">Ligado como <b id="loggedInNameTop" style="color:var(--tera-cyan);"></b> — <a href="#" class="nav-link" onclick="doPlayerLogout(); return false;">Trocar jogador</a></div>
 
@@ -590,14 +590,15 @@ function renderPlayerList(){
 
     const profile = playerProfiles[name] || {};
     const displayName = profile.nickname ? profile.nickname : name;
-    const avatar = avatarHtml(name, profile.photo_url, 34);
+    const bgCosmetic = profile.equippedBackground ? getCosmeticById(profile.equippedBackground) : null;
+    const avatar = avatarHtml(name, profile.photo_url, 34, bgCosmetic ? bgCosmetic.css : null);
 
     return `<div class="player-card">
       <div class="player-card-head">
         <a href="perfil.html?jogador=${encodeURIComponent(name)}" style="display:flex;align-items:center;gap:10px;text-decoration:none;" onmouseover="showHoverCard(event,'${name.replace(/'/g,"\\'")}')" onmousemove="positionHoverCard(event)" onmouseout="hideHoverCard()">
           ${avatar}
           <span>
-            <span class="player-card-name" style="color:var(--text-main);">${trophyEmojiFor(name, currentTrophies)} ${escapeHtml(displayName)}</span>
+            <span class="player-card-name" style="color:${profile.equippedAccent && getCosmeticById(profile.equippedAccent) ? getCosmeticById(profile.equippedAccent).color : 'var(--text-main)'};">${trophyEmojiFor(name, currentTrophies)} ${escapeHtml(displayName)}</span>
             ${profile.nickname ? `<div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(name)}</div>` : ''}
           </span>
         </a>
