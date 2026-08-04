@@ -32,6 +32,12 @@ body{
   color:var(--text-main);width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:16px;
 }
 .theme-toggle:hover{border-color:var(--tera-cyan);}
+.player-corner-badge{
+  position:fixed;top:16px;left:16px;z-index:900;display:flex;align-items:center;gap:8px;
+  background:var(--bg-panel);border:1px solid var(--line);border-radius:20px;padding:5px 12px 5px 5px;
+  text-decoration:none;color:var(--text-main);font-family:'Chakra Petch',sans-serif;font-size:12.5px;font-weight:600;
+}
+.player-corner-badge:hover{border-color:var(--tera-cyan);}
 .wrap{max-width:480px;width:100%;padding:32px 20px;text-align:center;}
 .crystal{
   width:56px;height:56px;margin:0 auto 20px auto;
@@ -57,6 +63,7 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
 </head>
 <body>
 <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro">🌙</button>
+<div id="playerCornerContainer"></div>
 <div class="wrap">
   <div class="crystal"></div>
   <h1>Torneio Showdown - VSE</h1>
@@ -75,14 +82,6 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
     <div class="nav-text">
       <h2>Estatísticas</h2>
       <p>Rankings e histórico de todos os torneios já disputados.</p>
-    </div>
-  </a>
-
-  <a class="nav-card" href="perfil.html">
-    <div class="nav-icon">👤</div>
-    <div class="nav-text">
-      <h2>Perfil do Jogador</h2>
-      <p>Histórico individual, vitórias, títulos e Pokémon favoritos.</p>
     </div>
   </a>
 
@@ -110,9 +109,28 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
     </div>
   </a>
 
-  <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
+  <div class="footer-note">O seu perfil fica acessível pelo ícone no canto superior esquerdo. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 <script src="showdown-utils.js"></script>
-<script>initTheme();</script>
+<script>
+initTheme();
+const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+
+async function loadCornerBadge(){
+  const savedName = localStorage.getItem('player_login_name');
+  if(!savedName){
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(null, null);
+    return;
+  }
+  try{
+    const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(savedName, profiles[savedName]);
+  } catch(e){
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(null, null);
+  }
+}
+loadCornerBadge();
+</script>
 </body>
 </html>

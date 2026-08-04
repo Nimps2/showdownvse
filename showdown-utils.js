@@ -888,7 +888,15 @@ async function spinRoulette(supabaseUrl, supabaseAnonKey, name, betAmount){
 // ---------- Ícone do jogador logado (canto da tela, leva ao perfil) ----------
 // Devolve o HTML de uma "pill" pequena com o avatar do jogador; ao clicar,
 // navega para perfil.html. Usa o mesmo avatarHtml (fundo/moldura equipados).
+// Se ninguém estiver logado ainda (name vazio), mostra um estado genérico
+// "Entrar" que também leva ao perfil (onde aparece o ecrã de login).
 function renderPlayerCornerBadge(name, profile){
+  if(!name){
+    return `<a href="perfil.html" class="player-corner-badge" title="Entrar">
+      <span style="width:28px;height:28px;border-radius:8px;background:var(--bg-card);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">👤</span>
+      <span class="player-corner-name">Entrar</span>
+    </a>`;
+  }
   profile = profile || {};
   const displayName = profile.nickname || name;
   const bgCosmetic = profile.equippedBackground ? getCosmeticById(profile.equippedBackground) : null;
