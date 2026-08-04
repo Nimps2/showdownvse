@@ -23,6 +23,12 @@ body.light-theme{
   color:var(--text-main);width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:16px;
 }
 .theme-toggle:hover{border-color:var(--tera-cyan);}
+.player-corner-badge{
+  position:fixed;top:16px;left:16px;z-index:900;display:flex;align-items:center;gap:8px;
+  background:var(--bg-panel);border:1px solid var(--line);border-radius:20px;padding:5px 12px 5px 5px;
+  text-decoration:none;color:var(--text-main);font-family:'Chakra Petch',sans-serif;font-size:12.5px;font-weight:600;
+}
+.player-corner-badge:hover{border-color:var(--tera-cyan);}
 *{box-sizing:border-box;}
 body{
   margin:0;background:var(--bg-void);
@@ -132,6 +138,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
 </head>
 <body>
 <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro">🌙</button>
+<div id="playerCornerContainer"></div>
 <div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
   <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
     <h2>Entrar</h2>
@@ -150,7 +157,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
     <div><h1>Torneio Showdown — Bracket & Sorteio</h1></div>
   </div>
   <div class="subtitle">Página só de visualização — vê o bracket ao vivo e os seus Pokémon sorteados.</div>
-  <div class="subtitle" style="margin-top:-14px;"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="estatisticas.html">Ver estatísticas</a> &nbsp;|&nbsp; <a class="nav-link" href="perfil.html">Perfil de jogador</a> &nbsp;|&nbsp; <a class="nav-link" href="hall-da-fama.html">Hall da Fama</a> &nbsp;|&nbsp; <a class="nav-link" href="palpites.html">Palpiteiro →</a></div>
+  <div class="subtitle" style="margin-top:-14px;"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="estatisticas.html">Ver estatísticas</a> &nbsp;|&nbsp; <a class="nav-link" href="perfil.html">Perfil de jogador</a> &nbsp;|&nbsp; <a class="nav-link" href="hall-da-fama.html">Hall da Fama</a> &nbsp;|&nbsp; <a class="nav-link" href="loja.html">Loja</a> &nbsp;|&nbsp; <a class="nav-link" href="palpites.html">Palpiteiro →</a></div>
 
   <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
   <div class="subtitle" style="margin-top:-14px;">Ligado como <b id="loggedInNameTop" style="color:var(--tera-cyan);"></b> — <a href="#" class="nav-link" onclick="doPlayerLogout(); return false;">Trocar jogador</a></div>
@@ -296,6 +303,7 @@ async function init(){
     setStatus(true, `Conectado — ${tournaments.length} torneio(s) encontrados.`);
     playerStats = aggregatePlayers(tournaments);
     playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, playerProfiles[loggedInPlayerName]);
     currentTrophies = computeCurrentTrophies(tournaments);
     eloRatings = computeEloRatings(tournaments);
     renderTournamentSelect();

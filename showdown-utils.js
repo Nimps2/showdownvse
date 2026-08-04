@@ -191,7 +191,7 @@ async function fetchRegisteredPlayerNames(supabaseUrl, supabaseAnonKey){
 // ---------- Perfil: apelido, foto (por link), mensagem de estado, moedas e personalização ----------
 // Devolve um mapa { nomeReal: {nickname, photo_url, status_message, coins, ownedCosmetics, equippedBackground, equippedAccent} }.
 async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
-  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent,equipped_frame,equipped_name_effect,equipped_title,equipped_badges,profile_background_url,guaranteed_bye`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent,equipped_frame,equipped_name_effect,equipped_title,equipped_badges,profile_background_url,guaranteed_bye,elo_chart_unlocked`, {headers: sbAuthHeaders(supabaseAnonKey)});
   if(!res.ok) return {};
   const rows = await res.json();
   const map = {};
@@ -202,7 +202,8 @@ async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
       equippedBackground: r.equipped_background || null, equippedAccent: r.equipped_accent || null,
       equippedFrame: r.equipped_frame || null, equippedNameEffect: r.equipped_name_effect || null,
       equippedTitle: r.equipped_title || null, equippedBadges: r.equipped_badges || [],
-      profileBackgroundUrl: r.profile_background_url || null, guaranteedBye: !!r.guaranteed_bye
+      profileBackgroundUrl: r.profile_background_url || null, guaranteedBye: !!r.guaranteed_bye,
+      eloChartUnlocked: !!r.elo_chart_unlocked
     };
   });
   return map;
@@ -689,6 +690,27 @@ async function adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, amount, rea
 const SPONSORSHIP_PRICE = 200;
 const GUARANTEED_BYE_PRICE = 150;
 
+// ---------- Desbloqueio do gráfico de evolução do Elo ----------
+const ELO_CHART_PRICE = 80;
+
+// Devolve {ok, reason} — 'insufficient' | 'alreadyunlocked' | 'error' | true
+async function buyEloChartUnlock(supabaseUrl, supabaseAnonKey, name){
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins,elo_chart_unlocked`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const rows = await res.json();
+  if(!rows || !rows[0]) return {ok:false, reason:'error'};
+  if(rows[0].elo_chart_unlocked) return {ok:false, reason:'alreadyunlocked'};
+  if((rows[0].coins||0) < ELO_CHART_PRICE) return {ok:false, reason:'insufficient'};
+
+  const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, -ELO_CHART_PRICE, 'Desbloqueio do gráfico de evolução do Elo');
+  if(!ok) return {ok:false, reason:'error'};
+  await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+    method:'PATCH',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify({ elo_chart_unlocked: true })
+  });
+  return {ok:true};
+}
+
 // ---------- Bloco 3 (ajuste): preço do reroll dobra a cada pedido feito pelo
 // mesmo jogador NO MESMO torneio (30 -> 60 -> 120 -> ...), voltando ao normal
 // no torneio seguinte porque a contagem é sempre por torneio.
@@ -786,14 +808,13 @@ async function fetchTierVoteStandings(supabaseUrl, supabaseAnonKey){
 }
 
 // ---------- Bloco 4: Caixa surpresa (loot box) ----------
-// Mais barata que comprar direto na loja, mas o item sai à sorte dentro da categoria escolhida.
+// Totalmente aleatória — o jogador não escolhe nem a categoria nem o item,
+// sai à sorte de tudo (fundo, cor, moldura, efeito, título ou emblema).
 const LOOT_BOX_PRICE = 35;
+const LOOT_BOX_CATEGORIES = ['backgrounds','accents','frames','nameEffects','titles','badges'];
 
-// Devolve {ok, reason, item} — 'insufficient' | 'nooptions' | 'error' | true
-async function openLootBox(supabaseUrl, supabaseAnonKey, name, category){
-  const catalogList = COSMETIC_CATALOG[category];
-  if(!catalogList) return {ok:false, reason:'error'};
-
+// Devolve {ok, reason, item, category} — 'insufficient' | 'nooptions' | 'error' | true
+async function openLootBox(supabaseUrl, supabaseAnonKey, name){
   const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins,owned_cosmetics`, {headers: sbAuthHeaders(supabaseAnonKey)});
   const rows = await res.json();
   if(!rows || !rows[0]) return {ok:false, reason:'error'};
@@ -801,10 +822,18 @@ async function openLootBox(supabaseUrl, supabaseAnonKey, name, category){
   if((current.coins||0) < LOOT_BOX_PRICE) return {ok:false, reason:'insufficient'};
 
   const owned = current.owned_cosmetics || [];
-  const available = catalogList.filter(item => item.price > 0 && !owned.includes(item.id));
-  if(!available.length) return {ok:false, reason:'nooptions'};
+  // Junta TODOS os itens de TODAS as categorias num único conjunto, e sorteia
+  // um item qualquer entre os que o jogador ainda não tem — sem preferência
+  // de categoria, cada item individual tem a mesma chance.
+  const allAvailable = [];
+  LOOT_BOX_CATEGORIES.forEach(cat=>{
+    (COSMETIC_CATALOG[cat]||[]).forEach(item=>{
+      if(item.price > 0 && !owned.includes(item.id)) allAvailable.push({ item, category: cat });
+    });
+  });
+  if(!allAvailable.length) return {ok:false, reason:'nooptions'};
 
-  const won = available[Math.floor(Math.random()*available.length)];
+  const { item: won, category } = allAvailable[Math.floor(Math.random()*allAvailable.length)];
   const newCoins = (current.coins||0) - LOOT_BOX_PRICE;
   const newOwned = owned.concat([won.id]);
   const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
@@ -815,7 +844,7 @@ async function openLootBox(supabaseUrl, supabaseAnonKey, name, category){
   if(patchRes.ok){
     await logCoinTransaction(supabaseUrl, supabaseAnonKey, name, -LOOT_BOX_PRICE, `Caixa surpresa: ganhou ${won.name}`);
   }
-  return {ok: patchRes.ok, item: won};
+  return {ok: patchRes.ok, item: won, category};
 }
 
 // ---------- Bloco 4: Roleta simples ----------
@@ -854,4 +883,19 @@ async function spinRoulette(supabaseUrl, supabaseAnonKey, name, betAmount){
   const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, net, `Roleta: ${outcome.label}`);
   if(!ok) return {ok:false, reason:'error'};
   return {ok:true, outcome, payout};
+}
+
+// ---------- Ícone do jogador logado (canto da tela, leva ao perfil) ----------
+// Devolve o HTML de uma "pill" pequena com o avatar do jogador; ao clicar,
+// navega para perfil.html. Usa o mesmo avatarHtml (fundo/moldura equipados).
+function renderPlayerCornerBadge(name, profile){
+  profile = profile || {};
+  const displayName = profile.nickname || name;
+  const bgCosmetic = profile.equippedBackground ? getCosmeticById(profile.equippedBackground) : null;
+  const frameCosmetic = profile.equippedFrame ? getCosmeticById(profile.equippedFrame) : null;
+  const avatar = avatarHtml(name, profile.photo_url, 28, bgCosmetic ? bgCosmetic.css : null, frameCosmetic ? frameCosmetic.border : null);
+  return `<a href="perfil.html" class="player-corner-badge" title="Ver o meu perfil">
+    ${avatar}
+    <span class="player-corner-name">${escapeHtml(displayName)}</span>
+  </a>`;
 }

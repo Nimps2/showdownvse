@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loja — Torneio Showdown - VSE</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-void:#0a0c14; --bg-panel:#12151f; --bg-card:#171b28;
+  --line:#262c3e; --tera-cyan:#4fd8d0; --tera-violet:#a56bf0; --tera-amber:#f0b64f;
+  --text-main:#e9ecf5; --text-dim:#8b91a8; --text-faint:#565d78; --success:#5ed890; --danger:#e0607a;
+}
+body.light-theme{
+  --bg-void:#f5f6fa; --bg-panel:#ffffff; --bg-card:#eef0f6;
+  --line:#dcdfe8; --tera-cyan:#0e9488; --tera-violet:#7c4dc4; --tera-amber:#b8860b;
+  --text-main:#1a1d29; --text-dim:#4a5068; --text-faint:#8890a8; --success:#1a9d5c; --danger:#c23f5a;
+}
+.theme-toggle{
+  position:fixed;top:16px;right:16px;z-index:900;background:var(--bg-panel);border:1px solid var(--line);
+  color:var(--text-main);width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:16px;
+}
+.theme-toggle:hover{border-color:var(--tera-cyan);}
+.player-corner-badge{
+  position:fixed;top:16px;left:16px;z-index:900;display:flex;align-items:center;gap:8px;
+  background:var(--bg-panel);border:1px solid var(--line);border-radius:20px;padding:5px 12px 5px 5px;
+  text-decoration:none;color:var(--text-main);font-family:'Chakra Petch',sans-serif;font-size:12.5px;font-weight:600;
+}
+.player-corner-badge:hover{border-color:var(--tera-cyan);}
+*{box-sizing:border-box;}
+body{
+  margin:0;background:var(--bg-void);
+  background-image:radial-gradient(circle at 15% 8%, rgba(165,107,240,0.10), transparent 40%),
+    radial-gradient(circle at 85% 92%, rgba(79,216,208,0.08), transparent 40%);
+  color:var(--text-main);font-family:'Inter',sans-serif;min-height:100vh;padding:0 0 60px 0;
+  transition:background-color .2s, color .2s;
+}
+.wrap{max-width:820px;margin:0 auto;padding:32px 20px;}
+.header{display:flex;align-items:center;gap:16px;margin-bottom:8px;}
+.crystal{width:38px;height:38px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));
+  clip-path:polygon(50% 0%, 100% 30%, 82% 100%, 18% 100%, 0% 30%);}
+h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0;letter-spacing:0.5px;}
+.subtitle{color:var(--text-dim);font-size:13px;margin:14px 0 6px 0;}
+.nav-link{color:var(--tera-cyan);font-size:12.5px;text-decoration:none;font-family:'Chakra Petch',sans-serif;}
+.nav-link:hover{text-decoration:underline;}
+.status-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);margin:14px 0 20px 0;}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
+.status-dot.on{background:var(--success);}
+.status-dot.off{background:var(--danger);}
+
+.card{background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px;}
+.card h2{font-family:'Chakra Petch',sans-serif;font-size:15px;margin:0 0 14px 0;color:var(--text-main);
+  display:flex;align-items:center;gap:8px;}
+.card h2::before{content:'';width:4px;height:15px;background:var(--tera-violet);border-radius:2px;}
+select,input[type=text],input[type=password],input[type=number]{width:100%;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);
+  border-radius:8px;color:var(--text-main);font-family:'Inter',sans-serif;font-size:14px;margin-bottom:6px;}
+select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
+.btn-primary{
+  width:100%;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));color:#0a0c14;
+  border:none;padding:11px 20px;border-radius:8px;font-family:'Chakra Petch',sans-serif;font-weight:700;
+  font-size:13.5px;cursor:pointer;margin-top:4px;
+}
+.btn-primary:disabled{opacity:0.4;cursor:not-allowed;}
+
+.coin-banner{
+  display:flex;align-items:center;justify-content:space-between;background:var(--bg-panel);
+  border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:18px;
+}
+.coin-banner b{color:var(--tera-amber);font-family:'Chakra Petch',sans-serif;font-size:16px;}
+
+.tabs{display:flex;gap:2px;margin-bottom:20px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+.tab-btn{
+  flex:1;min-width:110px;padding:12px 10px;background:none;border:none;color:var(--text-faint);
+  font-family:'Chakra Petch',sans-serif;font-size:13px;font-weight:600;
+  cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;letter-spacing:0.3px;
+}
+.tab-btn:hover{color:var(--text-dim);}
+.tab-btn.active{color:var(--tera-cyan);border-bottom-color:var(--tera-cyan);}
+.shop-panel{display:none;}
+.shop-panel.active{display:block;}
+
+.shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;}
+.shop-item{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center;}
+.shop-swatch{width:100%;height:36px;border-radius:8px;margin-bottom:8px;}
+.shop-item-name{font-size:11px;color:var(--text-dim);margin-bottom:8px;}
+.shop-btn{
+  width:100%;font-size:10.5px;padding:6px;border-radius:6px;background:var(--bg-panel);
+  border:1px solid var(--line);color:var(--text-dim);cursor:pointer;font-family:'Chakra Petch',sans-serif;
+}
+.shop-btn:hover:not(:disabled){border-color:var(--tera-cyan);color:var(--tera-cyan);}
+.shop-btn:disabled{cursor:not-allowed;}
+
+.history-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--text-dim);
+  padding:8px 0;gap:8px;border-bottom:1px solid var(--line);}
+.history-row:last-child{border-bottom:none;}
+
+.empty-state{color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;}
+.footer-note{color:var(--text-faint);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.5;}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro">🌙</button>
+<div id="playerCornerContainer"></div>
+
+<div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
+    <h2>Entrar</h2>
+    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Nome</label>
+    <select id="gateNameSelect"><option value="">— carregando jogadores —</option></select>
+    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Password</label>
+    <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()">
+    <button class="btn-primary" onclick="doGateLogin()">Entrar</button>
+    <div id="gateError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;"></div>
+  </div>
+</div>
+
+<div id="mainContent" class="wrap" style="display:none;">
+  <div class="header">
+    <div class="crystal"></div>
+    <div><h1>Loja</h1></div>
+  </div>
+  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="perfil.html">Meu perfil</a> &nbsp;|&nbsp; <a class="nav-link" href="palpites.html">Palpiteiro →</a></div>
+  <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
+
+  <div class="coin-banner">
+    <span>Seu saldo</span>
+    <b id="myCoinsDisplay">🪙 0</b>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchShopTab('personalizacao')">Personalização</button>
+    <button class="tab-btn" onclick="switchShopTab('vantagens')">Vantagens</button>
+    <button class="tab-btn" onclick="switchShopTab('social')">Social</button>
+    <button class="tab-btn" onclick="switchShopTab('sorte')">Sorte</button>
+  </div>
+
+  <!-- ==================== PERSONALIZAÇÃO ==================== -->
+  <div id="panel-personalizacao" class="shop-panel active">
+    <div class="card">
+      <h2>🎁 Caixa Surpresa</h2>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">🪙<span id="lootBoxPriceLabel">?</span> por um item totalmente aleatório — pode ser qualquer fundo, cor, moldura, efeito, título ou emblema que você ainda não tenha. Você não escolhe o quê, só a sorte decide.</div>
+      <button class="btn-primary" onclick="doOpenLootBox()">Abrir caixa</button>
+      <div id="lootBoxResult" style="margin-top:12px;font-size:13px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>🛍️ Comprar diretamente</h2>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Fundos do avatar</div>
+      <div class="shop-grid" id="shopBackgrounds"></div>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Cor de destaque</div>
+      <div class="shop-grid" id="shopAccents"></div>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Moldura do avatar</div>
+      <div class="shop-grid" id="shopFrames"></div>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Efeito no nome</div>
+      <div class="shop-grid" id="shopNameEffects"></div>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Título</div>
+      <div class="shop-grid" id="shopTitles"></div>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Emblemas</div>
+      <div class="shop-grid" id="shopBadges"></div>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Fundo de perfil (foto)</div>
+      <div id="shopCustomBg"></div>
+      <div class="footer-note" style="margin-top:14px;">Para equipar o que já possui, vá ao seu <a class="nav-link" href="perfil.html">perfil</a> e clique em "Customizar".</div>
+    </div>
+  </div>
+
+  <!-- ==================== VANTAGENS ==================== -->
+  <div id="panel-vantagens" class="shop-panel">
+    <div class="card">
+      <h2>📣 Patrocinar o torneio da semana</h2>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">O seu nome (e uma mensagem opcional) aparece em destaque no próximo anúncio de campeão no Discord. Custa 🪙<span id="sponsorshipPriceLabel">?</span>.</div>
+      <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Mensagem (opcional)</label>
+      <input type="text" id="sponsorMessage" placeholder="Ex: Boa sorte a todos!" maxlength="200">
+      <button class="btn-primary" onclick="doBuySponsorship()">Patrocinar agora</button>
+    </div>
+
+    <div class="card">
+      <h2>🎫 Garantia de bye no Play-in</h2>
+      <div id="guaranteedByeInfo" style="font-size:12px;color:var(--text-dim);margin-bottom:10px;"></div>
+      <button class="btn-primary" id="guaranteedByeBtn" onclick="doBuyGuaranteedBye()">Comprar garantia</button>
+    </div>
+
+    <div class="card">
+      <h2>📈 Desbloquear gráfico de evolução do Elo</h2>
+      <div id="eloChartInfo" style="font-size:12px;color:var(--text-dim);margin-bottom:10px;"></div>
+      <button class="btn-primary" id="eloChartBtn" onclick="doBuyEloChart()">Desbloquear</button>
+    </div>
+
+    <div class="card">
+      <h2>🗳️ Votar no tier da próxima semana</h2>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">Financie o tier que quer jogar a seguir — quem juntar mais moedas num tier tem mais peso na escolha do organizador. Só entram os tiers que ainda faltam no ciclo atual.</div>
+      <select id="tierVoteSelect"></select>
+      <input type="number" id="tierVoteAmount" placeholder="Quantas moedas?" min="1">
+      <button class="btn-primary" onclick="doCastTierVote()">Votar</button>
+      <div style="margin-top:14px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">Votação atual</div>
+      <div id="tierVoteStandingsList"><div class="empty-state">A carregar…</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== SOCIAL ==================== -->
+  <div id="panel-social" class="shop-panel">
+    <div class="card">
+      <h2>🎁 Presentear moedas</h2>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">Escolha um jogador e envie moedas suas para ele.</div>
+      <select id="giftTargetSelect"></select>
+      <input type="number" id="giftAmount" placeholder="Quantas moedas?" min="1">
+      <button class="btn-primary" onclick="doGiftCoins()">Enviar</button>
+    </div>
+
+    <div class="card">
+      <h2>💝 Ranking de Generosidade</h2>
+      <div id="generosityList"><div class="empty-state">A carregar…</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== SORTE ==================== -->
+  <div id="panel-sorte" class="shop-panel">
+    <div class="card">
+      <h2>🎰 Roleta</h2>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Aposte moedas e gire — pode perder tudo, ganhar de volta parte, ou multiplicar até 5x. É pura sorte, sem ligação com o resultado de nenhuma partida.</div>
+      <input type="number" id="rouletteBet" placeholder="Quantas moedas apostar?" min="1">
+      <button class="btn-primary" onclick="doSpinRoulette()">Girar</button>
+      <div id="rouletteResult" style="margin-top:12px;font-size:13px;"></div>
+    </div>
+  </div>
+
+  <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
+</div>
+
+<script src="showdown-utils.js"></script>
+<script>
+initTheme();
+document.getElementById('lootBoxPriceLabel').textContent = LOOT_BOX_PRICE;
+document.getElementById('sponsorshipPriceLabel').textContent = SPONSORSHIP_PRICE;
+const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+
+let loggedInPlayerName = null;
+let playerProfiles = {};
+let allRows = [];
+let remainingTiers = [];
+let tierVoteStandings = [];
+let generosityRanking = [];
+
+async function doGateLogin(){
+  const name = document.getElementById('gateNameSelect').value;
+  const password = document.getElementById('gatePassword').value;
+  const errEl = document.getElementById('gateError');
+  errEl.style.display = 'none';
+  if(!name){ errEl.textContent = 'Selecione o seu nome.'; errEl.style.display='block'; return; }
+  if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
+  const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
+  if(!result.ok){
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registrado pelo organizador.'
+      : result.reason==='wrongpass' ? 'Password incorreta.'
+      : 'Erro ao ligar à base de dados.';
+    errEl.style.display = 'block';
+    return;
+  }
+  localStorage.setItem('player_login_name', name);
+  loggedInPlayerName = name;
+  unlockContent();
+}
+
+function unlockContent(){
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  init();
+}
+
+function doPlayerLogout(){
+  localStorage.removeItem('player_login_name');
+  loggedInPlayerName = null;
+  document.getElementById('gatePassword').value = '';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('authGate').style.display = 'flex';
+}
+
+async function pageBoot(){
+  const sel = document.getElementById('gateNameSelect');
+  try{
+    const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
+    names.forEach(n=>{
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+    const saved = localStorage.getItem('player_login_name');
+    if(saved && names.includes(saved)){
+      loggedInPlayerName = saved;
+      unlockContent();
+    }
+  } catch(e){
+    sel.innerHTML = '<option value="">— erro ao carregar jogadores —</option>';
+  }
+}
+
+function sbHeaders(){
+  return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+}
+function setStatus(ok, text){
+  document.getElementById('statusDot').className = 'status-dot ' + (ok?'on':'off');
+  document.getElementById('statusText').textContent = text;
+}
+
+function switchShopTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.shop-panel').forEach(p=>p.classList.remove('active'));
+  const map = {personalizacao:0, vantagens:1, social:2, sorte:3};
+  document.querySelectorAll('.tab-btn')[map[tab]].classList.add('active');
+  document.getElementById('panel-'+tab).classList.add('active');
+}
+
+async function init(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    allRows = await res.json();
+    setStatus(true, `Ligado — ${allRows.length} torneio(s) encontrados.`);
+    playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, playerProfiles[loggedInPlayerName]);
+    remainingTiers = computeRemainingTiersInCycle(allRows);
+    tierVoteStandings = await fetchTierVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY);
+    generosityRanking = await fetchGenerosityRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
+    renderAll();
+  } catch(e){
+    setStatus(false, 'Não foi possível ligar à base de dados.');
+  }
+}
+
+function renderAll(){
+  const myProfile = playerProfiles[loggedInPlayerName] || {};
+  document.getElementById('myCoinsDisplay').textContent = `🪙 ${myProfile.coins || 0}`;
+
+  // Personalização
+  document.getElementById('shopBackgrounds').innerHTML = COSMETIC_CATALOG.backgrounds.map(item => shopItemHtml(item, 'background', myProfile)).join('');
+  document.getElementById('shopAccents').innerHTML = COSMETIC_CATALOG.accents.map(item => shopItemHtml(item, 'accent', myProfile)).join('');
+  document.getElementById('shopFrames').innerHTML = COSMETIC_CATALOG.frames.map(item => shopItemHtml(item, 'frame', myProfile)).join('');
+  document.getElementById('shopNameEffects').innerHTML = COSMETIC_CATALOG.nameEffects.map(item => shopItemHtml(item, 'nameEffect', myProfile)).join('');
+  document.getElementById('shopTitles').innerHTML = COSMETIC_CATALOG.titles.map(item => shopItemHtml(item, 'title', myProfile)).join('');
+  document.getElementById('shopBadges').innerHTML = COSMETIC_CATALOG.badges.map(item => shopBadgeItemHtml(item, myProfile)).join('');
+  document.getElementById('shopCustomBg').innerHTML = shopCustomBgHtml(myProfile);
+
+  // Vantagens
+  document.getElementById('guaranteedByeInfo').innerHTML = myProfile.guaranteedBye
+    ? '✅ Já está ativa — vai ser usada automaticamente no próximo bracket gerado.'
+    : `Garante que fica de fora do Play-in no próximo torneio, independente do seu Elo. Custa 🪙${GUARANTEED_BYE_PRICE}.`;
+  document.getElementById('guaranteedByeBtn').style.display = myProfile.guaranteedBye ? 'none' : 'block';
+
+  document.getElementById('eloChartInfo').innerHTML = myProfile.eloChartUnlocked
+    ? '✅ Já desbloqueado — veja o gráfico no seu perfil.'
+    : `Desbloqueia para sempre um gráfico mostrando como o seu Elo mudou ao longo dos torneios. Custa 🪙${ELO_CHART_PRICE}.`;
+  document.getElementById('eloChartBtn').style.display = myProfile.eloChartUnlocked ? 'none' : 'block';
+
+  const tierSel = document.getElementById('tierVoteSelect');
+  tierSel.innerHTML = remainingTiers.map(t=>`<option value="${t}">${t}</option>`).join('');
+  document.getElementById('tierVoteStandingsList').innerHTML = tierVoteStandings.length
+    ? tierVoteStandings.map(([t,amt])=>`<div class="history-row"><span>${t}</span><b style="color:var(--tera-amber);">🪙 ${amt}</b></div>`).join('')
+    : '<div class="empty-state">Ainda ninguém votou.</div>';
+
+  // Social
+  const giftSel = document.getElementById('giftTargetSelect');
+  const otherNames = Object.keys(playerProfiles).filter(n=>n!==loggedInPlayerName).sort((a,b)=>a.localeCompare(b));
+  giftSel.innerHTML = '<option value="">— selecione um jogador —</option>' + otherNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  document.getElementById('generosityList').innerHTML = generosityRanking.length
+    ? generosityRanking.map(([gname, total], i)=>`<div class="history-row"><span><span style="color:var(--text-faint);font-family:'Chakra Petch',sans-serif;margin-right:8px;">#${i+1}</span>${escapeHtml(gname)}</span><b style="color:var(--tera-amber);">🪙 ${total} doado(s)</b></div>`).join('')
+    : '<div class="empty-state">Ainda ninguém presenteou moedas a outro jogador.</div>';
+}
+
+async function refreshAfterSpend(){
+  playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+  renderAll();
+}
+
+function shopItemHtml(item, type, profile){
+  const fieldMap = {
+    background: profile.equippedBackground, accent: profile.equippedAccent,
+    frame: profile.equippedFrame, nameEffect: profile.equippedNameEffect, title: profile.equippedTitle
+  };
+  const equippedId = fieldMap[type];
+  const owned = item.price === 0 || (profile.ownedCosmetics||[]).includes(item.id);
+  const equipped = equippedId ? equippedId === item.id : item.price === 0;
+
+  let swatchHtml;
+  if(type === 'background') swatchHtml = `<div class="shop-swatch" style="background:${item.css};"></div>`;
+  else if(type === 'accent') swatchHtml = `<div class="shop-swatch" style="background:${item.color};"></div>`;
+  else if(type === 'frame') swatchHtml = `<div class="shop-swatch" style="background:var(--bg-panel);border:${item.border==='none'?'2px dashed var(--line)':item.border};"></div>`;
+  else if(type === 'nameEffect') swatchHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;font-weight:700;${item.css}">Abc</div>`;
+  else if(type === 'title') swatchHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:11px;padding:4px;">${item.text ? escapeHtml(item.text) : '—'}</div>`;
+
+  let actionBtn;
+  if(owned){
+    actionBtn = `<button class="shop-btn" disabled style="opacity:0.5;">${equipped?'Equipado':'Possui'} ✓</button>`;
+  } else {
+    actionBtn = `<button class="shop-btn" onclick="doBuyCosmetic('${item.id}')">Comprar 🪙${item.price}</button>`;
+  }
+  return `<div class="shop-item">
+    ${swatchHtml}
+    <div class="shop-item-name">${escapeHtml(item.name)}</div>
+    ${actionBtn}
+  </div>`;
+}
+
+function shopBadgeItemHtml(item, profile){
+  const owned = (profile.ownedCosmetics||[]).includes(item.id);
+  return `<div class="shop-item">
+    <div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:20px;">${item.emoji}</div>
+    <div class="shop-item-name">${escapeHtml(item.name)}</div>
+    ${owned ? `<button class="shop-btn" disabled style="opacity:0.5;">Possui ✓</button>` : `<button class="shop-btn" onclick="doBuyCosmetic('${item.id}')">Comprar 🪙${item.price}</button>`}
+  </div>`;
+}
+
+function shopCustomBgHtml(profile){
+  const owned = (profile.ownedCosmetics||[]).includes('feature_custom_pagebg');
+  const item = getCosmeticById('feature_custom_pagebg');
+  if(owned){
+    return `<div class="empty-state" style="text-align:left;padding:8px 0;">✅ Já desbloqueado — defina a foto no seu <a class="nav-link" href="perfil.html">perfil</a>.</div>`;
+  }
+  return `<div class="shop-item" style="max-width:240px;">
+    <div class="shop-item-name">${escapeHtml(item.name)}</div>
+    <button class="shop-btn" onclick="doBuyCosmetic('feature_custom_pagebg')">Comprar 🪙${item.price}</button>
+  </div>`;
+}
+
+async function doBuyCosmetic(id){
+  const result = await buyCosmetic(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, id);
+  if(!result.ok){
+    const msg = result.reason==='insufficient' ? 'Moedas insuficientes para comprar este item.'
+      : result.reason==='alreadyowned' ? 'Você já possui este item.'
+      : 'Não foi possível comprar. Tente novamente.';
+    alert(msg);
+    return;
+  }
+  await refreshAfterSpend();
+}
+
+async function doOpenLootBox(){
+  const resultDiv = document.getElementById('lootBoxResult');
+  const result = await openLootBox(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+  if(!result.ok){
+    const msg = result.reason === 'insufficient' ? `Você precisa de 🪙${LOOT_BOX_PRICE} para abrir a caixa.`
+      : result.reason === 'nooptions' ? 'Você já tem todos os itens possíveis!'
+      : 'Não foi possível processar. Tente novamente.';
+    resultDiv.innerHTML = `<span style="color:var(--danger);">${msg}</span>`;
+    return;
+  }
+  resultDiv.innerHTML = `<span style="color:var(--success);font-family:'Chakra Petch',sans-serif;font-weight:700;">🎉 Ganhaste: ${escapeHtml(result.item.name)}!</span>`;
+  await refreshAfterSpend();
+}
+
+async function doBuySponsorship(){
+  const message = document.getElementById('sponsorMessage').value.trim();
+  const result = await buySponsorship(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, message);
+  if(!result.ok){
+    alert(result.reason === 'insufficient' ? `Você precisa de 🪙${SPONSORSHIP_PRICE} para patrocinar.` : 'Não foi possível processar. Tente novamente.');
+    return;
+  }
+  alert('Patrocínio confirmado! O seu nome vai aparecer no próximo anúncio de campeão no Discord.');
+  document.getElementById('sponsorMessage').value = '';
+  await refreshAfterSpend();
+}
+
+async function doBuyGuaranteedBye(){
+  const result = await buyGuaranteedBye(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+  if(!result.ok){
+    const msg = result.reason === 'insufficient' ? `Você precisa de 🪙${GUARANTEED_BYE_PRICE} para garantir o bye.`
+      : result.reason === 'alreadyactive' ? 'Você já tem uma garantia de bye ativa.'
+      : 'Não foi possível processar. Tente novamente.';
+    alert(msg);
+    return;
+  }
+  alert('Garantia de bye comprada! Vai ser usada automaticamente no próximo bracket.');
+  await refreshAfterSpend();
+}
+
+async function doBuyEloChart(){
+  const result = await buyEloChartUnlock(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+  if(!result.ok){
+    const msg = result.reason === 'insufficient' ? `Você precisa de 🪙${ELO_CHART_PRICE} para desbloquear.`
+      : result.reason === 'alreadyunlocked' ? 'Você já desbloqueou o gráfico.'
+      : 'Não foi possível processar. Tente novamente.';
+    alert(msg);
+    return;
+  }
+  alert('Gráfico desbloqueado! Veja no seu perfil.');
+  await refreshAfterSpend();
+}
+
+async function doCastTierVote(){
+  const tier = document.getElementById('tierVoteSelect').value;
+  const amount = parseInt(document.getElementById('tierVoteAmount').value, 10);
+  if(!amount || amount <= 0){ alert('Digite uma quantidade de moedas válida.'); return; }
+  const result = await castTierVote(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, tier, amount);
+  if(!result.ok){
+    alert(result.reason === 'insufficient' ? 'Você não tem moedas suficientes para esse voto.' : 'Não foi possível processar. Tente novamente.');
+    return;
+  }
+  alert(`Voto registrado: 🪙${amount} em ${tier}!`);
+  document.getElementById('tierVoteAmount').value = '';
+  tierVoteStandings = await fetchTierVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY);
+  await refreshAfterSpend();
+}
+
+async function doGiftCoins(){
+  const targetName = document.getElementById('giftTargetSelect').value;
+  const amount = parseInt(document.getElementById('giftAmount').value, 10);
+  if(!targetName){ alert('Escolha um jogador.'); return; }
+  if(!amount || amount <= 0){ alert('Digite uma quantidade de moedas válida.'); return; }
+  const result = await giftCoins(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, targetName, amount);
+  if(!result.ok){
+    const msg = result.reason === 'insufficient' ? 'Você não tem moedas suficientes para essa doação.' : 'Não foi possível enviar. Tente novamente.';
+    alert(msg);
+    return;
+  }
+  alert(`Enviaste 🪙 ${amount} para ${targetName}!`);
+  document.getElementById('giftAmount').value = '';
+  generosityRanking = await fetchGenerosityRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
+  await refreshAfterSpend();
+}
+
+let playerCoinsLocal = 0;
+async function doSpinRoulette(){
+  const betInput = document.getElementById('rouletteBet');
+  const bet = parseInt(betInput.value, 10);
+  const resultDiv = document.getElementById('rouletteResult');
+  const myProfile = playerProfiles[loggedInPlayerName] || {};
+  if(!bet || bet <= 0){ alert('Digite uma quantidade de moedas válida.'); return; }
+  if(bet > (myProfile.coins||0)){ alert('Você não tem moedas suficientes para essa aposta.'); return; }
+
+  const result = await spinRoulette(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, bet);
+  if(!result.ok){
+    resultDiv.innerHTML = `<div style="color:var(--danger);">Não foi possível processar. Tente novamente.</div>`;
+    return;
+  }
+  const net = result.payout - bet;
+  const color = net > 0 ? 'var(--success)' : net === 0 ? 'var(--text-faint)' : 'var(--danger)';
+  resultDiv.innerHTML = `<div style="color:${color};font-family:'Chakra Petch',sans-serif;font-weight:700;">${result.outcome.label} — ${net>=0?'+':''}${net} 🪙</div>`;
+  betInput.value = '';
+  await refreshAfterSpend();
+}
+
+pageBoot();
+</script>
+</body>
+</html>
