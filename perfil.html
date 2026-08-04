@@ -458,6 +458,7 @@ async function saveMyProfile(){
       nickname: nickname || null, photo_url: photoUrl || null, status_message: message || null
     });
     renderProfile();
+    logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'perfil', `Editou o perfil (apelido: "${nickname||'—'}", mensagem: "${message||'—'}")`);
   } else {
     alert('Não foi possível guardar o perfil. Tente novamente.');
   }
@@ -523,6 +524,8 @@ async function doEquipCosmetic(type, id){
     playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     renderProfile();
     document.getElementById('customizePanel').style.display = 'block';
+    const item = getCosmeticById(id);
+    logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'perfil', `Equipou "${item?item.name:id}"`);
   } else {
     alert('Não foi possível aplicar. Tente novamente.');
   }
@@ -530,6 +533,7 @@ async function doEquipCosmetic(type, id){
 
 async function doToggleBadge(badgeId){
   const profile = playerProfiles[loggedInPlayerName] || {};
+  const wasEquipped = (profile.equippedBadges||[]).includes(badgeId);
   const result = await toggleBadge(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, badgeId, profile.equippedBadges || []);
   if(!result.ok){
     if(result.reason === 'limit') alert(`Só pode ter ${MAX_EQUIPPED_BADGES} emblemas equipados ao mesmo tempo. Remova um antes de adicionar outro.`);
@@ -539,6 +543,8 @@ async function doToggleBadge(badgeId){
   playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
   renderProfile();
   document.getElementById('customizePanel').style.display = 'block';
+  const item = getCosmeticById(badgeId);
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'perfil', `${wasEquipped?'Removeu':'Equipou'} o emblema "${item?item.name:badgeId}"`);
 }
 
 async function doSaveProfileBgUrl(){
@@ -548,6 +554,7 @@ async function doSaveProfileBgUrl(){
     playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     renderProfile();
     document.getElementById('customizePanel').style.display = 'block';
+    logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'perfil', `Definiu novo fundo de perfil: ${url || '(removido)'}`);
   } else {
     alert('Não foi possível guardar o fundo. Tente novamente.');
   }

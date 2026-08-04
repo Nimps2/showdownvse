@@ -907,3 +907,55 @@ function renderPlayerCornerBadge(name, profile){
     <span class="player-corner-name">${escapeHtml(displayName)}</span>
   </a>`;
 }
+
+// ---------- Roleta: histórico e ranking ----------
+// Reaproveita o histórico de transações já existente (cada giro fica lá
+// registado como "Roleta: <resultado>"), sem precisar de tabela nova.
+async function fetchRouletteTransactions(supabaseUrl, supabaseAnonKey, name, limit){
+  let url = `${supabaseUrl}/rest/v1/coin_transactions?reason=like.Roleta:*&select=*&order=created_at.desc`;
+  if(name) url += `&player_name=eq.${encodeURIComponent(name)}`;
+  if(limit) url += `&limit=${limit}`;
+  const res = await fetch(url, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return [];
+  return await res.json();
+}
+
+const ROULETTE_RANKING_MIN_SPINS = 3;
+
+async function fetchRouletteRanking(supabaseUrl, supabaseAnonKey){
+  const rows = await fetchRouletteTransactions(supabaseUrl, supabaseAnonKey, null, null);
+  const stats = {};
+  rows.forEach(r=>{
+    if(!stats[r.player_name]) stats[r.player_name] = { spins:0, netProfit:0, biggestWin:0 };
+    stats[r.player_name].spins++;
+    stats[r.player_name].netProfit += r.amount;
+    if(r.amount > stats[r.player_name].biggestWin) stats[r.player_name].biggestWin = r.amount;
+  });
+  return Object.entries(stats)
+    .filter(([,s])=>s.spins >= ROULETTE_RANKING_MIN_SPINS)
+    .sort((a,b)=>b[1].netProfit-a[1].netProfit);
+}
+
+// ---------- Registo de auditoria (ações do organizador e dos jogadores) ----------
+async function logActivity(supabaseUrl, supabaseAnonKey, actorType, actorName, category, action){
+  try{
+    await fetch(`${supabaseUrl}/rest/v1/activity_log`, {
+      method:'POST',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify([{ actor_type: actorType, actor_name: actorName || null, category, action }])
+    });
+  } catch(e){ /* silencioso — a ação em si já foi feita, só o registo falhou */ }
+}
+
+// filters: {actorType, category, actorName, limit}
+async function fetchActivityLog(supabaseUrl, supabaseAnonKey, filters){
+  filters = filters || {};
+  let url = `${supabaseUrl}/rest/v1/activity_log?select=*&order=created_at.desc`;
+  if(filters.actorType) url += `&actor_type=eq.${encodeURIComponent(filters.actorType)}`;
+  if(filters.category) url += `&category=eq.${encodeURIComponent(filters.category)}`;
+  if(filters.actorName) url += `&actor_name=eq.${encodeURIComponent(filters.actorName)}`;
+  url += `&limit=${filters.limit || 100}`;
+  const res = await fetch(url, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return [];
+  return await res.json();
+}

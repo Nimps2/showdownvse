@@ -462,6 +462,7 @@ async function requestReroll(pIdx, slotIndex, monName){
   myRerollCount = priorCount + 1;
   alert('Pedido enviado! Aguarde o organizador aplicar o reroll.');
   renderMyDraw();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'sorteio', `Pediu reroll de ${monName} (🪙${price})`);
 }
 
 function renderMyDraw(){
@@ -552,10 +553,10 @@ function importMyMon(pIdx, idx, kind, btn){
   } else {
     currentData.draws[pIdx].free[idx] = { name: parsed.name, text: raw, src:'manual', moves: parsed.moves, item: parsed.item, ability: parsed.ability };
   }
-  saveMyDraws(pIdx, btn);
+  saveMyDraws(pIdx, btn, raw);
 }
 
-async function saveMyDraws(pIdx, btn){
+async function saveMyDraws(pIdx, btn, importedSetText){
   if(!currentTournamentId){ alert('Nenhum torneio carregado.'); return; }
   try{
     const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}&select=data`, {headers: sbHeaders()});
@@ -575,6 +576,9 @@ async function saveMyDraws(pIdx, btn){
     currentData = freshData;
     renderMyDraw();
     showSaveFeedback(btn, 'Guardado ✓', false);
+    if(importedSetText && loggedInPlayerName){
+      logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'sorteio', `Importou um set:\n${importedSetText}`);
+    }
   } catch(e){
     showSaveFeedback(btn, 'Erro ao guardar — tente de novo', true);
   }

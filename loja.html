@@ -223,6 +223,17 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
       <button class="btn-primary" onclick="doSpinRoulette()">Girar</button>
       <div id="rouletteResult" style="margin-top:12px;font-size:13px;"></div>
     </div>
+
+    <div class="card">
+      <h2>🧾 Meu histórico de giros</h2>
+      <div id="rouletteHistoryList"><div class="empty-state">A carregar…</div></div>
+    </div>
+
+    <div class="card">
+      <h2>🏆 Ranking da Roleta</h2>
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">Mínimo de 3 giros para entrar no ranking. Ordenado por lucro líquido total.</div>
+      <div id="rouletteRankingList"><div class="empty-state">A carregar…</div></div>
+    </div>
   </div>
 
   <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
@@ -242,6 +253,8 @@ let allRows = [];
 let remainingTiers = [];
 let tierVoteStandings = [];
 let generosityRanking = [];
+let rouletteHistory = [];
+let rouletteRanking = [];
 
 async function doGateLogin(){
   const name = document.getElementById('gateNameSelect').value;
@@ -324,6 +337,8 @@ async function init(){
     remainingTiers = computeRemainingTiersInCycle(allRows);
     tierVoteStandings = await fetchTierVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY);
     generosityRanking = await fetchGenerosityRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
+    rouletteHistory = await fetchRouletteTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 20);
+    rouletteRanking = await fetchRouletteRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
     renderAll();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
@@ -367,6 +382,20 @@ function renderAll(){
   document.getElementById('generosityList').innerHTML = generosityRanking.length
     ? generosityRanking.map(([gname, total], i)=>`<div class="history-row"><span><span style="color:var(--text-faint);font-family:'Chakra Petch',sans-serif;margin-right:8px;">#${i+1}</span>${escapeHtml(gname)}</span><b style="color:var(--tera-amber);">🪙 ${total} doado(s)</b></div>`).join('')
     : '<div class="empty-state">Ainda ninguém presenteou moedas a outro jogador.</div>';
+
+  // Sorte — histórico e ranking da roleta
+  document.getElementById('rouletteHistoryList').innerHTML = rouletteHistory.length
+    ? rouletteHistory.map(t=>{
+        const positive = t.amount > 0;
+        const dateStr = t.created_at ? new Date(t.created_at).toLocaleDateString('pt-BR') : '';
+        const label = t.reason.replace('Roleta: ', '');
+        return `<div class="history-row"><span>${escapeHtml(label)} <span style="color:var(--text-faint);">(${dateStr})</span></span><span style="font-family:'Chakra Petch',sans-serif;font-weight:700;color:${positive?'var(--success)':'var(--danger)'};">${positive?'+':''}${t.amount} 🪙</span></div>`;
+      }).join('')
+    : '<div class="empty-state">Ainda não girou a roleta.</div>';
+
+  document.getElementById('rouletteRankingList').innerHTML = rouletteRanking.length
+    ? rouletteRanking.map(([rname, s], i)=>`<div class="history-row"><span><span style="color:var(--text-faint);font-family:'Chakra Petch',sans-serif;margin-right:8px;">#${i+1}</span>${escapeHtml(rname)} <span style="color:var(--text-faint);">(${s.spins} giros)</span></span><b style="color:${s.netProfit>=0?'var(--success)':'var(--danger)'};">${s.netProfit>=0?'+':''}${s.netProfit} 🪙</b></div>`).join('')
+    : `<div class="empty-state">Ainda ninguém tem pelo menos ${ROULETTE_RANKING_MIN_SPINS} giros para entrar no ranking.</div>`;
 }
 
 async function refreshAfterSpend(){
@@ -434,6 +463,8 @@ async function doBuyCosmetic(id){
     return;
   }
   await refreshAfterSpend();
+  const item = getCosmeticById(id);
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Comprou "${item?item.name:id}" (🪙${item?item.price:'?'})`);
 }
 
 async function doOpenLootBox(){
@@ -448,6 +479,7 @@ async function doOpenLootBox(){
   }
   resultDiv.innerHTML = `<span style="color:var(--success);font-family:'Chakra Petch',sans-serif;font-weight:700;">🎉 Ganhaste: ${escapeHtml(result.item.name)}!</span>`;
   await refreshAfterSpend();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Abriu caixa surpresa (🪙${LOOT_BOX_PRICE}) e ganhou "${result.item.name}"`);
 }
 
 async function doBuySponsorship(){
@@ -460,6 +492,7 @@ async function doBuySponsorship(){
   alert('Patrocínio confirmado! O seu nome vai aparecer no próximo anúncio de campeão no Discord.');
   document.getElementById('sponsorMessage').value = '';
   await refreshAfterSpend();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Patrocinou o torneio da semana (🪙${SPONSORSHIP_PRICE})${message?` com a mensagem: "${message}"`:''}`);
 }
 
 async function doBuyGuaranteedBye(){
@@ -473,6 +506,7 @@ async function doBuyGuaranteedBye(){
   }
   alert('Garantia de bye comprada! Vai ser usada automaticamente no próximo bracket.');
   await refreshAfterSpend();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Comprou garantia de bye no Play-in (🪙${GUARANTEED_BYE_PRICE})`);
 }
 
 async function doBuyEloChart(){
@@ -486,6 +520,7 @@ async function doBuyEloChart(){
   }
   alert('Gráfico desbloqueado! Veja no seu perfil.');
   await refreshAfterSpend();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Desbloqueou o gráfico de evolução do Elo (🪙${ELO_CHART_PRICE})`);
 }
 
 async function doCastTierVote(){
@@ -501,6 +536,7 @@ async function doCastTierVote(){
   document.getElementById('tierVoteAmount').value = '';
   tierVoteStandings = await fetchTierVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY);
   await refreshAfterSpend();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Votou 🪙${amount} no tier ${tier}`);
 }
 
 async function doGiftCoins(){
@@ -518,6 +554,7 @@ async function doGiftCoins(){
   document.getElementById('giftAmount').value = '';
   generosityRanking = await fetchGenerosityRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
   await refreshAfterSpend();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'moedas', `Presenteou 🪙${amount} para ${targetName}`);
 }
 
 let playerCoinsLocal = 0;
@@ -538,7 +575,10 @@ async function doSpinRoulette(){
   const color = net > 0 ? 'var(--success)' : net === 0 ? 'var(--text-faint)' : 'var(--danger)';
   resultDiv.innerHTML = `<div style="color:${color};font-family:'Chakra Petch',sans-serif;font-weight:700;">${result.outcome.label} — ${net>=0?'+':''}${net} 🪙</div>`;
   betInput.value = '';
+  rouletteHistory = await fetchRouletteTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 20);
+  rouletteRanking = await fetchRouletteRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
   await refreshAfterSpend();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Girou a roleta com 🪙${bet} — ${result.outcome.label} (${net>=0?'+':''}${net})`);
 }
 
 pageBoot();

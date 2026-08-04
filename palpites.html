@@ -370,6 +370,7 @@ async function placeBet(matchId){
   await loadMyPredictions();
   renderOpenMatches();
   await renderMyPredictions();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'palpite', `Apostou 🪙${wager} em ${picked}`);
 }
 
 async function renderMyPredictions(){
