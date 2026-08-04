@@ -217,6 +217,8 @@ function renderTimeline(rows){
     const matches = data.matches || [];
     const finalMatch = matches.find(m => m.next === null);
     const runnerUp = finalMatch ? (finalMatch.winner === finalMatch.p1 ? finalMatch.p2 : finalMatch.p1) : null;
+    const bronzeMatches = finalMatch ? matches.filter(m => m.next === finalMatch.id && m.winner) : [];
+    const bronzePlayers = bronzeMatches.map(m => m.winner === m.p1 ? m.p2 : m.p1);
     const date = r.created_at ? new Date(r.created_at).toLocaleDateString('pt-BR') : '';
     const title = data.name || `Torneio (${r.tier || '?'})`;
 
@@ -229,6 +231,7 @@ function renderTimeline(rows){
           🏆 <a href="perfil.html?jogador=${encodeURIComponent(data.champion)}">${displayName(data.champion)}</a>
         </div>
         ${runnerUp ? `<div class="runner-up">🥈 Vice-campeão: <a href="perfil.html?jogador=${encodeURIComponent(runnerUp)}">${displayName(runnerUp)}</a></div>` : ''}
+        ${bronzePlayers.length ? `<div class="runner-up">🥉 3º lugar: ${bronzePlayers.map(p=>`<a href="perfil.html?jogador=${encodeURIComponent(p)}">${displayName(p)}</a>`).join(' e ')}</div>` : ''}
       </div>
     </div>`;
   }).join('') + `</div>`;

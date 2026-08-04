@@ -136,6 +136,14 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
     <div id="rankingContainer"><div class="empty-state">A calcular…</div></div>
   </div>
 
+  <div class="card">
+    <h2>🎰 Roleta</h2>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Aposte moedas e gire — pode perder tudo, ganhar de volta parte, ou multiplicar até 5x. É pura sorte, sem ligação com o resultado de nenhuma partida.</div>
+    <input type="number" id="rouletteBet" placeholder="Quantas moedas apostar?" min="1">
+    <button class="btn-primary" onclick="doSpinRoulette()">Girar</button>
+    <div id="rouletteResult" style="margin-top:12px;font-size:13px;"></div>
+  </div>
+
   <div class="footer-note">Aposta moedas em quem vai vencer cada partida — acerta e ganha o dobro, erra e perde a aposta. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
@@ -256,7 +264,7 @@ async function resolvePendingPredictions(allRows){
 
     const correct = match.winner === pred.predicted_winner;
     if(correct){
-      await adjustPlayerCoins(SUPABASE_URL, SUPABASE_ANON_KEY, pred.predictor_name, pred.wager * 2);
+      await adjustPlayerCoins(SUPABASE_URL, SUPABASE_ANON_KEY, pred.predictor_name, pred.wager * 2, `Palpite correto: ${pred.predicted_winner}`);
     }
     await fetch(`${SUPABASE_URL}/rest/v1/predictions?id=eq.${pred.id}`, {
       method:'PATCH',
@@ -282,21 +290,30 @@ function renderOpenMatches(){
     return;
   }
   const matches = activeTournament.data.matches || [];
-  const openMatches = matches.filter(m => m.p1 && m.p2 && !m.winner && (!m.games || m.games.every(g=>!g)));
+  // Uma partida só aceita NOVAS apostas se ainda não começou (nenhum jogo decidido).
+  // Mas se já tens uma aposta feita, ela continua visível até a partida CONCLUIR de vez
+  // (m.winner definido) — não desaparece só porque o primeiro jogo de uma Bo3 já saiu.
+  const relevantMatches = matches.filter(m => {
+    if(!m.p1 || !m.p2 || m.winner) return false;
+    const hasBet = !!myPredictionsForActive[m.id];
+    const notStarted = !m.games || m.games.every(g=>!g);
+    return hasBet || notStarted;
+  });
 
-  if(!openMatches.length){
+  if(!relevantMatches.length){
     container.innerHTML = '<div class="empty-state">Não há partidas disponíveis para palpite agora — ou já foram todas decididas, ou já começaram.</div>';
     return;
   }
 
-  container.innerHTML = openMatches.map(m=>{
+  container.innerHTML = relevantMatches.map(m=>{
     const existing = myPredictionsForActive[m.id];
+    const started = m.games && m.games.some(g=>g);
     if(existing){
       return `<div class="match-bet-card">
         <div class="match-bet-head">
           <span class="match-bet-title">${escapeHtml(m.p1)} vs ${escapeHtml(m.p2)}<span class="tag">${escapeHtml(m.label)} · Bo${m.bo}</span></span>
         </div>
-        <div class="bet-placed">Você apostou <b>🪙 ${existing.wager}</b> em <b>${escapeHtml(existing.predicted_winner)}</b>.</div>
+        <div class="bet-placed">Você apostou <b>🪙 ${existing.wager}</b> em <b>${escapeHtml(existing.predicted_winner)}</b>. ${started ? '⏳ Partida em curso...' : ''}</div>
       </div>`;
     }
     return `<div class="match-bet-card">
@@ -330,7 +347,7 @@ async function placeBet(matchId){
   if(!wager || wager <= 0){ alert('Digite uma quantidade de moedas válida.'); return; }
   if(wager > playerCoins){ alert('Você não tem moedas suficientes para essa aposta.'); return; }
 
-  const ok = await adjustPlayerCoins(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, -wager);
+  const ok = await adjustPlayerCoins(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, -wager, `Aposta em ${picked}`);
   if(!ok){ alert('Não foi possível processar a aposta. Tente novamente.'); return; }
 
   const res = await fetch(`${SUPABASE_URL}/rest/v1/predictions`, {
@@ -343,7 +360,7 @@ async function placeBet(matchId){
   });
   if(!res.ok){
     // devolve as moedas se a aposta não foi gravada
-    await adjustPlayerCoins(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, wager);
+    await adjustPlayerCoins(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, wager, 'Estorno de aposta (falhou)');
     alert('Não foi possível gravar a aposta (talvez já tenha apostado nesta partida). Tente novamente.');
     return;
   }
@@ -370,6 +387,27 @@ async function renderMyPredictions(){
     }
     return `<div class="history-row"><span>Apostou <b>🪙 ${r.wager}</b> em ${escapeHtml(r.predicted_winner)}</span><span class="res ${resClass}">${resText}</span></div>`;
   }).join('');
+}
+
+async function doSpinRoulette(){
+  const betInput = document.getElementById('rouletteBet');
+  const bet = parseInt(betInput.value, 10);
+  const resultDiv = document.getElementById('rouletteResult');
+  if(!bet || bet <= 0){ alert('Digite uma quantidade de moedas válida.'); return; }
+  if(bet > playerCoins){ alert('Você não tem moedas suficientes para essa aposta.'); return; }
+
+  const result = await spinRoulette(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, bet);
+  if(!result.ok){
+    resultDiv.innerHTML = `<div style="color:var(--danger);">Não foi possível processar. Tente novamente.</div>`;
+    return;
+  }
+
+  playerCoins = playerCoins - bet + result.payout;
+  document.getElementById('myCoinsDisplay').textContent = `🪙 ${playerCoins}`;
+  const net = result.payout - bet;
+  const color = net > 0 ? 'var(--success)' : net === 0 ? 'var(--text-faint)' : 'var(--danger)';
+  resultDiv.innerHTML = `<div style="color:${color};font-family:'Chakra Petch',sans-serif;font-weight:700;">${result.outcome.label} — ${net>=0?'+':''}${net} 🪙</div>`;
+  betInput.value = '';
 }
 
 async function renderRanking(){

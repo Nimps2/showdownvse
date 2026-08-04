@@ -95,6 +95,11 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 .shop-btn:hover:not(:disabled){border-color:var(--tera-cyan);color:var(--tera-cyan);}
 .shop-btn:disabled{cursor:not-allowed;}
 
+@keyframes vsePulseName{
+  0%,100%{ opacity:1; }
+  50%{ opacity:0.55; }
+}
+
 .history-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--text-dim);
   padding:8px 0;gap:8px;border-bottom:1px solid var(--line);}
 .history-row:last-child{border-bottom:none;}
@@ -211,6 +216,10 @@ let playerProfiles = {};
 let currentTrophies = null;
 let eloRatings = {};
 let currentH2H = null;
+let generosityRanking = [];
+let myCoinTransactions = [];
+let remainingTiers = [];
+let tierVoteStandings = [];
 
 async function init(){
   try{
@@ -222,6 +231,10 @@ async function init(){
     playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     currentTrophies = computeCurrentTrophies(allRows);
     eloRatings = computeEloRatings(allRows);
+    generosityRanking = await fetchGenerosityRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
+    myCoinTransactions = await fetchCoinTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 30);
+    remainingTiers = computeRemainingTiersInCycle(allRows);
+    tierVoteStandings = await fetchTierVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY);
     renderProfile();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
@@ -251,6 +264,7 @@ function renderProfile(){
   const topMoves = Object.entries(moves).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const h2h = computeHeadToHead(allRows, name);
   currentH2H = h2h;
+  const eloHistory = computeEloHistory(allRows, name);
 
   const historyRows = st.tournaments.slice().sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)).map(t=>{
     const label = t.name || (t.createdAt ? new Date(t.createdAt).toLocaleDateString('pt-BR') : 'Torneio');
@@ -277,16 +291,25 @@ function renderProfile(){
   const bgCosmetic = profile.equippedBackground ? getCosmeticById(profile.equippedBackground) : null;
   const accentCosmetic = profile.equippedAccent ? getCosmeticById(profile.equippedAccent) : null;
   const accentColor = accentCosmetic ? accentCosmetic.color : 'var(--tera-cyan)';
-  const avatar = avatarHtml(name, profile.photo_url, 56, bgCosmetic ? bgCosmetic.css : null);
+  const frameCosmetic = profile.equippedFrame ? getCosmeticById(profile.equippedFrame) : null;
+  const nameEffectCosmetic = profile.equippedNameEffect ? getCosmeticById(profile.equippedNameEffect) : null;
+  const titleCosmetic = profile.equippedTitle ? getCosmeticById(profile.equippedTitle) : null;
+  const equippedBadges = (profile.equippedBadges || []).map(id=>getCosmeticById(id)).filter(Boolean);
+  const avatar = avatarHtml(name, profile.photo_url, 56, bgCosmetic ? bgCosmetic.css : null, frameCosmetic ? frameCosmetic.border : null);
+  const hasCustomPageBg = (profile.ownedCosmetics||[]).includes('feature_custom_pagebg') && profile.profileBackgroundUrl;
+  const cardBgStyle = hasCustomPageBg
+    ? `background-image:linear-gradient(rgba(10,12,20,0.72),rgba(10,12,20,0.72)),url('${profile.profileBackgroundUrl.replace(/'/g,"\\'")}');background-size:cover;background-position:center;`
+    : '';
 
   container.innerHTML = `
-    <div class="card">
+    <div class="card" style="${cardBgStyle}">
       ${!isOwnProfile ? `<div style="margin-bottom:12px;"><a class="nav-link" href="perfil.html">← Ver o meu perfil</a></div>` : ''}
       <div class="profile-head">
         ${avatar}
         <div>
-          <div class="profile-name" style="color:${accentColor};">${trophyEmojiFor(name, currentTrophies)} ${escapeHtml(displayName)}</div>
+          <div class="profile-name" style="color:${accentColor};${nameEffectCosmetic ? nameEffectCosmetic.css : ''}">${trophyEmojiFor(name, currentTrophies)} ${escapeHtml(displayName)} ${equippedBadges.map(b=>b.emoji).join(' ')}</div>
           ${profile.nickname ? `<div style="font-size:11.5px;color:var(--text-faint);">${escapeHtml(name)}</div>` : ''}
+          ${titleCosmetic && titleCosmetic.text ? `<div style="font-size:12px;color:var(--text-dim);margin-top:2px;">${escapeHtml(titleCosmetic.text)}</div>` : ''}
           ${trophyEmojiFor(name, currentTrophies) ? `<div class="profile-champion-line">${trophyEmojiFor(name, currentTrophies)} ${currentTrophies.gold===name?'Campeão':currentTrophies.silver===name?'Vice-campeão':'3º lugar'} do último torneio (${escapeHtml(currentTrophies.tier)})</div>` : ''}
           ${st.titles > 0 ? `<div class="profile-champion-line">🏆 ${st.titles} título(s) conquistado(s) no total</div>` : ''}
         </div>
@@ -301,6 +324,20 @@ function renderProfile(){
         <div class="stat-box"><div class="n">${winrate}%</div><div class="l">Winrate</div></div>
       </div>
       ${titleChips ? `<div>${titleChips}</div>` : ''}
+    </div>
+
+    ${!isOwnProfile ? `
+    <div class="card">
+      <h2>🎁 Presentear moedas</h2>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">Envie moedas suas para ${escapeHtml(displayName)}. O seu saldo atual: <b style="color:var(--tera-amber);">🪙 ${(playerProfiles[loggedInPlayerName]||{}).coins || 0}</b></div>
+      <input type="number" id="giftAmount" placeholder="Quantas moedas?" min="1">
+      <button class="btn-primary" onclick="doGiftCoins()">Enviar</button>
+    </div>
+    ` : ''}
+
+    <div class="card">
+      <h2>📈 Evolução do Elo</h2>
+      ${buildEloChartSvg(eloHistory)}
     </div>
 
     <div class="card">
@@ -365,6 +402,24 @@ function renderProfile(){
       ${historyRows || '<div class="empty-state">Sem histórico.</div>'}
     </div>
 
+    <div class="card">
+      <h2>💝 Ranking de Generosidade</h2>
+      ${generosityRanking.length ? generosityRanking.map(([gname, total], i)=>
+        `<div class="rank-row" style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;"><span><span style="color:var(--text-faint);font-family:'Chakra Petch',sans-serif;margin-right:8px;">#${i+1}</span>${escapeHtml(gname)}</span><b style="color:var(--tera-amber);">🪙 ${total} doado(s)</b></div>`
+      ).join('') : '<div class="empty-state">Ainda ninguém presenteou moedas a outro jogador.</div>'}
+    </div>
+
+    ${isOwnProfile ? `
+    <div class="card">
+      <h2>🧾 Histórico de Transações</h2>
+      ${myCoinTransactions.length ? myCoinTransactions.map(t=>{
+        const positive = t.amount > 0;
+        const dateStr = t.created_at ? new Date(t.created_at).toLocaleDateString('pt-BR') : '';
+        return `<div class="history-row"><span>${escapeHtml(t.reason)} <span style="color:var(--text-faint);">(${dateStr})</span></span><span class="res ${positive?'champ':'elim'}">${positive?'+':''}${t.amount} 🪙</span></div>`;
+      }).join('') : '<div class="empty-state">Ainda não há transações registadas.</div>'}
+    </div>
+    ` : ''}
+
     ${isOwnProfile ? `
     <div class="card">
       <h2>🛍️ Loja de Personalização</h2>
@@ -377,6 +432,64 @@ function renderProfile(){
       <div class="shop-grid">
         ${COSMETIC_CATALOG.accents.map(item => shopItemHtml(item, 'accent', profile)).join('')}
       </div>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Moldura do avatar</div>
+      <div class="shop-grid">
+        ${COSMETIC_CATALOG.frames.map(item => shopItemHtml(item, 'frame', profile)).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Efeito no nome</div>
+      <div class="shop-grid">
+        ${COSMETIC_CATALOG.nameEffects.map(item => shopItemHtml(item, 'nameEffect', profile)).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Título</div>
+      <div class="shop-grid">
+        ${COSMETIC_CATALOG.titles.map(item => shopItemHtml(item, 'title', profile)).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Emblemas (até ${MAX_EQUIPPED_BADGES} ao mesmo tempo)</div>
+      <div class="shop-grid">
+        ${COSMETIC_CATALOG.badges.map(item => shopBadgeItemHtml(item, profile)).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Fundo de perfil (foto)</div>
+      ${shopCustomBgHtml(profile)}
+
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">🎁 Caixa surpresa — 🪙${LOOT_BOX_PRICE} por um item aleatório (mais barato que escolher direto)</div>
+      <div class="shop-grid">
+        <div class="shop-item"><div class="shop-item-name">Fundo do avatar</div><button class="shop-btn" onclick="doOpenLootBox('backgrounds')">Abrir 🪙${LOOT_BOX_PRICE}</button></div>
+        <div class="shop-item"><div class="shop-item-name">Cor de destaque</div><button class="shop-btn" onclick="doOpenLootBox('accents')">Abrir 🪙${LOOT_BOX_PRICE}</button></div>
+        <div class="shop-item"><div class="shop-item-name">Moldura</div><button class="shop-btn" onclick="doOpenLootBox('frames')">Abrir 🪙${LOOT_BOX_PRICE}</button></div>
+        <div class="shop-item"><div class="shop-item-name">Efeito no nome</div><button class="shop-btn" onclick="doOpenLootBox('nameEffects')">Abrir 🪙${LOOT_BOX_PRICE}</button></div>
+        <div class="shop-item"><div class="shop-item-name">Título</div><button class="shop-btn" onclick="doOpenLootBox('titles')">Abrir 🪙${LOOT_BOX_PRICE}</button></div>
+        <div class="shop-item"><div class="shop-item-name">Emblema</div><button class="shop-btn" onclick="doOpenLootBox('badges')">Abrir 🪙${LOOT_BOX_PRICE}</button></div>
+      </div>
+    </div>
+    ` : ''}
+
+    ${isOwnProfile ? `
+    <div class="card">
+      <h2>📣 Patrocinar o torneio da semana</h2>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">O seu nome aparece em destaque no próximo anúncio de campeão no Discord. Custa 🪙${SPONSORSHIP_PRICE}.</div>
+      <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Mensagem (opcional, aparece junto do anúncio)</label>
+      <input type="text" id="sponsorMessage" placeholder="Ex: Boa sorte a todos!" maxlength="200">
+      <button class="btn-primary" onclick="doBuySponsorship()">Patrocinar agora</button>
+    </div>
+
+    <div class="card">
+      <h2>🎫 Garantia de bye no Play-in</h2>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">
+        ${profile.guaranteedBye ? '✅ Já está ativa — vai ser usada automaticamente no próximo bracket gerado.' : `Garante que fica de fora do Play-in no próximo torneio, independente do seu Elo. Custa 🪙${GUARANTEED_BYE_PRICE}.`}
+      </div>
+      ${!profile.guaranteedBye ? `<button class="btn-primary" onclick="doBuyGuaranteedBye()">Comprar garantia</button>` : ''}
+    </div>
+
+    <div class="card">
+      <h2>🗳️ Votar no tier da próxima semana</h2>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">Financie o tier que quer jogar a seguir — quem juntar mais moedas num tier tem mais peso na escolha do organizador. Só entram os tiers que ainda faltam no ciclo atual.</div>
+      <select id="tierVoteSelect">
+        ${remainingTiers.map(t=>`<option value="${t}">${t}</option>`).join('')}
+      </select>
+      <input type="number" id="tierVoteAmount" placeholder="Quantas moedas?" min="1">
+      <button class="btn-primary" onclick="doCastTierVote()">Votar</button>
+      <div style="margin-top:14px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">Votação atual</div>
+      ${tierVoteStandings.length ? tierVoteStandings.map(([t,amt])=>`<div class="history-row"><span>${t}</span><b style="color:var(--tera-amber);">🪙 ${amt}</b></div>`).join('') : '<div class="empty-state">Ainda ninguém votou.</div>'}
     </div>
     ` : ''}
 
@@ -411,10 +524,21 @@ async function saveMyProfile(){
 }
 
 function shopItemHtml(item, type, profile){
-  const equippedId = type === 'background' ? profile.equippedBackground : profile.equippedAccent;
+  const fieldMap = {
+    background: profile.equippedBackground, accent: profile.equippedAccent,
+    frame: profile.equippedFrame, nameEffect: profile.equippedNameEffect, title: profile.equippedTitle
+  };
+  const equippedId = fieldMap[type];
   const owned = item.price === 0 || (profile.ownedCosmetics||[]).includes(item.id);
   const equipped = equippedId ? equippedId === item.id : item.price === 0;
-  const swatchColor = type === 'background' ? item.css : item.color;
+
+  let swatchHtml;
+  if(type === 'background') swatchHtml = `<div class="shop-swatch" style="background:${item.css};"></div>`;
+  else if(type === 'accent') swatchHtml = `<div class="shop-swatch" style="background:${item.color};"></div>`;
+  else if(type === 'frame') swatchHtml = `<div class="shop-swatch" style="background:var(--bg-panel);border:${item.border==='none'?'2px dashed var(--line)':item.border};"></div>`;
+  else if(type === 'nameEffect') swatchHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;font-weight:700;${item.css}">Abc</div>`;
+  else if(type === 'title') swatchHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:11px;padding:4px;">${item.text ? escapeHtml(item.text) : '—'}</div>`;
+
   let actionBtn;
   if(equipped){
     actionBtn = `<button class="shop-btn" disabled style="opacity:0.5;">Equipado ✓</button>`;
@@ -424,9 +548,40 @@ function shopItemHtml(item, type, profile){
     actionBtn = `<button class="shop-btn" onclick="doBuyCosmetic('${item.id}')">Comprar 🪙${item.price}</button>`;
   }
   return `<div class="shop-item">
-    <div class="shop-swatch" style="background:${swatchColor};"></div>
+    ${swatchHtml}
     <div class="shop-item-name">${escapeHtml(item.name)}</div>
     ${actionBtn}
+  </div>`;
+}
+
+function shopBadgeItemHtml(item, profile){
+  const owned = (profile.ownedCosmetics||[]).includes(item.id);
+  const equipped = (profile.equippedBadges||[]).includes(item.id);
+  let actionBtn;
+  if(owned){
+    actionBtn = `<button class="shop-btn" onclick="doToggleBadge('${item.id}')">${equipped ? 'Remover' : 'Usar'}</button>`;
+  } else {
+    actionBtn = `<button class="shop-btn" onclick="doBuyCosmetic('${item.id}')">Comprar 🪙${item.price}</button>`;
+  }
+  return `<div class="shop-item">
+    <div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:20px;">${item.emoji}</div>
+    <div class="shop-item-name">${escapeHtml(item.name)}${equipped?' ✓':''}</div>
+    ${actionBtn}
+  </div>`;
+}
+
+function shopCustomBgHtml(profile){
+  const owned = (profile.ownedCosmetics||[]).includes('feature_custom_pagebg');
+  const item = getCosmeticById('feature_custom_pagebg');
+  if(!owned){
+    return `<div class="shop-item" style="max-width:240px;">
+      <div class="shop-item-name">${escapeHtml(item.name)}</div>
+      <button class="shop-btn" onclick="doBuyCosmetic('feature_custom_pagebg')">Comprar 🪙${item.price}</button>
+    </div>`;
+  }
+  return `<div style="max-width:340px;">
+    <input type="text" id="editProfileBgUrl" placeholder="Link da foto de fundo" value="${escapeHtml(profile.profileBackgroundUrl || '')}">
+    <button class="shop-btn" onclick="doSaveProfileBgUrl()">Guardar fundo</button>
   </div>`;
 }
 
@@ -440,6 +595,7 @@ async function doBuyCosmetic(id){
     return;
   }
   playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+  myCoinTransactions = await fetchCoinTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 30);
   renderProfile();
 }
 
@@ -451,6 +607,106 @@ async function doEquipCosmetic(type, id){
   } else {
     alert('Não foi possível aplicar. Tente novamente.');
   }
+}
+
+async function doToggleBadge(badgeId){
+  const profile = playerProfiles[loggedInPlayerName] || {};
+  const result = await toggleBadge(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, badgeId, profile.equippedBadges || []);
+  if(!result.ok){
+    if(result.reason === 'limit') alert(`Só pode ter ${MAX_EQUIPPED_BADGES} emblemas equipados ao mesmo tempo. Remova um antes de adicionar outro.`);
+    else alert('Não foi possível atualizar. Tente novamente.');
+    return;
+  }
+  playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+  renderProfile();
+}
+
+async function doSaveProfileBgUrl(){
+  const url = document.getElementById('editProfileBgUrl').value.trim();
+  const ok = await setProfileBackgroundUrl(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, url);
+  if(ok){
+    playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    renderProfile();
+  } else {
+    alert('Não foi possível guardar o fundo. Tente novamente.');
+  }
+}
+
+async function doGiftCoins(){
+  const targetName = getViewedPlayerName();
+  const amount = parseInt(document.getElementById('giftAmount').value, 10);
+  if(!amount || amount <= 0){ alert('Digite uma quantidade de moedas válida.'); return; }
+  const result = await giftCoins(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, targetName, amount);
+  if(!result.ok){
+    const msg = result.reason === 'insufficient' ? 'Você não tem moedas suficientes para essa doação.' : 'Não foi possível enviar. Tente novamente.';
+    alert(msg);
+    return;
+  }
+  alert(`Enviaste 🪙 ${amount} para ${targetName}!`);
+  playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+  myCoinTransactions = await fetchCoinTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 30);
+  generosityRanking = await fetchGenerosityRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
+  renderProfile();
+}
+
+async function refreshCoinDependentData(){
+  playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+  myCoinTransactions = await fetchCoinTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 30);
+}
+
+async function doBuySponsorship(){
+  const message = document.getElementById('sponsorMessage').value.trim();
+  const result = await buySponsorship(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, message);
+  if(!result.ok){
+    alert(result.reason === 'insufficient' ? `Você precisa de 🪙${SPONSORSHIP_PRICE} para patrocinar.` : 'Não foi possível processar. Tente novamente.');
+    return;
+  }
+  alert('Patrocínio confirmado! O seu nome vai aparecer no próximo anúncio de campeão no Discord.');
+  await refreshCoinDependentData();
+  renderProfile();
+}
+
+async function doBuyGuaranteedBye(){
+  const result = await buyGuaranteedBye(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+  if(!result.ok){
+    const msg = result.reason === 'insufficient' ? `Você precisa de 🪙${GUARANTEED_BYE_PRICE} para garantir o bye.`
+      : result.reason === 'alreadyactive' ? 'Você já tem uma garantia de bye ativa.'
+      : 'Não foi possível processar. Tente novamente.';
+    alert(msg);
+    return;
+  }
+  alert('Garantia de bye comprada! Vai ser usada automaticamente no próximo bracket.');
+  await refreshCoinDependentData();
+  renderProfile();
+}
+
+async function doCastTierVote(){
+  const tier = document.getElementById('tierVoteSelect').value;
+  const amount = parseInt(document.getElementById('tierVoteAmount').value, 10);
+  if(!amount || amount <= 0){ alert('Digite uma quantidade de moedas válida.'); return; }
+  const result = await castTierVote(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, tier, amount);
+  if(!result.ok){
+    alert(result.reason === 'insufficient' ? 'Você não tem moedas suficientes para esse voto.' : 'Não foi possível processar. Tente novamente.');
+    return;
+  }
+  alert(`Voto registrado: 🪙${amount} em ${tier}!`);
+  await refreshCoinDependentData();
+  tierVoteStandings = await fetchTierVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY);
+  renderProfile();
+}
+
+async function doOpenLootBox(category){
+  const result = await openLootBox(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, category);
+  if(!result.ok){
+    const msg = result.reason === 'insufficient' ? `Você precisa de 🪙${LOOT_BOX_PRICE} para abrir a caixa.`
+      : result.reason === 'nooptions' ? 'Você já tem todos os itens dessa categoria!'
+      : 'Não foi possível processar. Tente novamente.';
+    alert(msg);
+    return;
+  }
+  alert(`🎉 Ganhaste: ${result.item.name}!`);
+  await refreshCoinDependentData();
+  renderProfile();
 }
 
 function renderCompare(){

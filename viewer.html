@@ -333,11 +333,16 @@ function onSelectTournament(){
   if(id) loadTournamentData(id);
 }
 
-function loadTournamentData(id){
+let myRerollCount = 0;
+
+async function loadTournamentData(id){
   const t = tournaments.find(x=>x.id===id);
   if(!t) return;
   currentTournamentId = id;
   currentData = t.data || {};
+  if(loggedInPlayerName){
+    myRerollCount = await countMyRerollRequests(SUPABASE_URL, SUPABASE_ANON_KEY, currentTournamentId, loggedInPlayerName);
+  }
   renderBracket();
   renderMyDraw();
 }
@@ -419,6 +424,38 @@ function renderBracket(){
 // escapeHtml, parseStatString, parseShowdownImport e copyText agora vivem em
 // showdown-utils.js (carregado no <head>), partilhado com o gestor.
 
+const REROLL_COST = 30;
+async function requestReroll(pIdx, slotIndex, monName){
+  if(pIdx !== currentData.players.indexOf(loggedInPlayerName)){ alert('Só pode pedir reroll dos seus próprios Pokémon.'); return; }
+
+  // Confirma a contagem mais atual antes de calcular o preço (evita preço desatualizado)
+  const priorCount = await countMyRerollRequests(SUPABASE_URL, SUPABASE_ANON_KEY, currentTournamentId, loggedInPlayerName);
+  const price = computeRerollPrice(priorCount);
+
+  if(!confirm(`Pedir reroll de ${monName} por ${price} moedas${priorCount>0 ? ' (o preço dobra a cada pedido neste torneio)' : ''}? O organizador precisa de aprovar o pedido.`)) return;
+
+  const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const myCoins = (profiles[loggedInPlayerName] || {}).coins || 0;
+  if(myCoins < price){ alert('Você não tem moedas suficientes para pedir um reroll a este preço.'); return; }
+
+  const ok = await adjustPlayerCoins(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, -price, `Pedido de reroll: ${monName} (${price} moedas)`);
+  if(!ok){ alert('Não foi possível processar. Tente novamente.'); return; }
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/reroll_requests`, {
+    method:'POST',
+    headers: Object.assign(sbHeaders(), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify([{ tournament_id: currentTournamentId, player_name: loggedInPlayerName, slot_index: slotIndex, mon_name: monName, status: 'pending', price_paid: price }])
+  });
+  if(!res.ok){
+    await adjustPlayerCoins(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, price, 'Estorno de pedido de reroll (falhou)');
+    alert('Não foi possível enviar o pedido. As moedas foram devolvidas.');
+    return;
+  }
+  myRerollCount = priorCount + 1;
+  alert('Pedido enviado! Aguarde o organizador aplicar o reroll.');
+  renderMyDraw();
+}
+
 function renderMyDraw(){
   const card = document.getElementById('drawCard');
   if(!loggedInPlayerName){
@@ -461,6 +498,7 @@ function renderMyDraw(){
       </div>
       <div class="import-box" id="${boxId}">${escapeHtml(r.text || r.mon)}</div>
       ${importSection(pasteId, `<button class="copy-btn" onclick="importMyMon(${pIdx},${i},'random', this)">Importar e salvar</button><span class="save-msg"></span>`, `${r.mon} @ Leftovers&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2`)}
+      ${!locked ? `<button class="copy-btn" style="margin-top:6px;" onclick="requestReroll(${pIdx},${i},'${r.mon.replace(/'/g,"\\'")}')">🎲 Pedir reroll (${computeRerollPrice(myRerollCount)} 🪙)</button>` : ''}
     </div>`;
   });
   (d.free||[]).forEach((f,i)=>{

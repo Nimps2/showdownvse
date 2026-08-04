@@ -191,7 +191,7 @@ async function fetchRegisteredPlayerNames(supabaseUrl, supabaseAnonKey){
 // ---------- Perfil: apelido, foto (por link), mensagem de estado, moedas e personalização ----------
 // Devolve um mapa { nomeReal: {nickname, photo_url, status_message, coins, ownedCosmetics, equippedBackground, equippedAccent} }.
 async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
-  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent,equipped_frame,equipped_name_effect,equipped_title,equipped_badges,profile_background_url,guaranteed_bye`, {headers: sbAuthHeaders(supabaseAnonKey)});
   if(!res.ok) return {};
   const rows = await res.json();
   const map = {};
@@ -199,7 +199,10 @@ async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
     map[r.name] = {
       nickname: r.nickname || null, photo_url: r.photo_url || null, status_message: r.status_message || null,
       coins: r.coins || 0, ownedCosmetics: r.owned_cosmetics || [],
-      equippedBackground: r.equipped_background || null, equippedAccent: r.equipped_accent || null
+      equippedBackground: r.equipped_background || null, equippedAccent: r.equipped_accent || null,
+      equippedFrame: r.equipped_frame || null, equippedNameEffect: r.equipped_name_effect || null,
+      equippedTitle: r.equipped_title || null, equippedBadges: r.equipped_badges || [],
+      profileBackgroundUrl: r.profile_background_url || null, guaranteedBye: !!r.guaranteed_bye
     };
   });
   return map;
@@ -214,7 +217,7 @@ async function updatePlayerProfile(supabaseUrl, supabaseAnonKey, name, nickname,
   return res.ok;
 }
 
-// ---------- Loja de personalização (fundos e cores) ----------
+// ---------- Loja de personalização ----------
 const COSMETIC_CATALOG = {
   backgrounds: [
     { id:'bg_default',  name:'Padrão',       price:0,   css:'linear-gradient(135deg,#a56bf0,#4fd8d0)' },
@@ -230,12 +233,44 @@ const COSMETIC_CATALOG = {
     { id:'accent_amber',   name:'Âmbar',          price:30, color:'#f0b64f' },
     { id:'accent_rose',    name:'Rosa',           price:30, color:'#e0607a' },
     { id:'accent_emerald', name:'Esmeralda',      price:50, color:'#5ed890' }
+  ],
+  frames: [
+    { id:'frame_none',  name:'Sem moldura',   price:0,   border:'none' },
+    { id:'frame_gold',  name:'Moldura Dourada', price:60,  border:'3px solid #f0b64f' },
+    { id:'frame_neon',  name:'Moldura Neon',    price:60,  border:'3px solid #4fd8d0' },
+    { id:'frame_royal', name:'Moldura Real',    price:100, border:'3px solid #a56bf0' }
+  ],
+  nameEffects: [
+    { id:'effect_none',  name:'Nenhum',  price:0,  css:'' },
+    { id:'effect_glow',  name:'Brilho',  price:70, css:'text-shadow:0 0 8px currentColor;' },
+    { id:'effect_pulse', name:'Pulsar',  price:90, css:'animation:vsePulseName 1.5s ease-in-out infinite;' }
+  ],
+  titles: [
+    { id:'title_none',         name:'Nenhum',              price:0,  text:'' },
+    { id:'title_playin_king',  name:'Rei do Play-in',      price:40, text:'👑 Rei do Play-in' },
+    { id:'title_bo3_legend',   name:'Lenda da Bo3',        price:40, text:'⚔️ Lenda da Bo3' },
+    { id:'title_wall',         name:'Muralha Ambulante',   price:40, text:'🧱 Muralha Ambulante' },
+    { id:'title_underdog',     name:'Zebra do Torneio',    price:40, text:'🦓 Zebra do Torneio' }
+  ],
+  badges: [
+    { id:'badge_stall',   name:'Fã de Stall',   price:30, emoji:'🐌' },
+    { id:'badge_speed',   name:'Speedrunner',   price:30, emoji:'⚡' },
+    { id:'badge_lucky',   name:'Sortudo',       price:30, emoji:'🍀' },
+    { id:'badge_veteran', name:'Veterano',      price:50, emoji:'🎖️' }
+  ],
+  features: [
+    { id:'feature_custom_pagebg', name:'Fundo de perfil personalizado (foto)', price:120 }
   ]
 };
+const MAX_EQUIPPED_BADGES = 3;
 
 function getCosmeticById(id){
   if(!id) return null;
-  return COSMETIC_CATALOG.backgrounds.find(c=>c.id===id) || COSMETIC_CATALOG.accents.find(c=>c.id===id) || null;
+  for(const category of Object.values(COSMETIC_CATALOG)){
+    const found = category.find(c=>c.id===id);
+    if(found) return found;
+  }
+  return null;
 }
 
 // Devolve {ok, reason} — 'insufficient' (moedas a menos) | 'alreadyowned' | 'notfound' | true
@@ -257,11 +292,20 @@ async function buyCosmetic(supabaseUrl, supabaseAnonKey, name, cosmeticId){
     headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
     body: JSON.stringify({ coins: newCoins, owned_cosmetics: newOwned })
   });
+  if(patchRes.ok && item.price > 0){
+    await logCoinTransaction(supabaseUrl, supabaseAnonKey, name, -item.price, `Compra na loja: ${item.name}`);
+  }
   return {ok: patchRes.ok};
 }
 
+// type: 'background' | 'accent' | 'frame' | 'nameEffect' | 'title'
 async function equipCosmetic(supabaseUrl, supabaseAnonKey, name, type, cosmeticId){
-  const field = type === 'background' ? 'equipped_background' : 'equipped_accent';
+  const fieldMap = {
+    background: 'equipped_background', accent: 'equipped_accent', frame: 'equipped_frame',
+    nameEffect: 'equipped_name_effect', title: 'equipped_title'
+  };
+  const field = fieldMap[type];
+  if(!field) return false;
   const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
     method:'PATCH',
     headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
@@ -270,16 +314,45 @@ async function equipCosmetic(supabaseUrl, supabaseAnonKey, name, type, cosmeticI
   return res.ok;
 }
 
+// Liga/desliga um emblema equipado (até MAX_EQUIPPED_BADGES ao mesmo tempo).
+async function toggleBadge(supabaseUrl, supabaseAnonKey, name, badgeId, currentEquipped){
+  let newBadges;
+  if(currentEquipped.includes(badgeId)){
+    newBadges = currentEquipped.filter(b=>b!==badgeId);
+  } else {
+    if(currentEquipped.length >= MAX_EQUIPPED_BADGES) return {ok:false, reason:'limit'};
+    newBadges = currentEquipped.concat([badgeId]);
+  }
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+    method:'PATCH',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify({ equipped_badges: newBadges })
+  });
+  return {ok: res.ok};
+}
+
+// Define o link da foto usada como fundo do perfil (só faz sentido depois de
+// comprar o item 'feature_custom_pagebg').
+async function setProfileBackgroundUrl(supabaseUrl, supabaseAnonKey, name, url){
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+    method:'PATCH',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify({ profile_background_url: url || null })
+  });
+  return res.ok;
+}
+
 // Devolve HTML de um avatar: <img> se houver photo_url, senão um círculo com
-// as iniciais, usando o fundo personalizado equipado (se existir).
-function avatarHtml(name, photoUrl, sizePx, backgroundCss){
+// as iniciais, usando o fundo e a moldura personalizados equipados (se existirem).
+function avatarHtml(name, photoUrl, sizePx, backgroundCss, frameBorder){
   const size = sizePx || 44;
+  const border = frameBorder && frameBorder !== 'none' ? `border:${frameBorder};` : '';
   if(photoUrl){
-    return `<img src="${photoUrl.replace(/"/g,'&quot;')}" alt="${(name||'').replace(/"/g,'&quot;')}" style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none';">`;
+    return `<img src="${photoUrl.replace(/"/g,'&quot;')}" alt="${(name||'').replace(/"/g,'&quot;')}" style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;object-fit:cover;flex-shrink:0;${border}" onerror="this.style.display='none';">`;
   }
   const initials = (name||'?').slice(0,2).toUpperCase();
   const bg = backgroundCss || 'linear-gradient(135deg,var(--tera-violet),var(--tera-cyan))';
-  return `<div style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;flex-shrink:0;background:${bg};display:flex;align-items:center;justify-content:center;font-family:'Chakra Petch',sans-serif;font-size:${Math.round(size*0.4)}px;font-weight:700;color:#0a0c14;">${initials}</div>`;
+  return `<div style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;flex-shrink:0;background:${bg};display:flex;align-items:center;justify-content:center;font-family:'Chakra Petch',sans-serif;font-size:${Math.round(size*0.4)}px;font-weight:700;color:#0a0c14;${border}">${initials}</div>`;
 }
 
 // ---------- Troféus do último torneio concluído (Ouro/Prata/Bronze) ----------
@@ -468,9 +541,130 @@ function computeEloRatings(rows){
   return rounded;
 }
 
-// ---------- Moedas: ajuste genérico (usado pelo Palpiteiro) ----------
-// amount pode ser negativo (para descontar, ex: ao apostar).
-async function adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, amount){
+// Devolve o histórico cronológico do Elo de UM jogador — um ponto a cada
+// partida dele já disputada. Útil para desenhar um gráfico de evolução.
+function computeEloHistory(rows, playerName){
+  const ratings = {};
+  const K = 32;
+  const BASE = 1000;
+  function getRating(name){
+    if(!(name in ratings)) ratings[name] = BASE;
+    return ratings[name];
+  }
+
+  const history = [];
+  const sorted = rows.slice().sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  sorted.forEach(r=>{
+    const data = r.data || {};
+    const matches = data.matches || [];
+    matches.forEach(m=>{
+      if(!m.winner || !m.p1 || !m.p2) return;
+      const winner = m.winner;
+      const loser = winner === m.p1 ? m.p2 : m.p1;
+      const rWinner = getRating(winner);
+      const rLoser = getRating(loser);
+      const expectedWinner = 1 / (1 + Math.pow(10, (rLoser - rWinner) / 400));
+      ratings[winner] = rWinner + K * (1 - expectedWinner);
+      ratings[loser] = rLoser + K * (0 - (1 - expectedWinner));
+      if(winner === playerName || loser === playerName){
+        history.push({ date: r.created_at, rating: Math.round(ratings[playerName]) });
+      }
+    });
+  });
+  return history;
+}
+
+// Desenha um gráfico de linha simples (SVG, sem bibliotecas externas) a
+// partir do histórico devolvido por computeEloHistory().
+function buildEloChartSvg(history){
+  if(!history || history.length < 2){
+    return '<div style="font-size:12.5px;color:var(--text-faint);text-align:center;padding:16px 0;">Ainda não há partidas suficientes para desenhar o gráfico.</div>';
+  }
+  const W = 600, H = 160, PAD = 28;
+  const ratingsArr = history.map(h=>h.rating);
+  const minR = Math.min(...ratingsArr) - 15;
+  const maxR = Math.max(...ratingsArr) + 15;
+  const range = (maxR - minR) || 1;
+
+  const points = history.map((h,i)=>{
+    const x = PAD + (i/(history.length-1)) * (W - PAD*2);
+    const y = H - PAD - ((h.rating - minR)/range) * (H - PAD*2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const last = points[points.length-1].split(',');
+
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;">
+    <polyline points="${points.join(' ')}" fill="none" stroke="var(--tera-cyan)" stroke-width="2.5"/>
+    <circle cx="${last[0]}" cy="${last[1]}" r="4.5" fill="var(--tera-amber)"/>
+    <text x="${PAD}" y="16" font-size="11" fill="var(--text-faint)">${Math.round(maxR)}</text>
+    <text x="${PAD}" y="${H-8}" font-size="11" fill="var(--text-faint)">${Math.round(minR)}</text>
+  </svg>`;
+}
+
+// ---------- Moedas: presentear outro jogador ----------
+async function logGift(supabaseUrl, supabaseAnonKey, fromName, toName, amount){
+  try{
+    await fetch(`${supabaseUrl}/rest/v1/gifts`, {
+      method:'POST',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify([{ from_name: fromName, to_name: toName, amount }])
+    });
+  } catch(e){ /* silencioso — a doação em si já foi feita, só o registo do ranking falhou */ }
+}
+
+// Devolve {ok, reason} — 'invalid' | 'insufficient' | 'error' | true
+async function giftCoins(supabaseUrl, supabaseAnonKey, fromName, toName, amount){
+  if(!amount || amount <= 0) return {ok:false, reason:'invalid'};
+  if(fromName === toName) return {ok:false, reason:'invalid'};
+
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(fromName)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const rows = await res.json();
+  if(!rows || !rows[0]) return {ok:false, reason:'error'};
+  if((rows[0].coins||0) < amount) return {ok:false, reason:'insufficient'};
+
+  const fromOk = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, fromName, -amount, `Presente enviado para ${toName}`);
+  if(!fromOk) return {ok:false, reason:'error'};
+  const toOk = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, toName, amount, `Presente recebido de ${fromName}`);
+  if(!toOk){
+    await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, fromName, amount, 'Estorno de presente (falhou)'); // devolve se o segundo passo falhar
+    return {ok:false, reason:'error'};
+  }
+  await logGift(supabaseUrl, supabaseAnonKey, fromName, toName, amount);
+  return {ok:true};
+}
+
+async function fetchGenerosityRanking(supabaseUrl, supabaseAnonKey){
+  const res = await fetch(`${supabaseUrl}/rest/v1/gifts?select=from_name,amount`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return [];
+  const rows = await res.json();
+  const totals = {};
+  rows.forEach(r=>{ totals[r.from_name] = (totals[r.from_name]||0) + r.amount; });
+  return Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+}
+
+// ---------- Moedas: ajuste genérico (usado pelo Palpiteiro e pelas doações) ----------
+// amount pode ser negativo (para descontar, ex: ao apostar ou ao presentear).
+// ---------- Histórico de transações de moedas ----------
+async function logCoinTransaction(supabaseUrl, supabaseAnonKey, name, amount, reason){
+  if(!reason) return;
+  try{
+    await fetch(`${supabaseUrl}/rest/v1/coin_transactions`, {
+      method:'POST',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify([{ player_name: name, amount, reason }])
+    });
+  } catch(e){ /* silencioso — a transação em si já foi feita, só o registo do histórico falhou */ }
+}
+
+async function fetchCoinTransactions(supabaseUrl, supabaseAnonKey, name, limit){
+  const res = await fetch(`${supabaseUrl}/rest/v1/coin_transactions?player_name=eq.${encodeURIComponent(name)}&select=*&order=created_at.desc&limit=${limit||30}`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return [];
+  return await res.json();
+}
+
+// amount pode ser negativo (para descontar, ex: ao apostar ou ao presentear).
+// reason (opcional) fica registado no histórico de transações do jogador.
+async function adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, amount, reason){
   if(!name || !amount) return false;
   try{
     const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
@@ -482,8 +676,182 @@ async function adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, amount){
       headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
       body: JSON.stringify({ coins: newCoins })
     });
+    if(patchRes.ok && reason){
+      await logCoinTransaction(supabaseUrl, supabaseAnonKey, name, amount, reason);
+    }
     return patchRes.ok;
   } catch(e){
     return false;
   }
+}
+
+// ---------- Bloco 3 (compra): Patrocínio e Garantia de bye ----------
+const SPONSORSHIP_PRICE = 200;
+const GUARANTEED_BYE_PRICE = 150;
+
+// ---------- Bloco 3 (ajuste): preço do reroll dobra a cada pedido feito pelo
+// mesmo jogador NO MESMO torneio (30 -> 60 -> 120 -> ...), voltando ao normal
+// no torneio seguinte porque a contagem é sempre por torneio.
+const REROLL_BASE_COST = 30;
+function computeRerollPrice(priorRequestsThisTournament){
+  return REROLL_BASE_COST * Math.pow(2, priorRequestsThisTournament || 0);
+}
+async function countMyRerollRequests(supabaseUrl, supabaseAnonKey, tournamentId, playerName){
+  const res = await fetch(`${supabaseUrl}/rest/v1/reroll_requests?tournament_id=eq.${tournamentId}&player_name=eq.${encodeURIComponent(playerName)}&status=neq.rejected&select=id`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return 0;
+  const rows = await res.json();
+  return rows.length;
+}
+
+// Devolve {ok, reason} — 'insufficient' | 'error' | true
+async function buySponsorship(supabaseUrl, supabaseAnonKey, name, message){
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const rows = await res.json();
+  if(!rows || !rows[0]) return {ok:false, reason:'error'};
+  if((rows[0].coins||0) < SPONSORSHIP_PRICE) return {ok:false, reason:'insufficient'};
+
+  const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, -SPONSORSHIP_PRICE, 'Patrocínio do torneio da semana');
+  if(!ok) return {ok:false, reason:'error'};
+  await fetch(`${supabaseUrl}/rest/v1/sponsorships`, {
+    method:'POST',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify([{ sponsor_name: name, amount: SPONSORSHIP_PRICE, used:false, message: message || null }])
+  });
+  return {ok:true};
+}
+
+// Devolve {ok, reason} — 'insufficient' | 'alreadyactive' | 'error' | true
+async function buyGuaranteedBye(supabaseUrl, supabaseAnonKey, name){
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins,guaranteed_bye`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const rows = await res.json();
+  if(!rows || !rows[0]) return {ok:false, reason:'error'};
+  if(rows[0].guaranteed_bye) return {ok:false, reason:'alreadyactive'};
+  if((rows[0].coins||0) < GUARANTEED_BYE_PRICE) return {ok:false, reason:'insufficient'};
+
+  const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, -GUARANTEED_BYE_PRICE, 'Garantia de bye no Play-in');
+  if(!ok) return {ok:false, reason:'error'};
+  await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+    method:'PATCH',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify({ guaranteed_bye: true })
+  });
+  return {ok:true};
+}
+
+// ---------- Bloco 4: Voto no tier da próxima semana ----------
+const ALL_TIERS = ['OU','UU','RU','NU','PU','ZU'];
+
+// Devolve a lista de tiers ainda por jogar no ciclo atual (reinicia quando
+// todos os 6 já saíram uma vez desde o último reinício).
+function computeRemainingTiersInCycle(rows){
+  const sorted = rows.slice().sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  let usedInCycle = new Set();
+  sorted.forEach(r=>{
+    const tier = r.tier;
+    if(!tier) return;
+    if(usedInCycle.size >= ALL_TIERS.length) usedInCycle = new Set();
+    usedInCycle.add(tier);
+  });
+  const remaining = ALL_TIERS.filter(t => !usedInCycle.has(t));
+  // Se o ciclo acabou de se completar totalmente, o próximo torneio já
+  // começa um ciclo novo — mostra os 6 tiers outra vez em vez de lista vazia.
+  return remaining.length ? remaining : ALL_TIERS;
+}
+
+// Devolve {ok, reason} — 'insufficient' | 'invalid' | 'error' | true
+async function castTierVote(supabaseUrl, supabaseAnonKey, name, tier, amount){
+  if(!amount || amount <= 0) return {ok:false, reason:'invalid'};
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const rows = await res.json();
+  if(!rows || !rows[0]) return {ok:false, reason:'error'};
+  if((rows[0].coins||0) < amount) return {ok:false, reason:'insufficient'};
+
+  const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, -amount, `Voto no tier ${tier} para a próxima semana`);
+  if(!ok) return {ok:false, reason:'error'};
+  await fetch(`${supabaseUrl}/rest/v1/tier_votes`, {
+    method:'POST',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify([{ voter_name: name, tier, amount }])
+  });
+  return {ok:true};
+}
+
+async function fetchTierVoteStandings(supabaseUrl, supabaseAnonKey){
+  const res = await fetch(`${supabaseUrl}/rest/v1/tier_votes?select=tier,amount`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return [];
+  const rows = await res.json();
+  const totals = {};
+  rows.forEach(r=>{ totals[r.tier] = (totals[r.tier]||0) + r.amount; });
+  return Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+}
+
+// ---------- Bloco 4: Caixa surpresa (loot box) ----------
+// Mais barata que comprar direto na loja, mas o item sai à sorte dentro da categoria escolhida.
+const LOOT_BOX_PRICE = 35;
+
+// Devolve {ok, reason, item} — 'insufficient' | 'nooptions' | 'error' | true
+async function openLootBox(supabaseUrl, supabaseAnonKey, name, category){
+  const catalogList = COSMETIC_CATALOG[category];
+  if(!catalogList) return {ok:false, reason:'error'};
+
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins,owned_cosmetics`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const rows = await res.json();
+  if(!rows || !rows[0]) return {ok:false, reason:'error'};
+  const current = rows[0];
+  if((current.coins||0) < LOOT_BOX_PRICE) return {ok:false, reason:'insufficient'};
+
+  const owned = current.owned_cosmetics || [];
+  const available = catalogList.filter(item => item.price > 0 && !owned.includes(item.id));
+  if(!available.length) return {ok:false, reason:'nooptions'};
+
+  const won = available[Math.floor(Math.random()*available.length)];
+  const newCoins = (current.coins||0) - LOOT_BOX_PRICE;
+  const newOwned = owned.concat([won.id]);
+  const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+    method:'PATCH',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify({ coins: newCoins, owned_cosmetics: newOwned })
+  });
+  if(patchRes.ok){
+    await logCoinTransaction(supabaseUrl, supabaseAnonKey, name, -LOOT_BOX_PRICE, `Caixa surpresa: ganhou ${won.name}`);
+  }
+  return {ok: patchRes.ok, item: won};
+}
+
+// ---------- Bloco 4: Roleta simples ----------
+// Multiplicadores com pesos diferentes — a soma das probabilidades dá 100%.
+const ROULETTE_OUTCOMES = [
+  { multiplier: 0,   weight: 35, label: '💀 Perdeu tudo' },
+  { multiplier: 0.5, weight: 25, label: '📉 Metade de volta' },
+  { multiplier: 1,   weight: 20, label: '➖ Empate' },
+  { multiplier: 2,   weight: 12, label: '📈 Dobrou!' },
+  { multiplier: 3,   weight: 6,  label: '🎉 Triplicou!' },
+  { multiplier: 5,   weight: 2,  label: '💎 Jackpot 5x!' }
+];
+
+function pickRouletteOutcome(){
+  const totalWeight = ROULETTE_OUTCOMES.reduce((s,o)=>s+o.weight, 0);
+  let roll = Math.random() * totalWeight;
+  for(const outcome of ROULETTE_OUTCOMES){
+    if(roll < outcome.weight) return outcome;
+    roll -= outcome.weight;
+  }
+  return ROULETTE_OUTCOMES[0];
+}
+
+// Devolve {ok, reason, outcome, payout} — 'insufficient' | 'invalid' | 'error' | true
+async function spinRoulette(supabaseUrl, supabaseAnonKey, name, betAmount){
+  if(!betAmount || betAmount <= 0) return {ok:false, reason:'invalid'};
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const rows = await res.json();
+  if(!rows || !rows[0]) return {ok:false, reason:'error'};
+  if((rows[0].coins||0) < betAmount) return {ok:false, reason:'insufficient'};
+
+  const outcome = pickRouletteOutcome();
+  const payout = Math.round(betAmount * outcome.multiplier);
+  const net = payout - betAmount; // pode ser negativo
+
+  const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, net, `Roleta: ${outcome.label}`);
+  if(!ok) return {ok:false, reason:'error'};
+  return {ok:true, outcome, payout};
 }
