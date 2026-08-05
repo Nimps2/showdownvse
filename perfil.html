@@ -141,7 +141,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
     <div class="crystal"></div>
     <div><h1>Perfil do Jogador</h1></div>
   </div>
-  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="viewer.html">Ver bracket da semana</a> &nbsp;|&nbsp; <a class="nav-link" href="estatisticas.html">Estatísticas</a> &nbsp;|&nbsp; <a class="nav-link" href="hall-da-fama.html">Hall da Fama</a> &nbsp;|&nbsp; <a class="nav-link" href="loja.html">Loja</a> &nbsp;|&nbsp; <a class="nav-link" href="palpites.html">Palpiteiro →</a></div>
+  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="viewer.html">Ver bracket da semana</a> &nbsp;|&nbsp; <a class="nav-link" href="estatisticas.html">Estatísticas</a> &nbsp;|&nbsp; <a class="nav-link" href="hall-da-fama.html">Hall da Fama</a> &nbsp;|&nbsp; <a class="nav-link" href="loja.html">Loja</a> &nbsp;|&nbsp; <a class="nav-link" href="conquistas.html">Conquistas</a> &nbsp;|&nbsp; <a class="nav-link" href="palpites.html">Palpiteiro →</a></div>
   <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
   <div class="subtitle" style="margin-top:-14px;">Ligado como <b id="loggedInNameTop" style="color:var(--tera-cyan);"></b> — <a href="#" class="nav-link" onclick="doPlayerLogout(); return false;">Trocar jogador</a></div>
 
@@ -364,16 +364,15 @@ function renderProfile(){
 
     <div class="card">
       <h2>🎖️ Conquistas</h2>
-      <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">Desbloqueiam-se sozinhas por mérito — sem custar moedas.</div>
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">${achievements.size} de ${ACHIEVEMENTS.length} desbloqueadas — sem custar moedas, só por mérito.</div>
       <div class="shop-grid">
-        ${ACHIEVEMENTS.map(a=>{
-          const earned = achievements.has(a.id);
-          return `<div class="shop-item" style="${earned?'':'opacity:0.4;'}" title="${escapeHtml(a.desc)}">
-            <div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:22px;">${earned?a.emoji:'🔒'}</div>
+        ${ACHIEVEMENTS.filter(a=>achievements.has(a.id)).slice(0,4).map(a=>`
+          <div class="shop-item" title="${escapeHtml(a.desc)}">
+            <div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:22px;">${a.emoji}</div>
             <div class="shop-item-name">${escapeHtml(a.name)}</div>
-          </div>`;
-        }).join('')}
+          </div>`).join('') || '<div class="empty-state" style="grid-column:1/-1;">Ainda nenhuma conquista — fica de olho!</div>'}
       </div>
+      <a href="conquistas.html?jogador=${encodeURIComponent(name)}" class="customize-toggle-btn" style="display:inline-block;text-decoration:none;text-align:center;">Ver todas as conquistas →</a>
     </div>
 
     <div class="card">
