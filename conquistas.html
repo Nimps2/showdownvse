@@ -72,17 +72,27 @@ select:focus{outline:none;border-color:var(--tera-cyan);}
 .progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--tera-cyan),var(--tera-violet));border-radius:4px;transition:width .3s;}
 
 .achv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}
-.achv-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start;}
+.achv-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start;position:relative;}
 .achv-card.earned{border-color:rgba(240,182,79,0.35);background:linear-gradient(135deg,rgba(240,182,79,0.06),rgba(165,107,240,0.04));}
 .achv-emoji{font-size:30px;flex-shrink:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;
   background:var(--bg-panel);border-radius:10px;}
 .achv-card.earned .achv-emoji{background:rgba(240,182,79,0.12);}
-.achv-name{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;margin-bottom:4px;}
+.achv-name{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;margin-bottom:4px;padding-right:28px;}
 .achv-card.earned .achv-name{color:var(--tera-amber);}
 .achv-desc{font-size:12px;color:var(--text-dim);line-height:1.4;}
 .achv-status{font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;margin-top:6px;font-weight:700;}
 .achv-status.earned{color:var(--success);}
 .achv-status.locked{color:var(--text-faint);}
+.pin-btn{
+  position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:50%;
+  background:var(--bg-panel);border:1px solid var(--line);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .15s;padding:0;
+}
+.pin-btn:hover{border-color:var(--tera-amber);transform:scale(1.12);}
+.pin-btn.featured{
+  background:linear-gradient(135deg,var(--tera-amber),#c98f2e);border-color:var(--tera-amber);
+  box-shadow:0 0 10px rgba(240,182,79,0.5);
+}
 
 .empty-state{color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;}
 .footer-note{color:var(--text-faint);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.5;}
@@ -121,6 +131,7 @@ select:focus{outline:none;border-color:var(--tera-cyan);}
 
   <div class="card">
     <h2>🎖️ Todas as conquistas</h2>
+    <div style="font-size:11px;color:var(--text-faint);margin-bottom:14px;">Clique no 📌 de uma conquista já desbloqueada para a destacar no seu perfil (até <span id="maxFeaturedLabel">?</span> ao mesmo tempo).</div>
     <div id="achievementsGrid" class="achv-grid"><div class="empty-state">A carregar…</div></div>
   </div>
 
@@ -130,6 +141,7 @@ select:focus{outline:none;border-color:var(--tera-cyan);}
 <script src="showdown-utils.js"></script>
 <script>
 initTheme();
+document.getElementById('maxFeaturedLabel').textContent = MAX_FEATURED_ACHIEVEMENTS;
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
 
@@ -261,17 +273,16 @@ function renderAchievements(){
   grid.innerHTML = ACHIEVEMENTS.map(a=>{
     const has = earned.has(a.id);
     const isFeatured = featured.includes(a.id);
-    let featureBtn = '';
-    if(isOwn && has){
-      featureBtn = `<button class="shop-btn" style="margin-top:8px;" onclick="doToggleFeatured('${a.id}')">${isFeatured ? '✓ Em destaque — remover' : `📌 Destacar (até ${MAX_FEATURED_ACHIEVEMENTS})`}</button>`;
-    }
+    const pinBtn = (isOwn && has)
+      ? `<button class="pin-btn${isFeatured?' featured':''}" onclick="doToggleFeatured('${a.id}')" title="${isFeatured ? 'Em destaque — clique para remover' : `Destacar no perfil (até ${MAX_FEATURED_ACHIEVEMENTS})`}">📌</button>`
+      : '';
     return `<div class="achv-card ${has?'earned':''}">
+      ${pinBtn}
       <div class="achv-emoji">${has ? a.emoji : '🔒'}</div>
       <div style="flex:1;">
         <div class="achv-name">${escapeHtml(a.name)}</div>
         <div class="achv-desc">${escapeHtml(a.desc)}</div>
-        <div class="achv-status ${has?'earned':'locked'}">${has ? '✓ Desbloqueada' : 'Por desbloquear'}</div>
-        ${featureBtn}
+        <div class="achv-status ${has?'earned':'locked'}">${has ? '✓ Desbloqueada' : 'Por desbloquear'}${isFeatured ? ' · ⭐ Em destaque' : ''}</div>
       </div>
     </div>`;
   }).join('');

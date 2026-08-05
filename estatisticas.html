@@ -208,6 +208,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
       </div>
       <div id="pokeGrid" class="poke-grid"></div>
       <div id="pokePagination" class="pagination"></div>
+      <div style="font-size:10.5px;color:var(--text-faint);margin-top:10px;">* Winrate do time: como não sabemos qual Pokémon específico jogou em cada partida, este número reflete o resultado do jogador no torneio inteiro, atribuído a toda a equipa dele — é uma aproximação, não um dado batalha a batalha.</div>
     </div>
   </div>
 
@@ -220,6 +221,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
     <div class="card">
       <h2>Jogadores</h2>
       <div class="controls">
+        <select id="seasonFilterSelect" onchange="onSeasonChange()"></select>
         <input type="text" id="playerSearchBox" placeholder="Procurar jogador..." oninput="onPlayerFilterChange()">
         <select id="playerSortSelect" onchange="onPlayerFilterChange()">
           <option value="elo_desc">Ranking (Elo)</option>
@@ -365,15 +367,14 @@ async function init(){
     setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
     populateTierFilter(rows);
     aggregate(rows);
-    playerStats = aggregatePlayers(rows);
+    populateSeasonFilter(rows);
+    recomputePlayerData(rows);
     playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, playerProfiles[loggedInPlayerName]);
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
     currentTrophies = computeCurrentTrophies(rows);
-    eloRatings = computeEloRatings(rows);
-    currentStreaks = computeAllCurrentStreaks(rows);
     renderHighlights();
     renderPokemonList();
     renderPlayerHighlights();
@@ -384,6 +385,31 @@ async function init(){
     document.getElementById('highlightsCard').innerHTML = '<h2>Resumo geral</h2><div class="empty-state">Erro ao carregar dados.</div>';
     document.getElementById('playerHighlightsCard').innerHTML = '<h2>Resumo geral</h2><div class="empty-state">Erro ao carregar dados.</div>';
   }
+}
+
+function populateSeasonFilter(rows){
+  const sel = document.getElementById('seasonFilterSelect');
+  const current = getCurrentSeasonNumber(rows);
+  let options = '<option value="all">Geral (todas as temporadas)</option>';
+  for(let s=current; s>=1; s--){
+    options += `<option value="${s}">Temporada ${s}${s===current?' (atual)':''}</option>`;
+  }
+  sel.innerHTML = options;
+  sel.value = 'all';
+}
+
+function recomputePlayerData(rows){
+  const seasonValue = document.getElementById('seasonFilterSelect').value || 'all';
+  const filteredRows = seasonValue === 'all' ? rows : filterRowsBySeason(rows, parseInt(seasonValue, 10));
+  playerStats = aggregatePlayers(filteredRows);
+  eloRatings = computeEloRatings(filteredRows);
+  currentStreaks = computeAllCurrentStreaks(filteredRows);
+}
+
+function onSeasonChange(){
+  recomputePlayerData(allTournamentRows);
+  renderPlayerHighlights();
+  renderPlayerList();
 }
 
 function populateTierFilter(rows){
@@ -429,14 +455,15 @@ function switchStatsTab(tab){
 }
 
 function getOrCreate(name){
-  if(!pokeStats[name]) pokeStats[name] = { total:0, free:0, abilities:{}, moves:{} };
+  if(!pokeStats[name]) pokeStats[name] = { total:0, free:0, abilities:{}, moves:{}, wins:0, losses:0 };
   return pokeStats[name];
 }
 
-function processItem(name, item){
+function processItem(name, item, record){
   const st = getOrCreate(name);
   st.total++;
   if(item.__isFree) st.free++;
+  if(record){ st.wins += record.wins; st.losses += record.losses; }
   let ability = item.ability;
   let moves = item.moves;
   if((!ability || !moves || !moves.length) && item.text){
@@ -460,16 +487,35 @@ function aggregate(rows){
   totalSlots = 0;
   rows.forEach(r=>{
     const data = r.data || {};
-    const numPlayers = (data.players||[]).length;
+    const players = data.players || [];
+    const numPlayers = players.length;
     totalSlots += numPlayers * 6;
-    Object.values(data.draws||{}).forEach(entry=>{
+    const matches = data.matches || [];
+
+    // Vitórias/derrotas de cada jogador NESTE torneio específico — usado como
+    // proxy para "winrate do Pokémon" (atribuído ao time inteiro do jogador,
+    // já que não sabemos qual Pokémon específico jogou em cada partida).
+    const recordByName = {};
+    matches.forEach(m=>{
+      if(!m.winner || !m.p1 || !m.p2) return;
+      const loser = m.winner === m.p1 ? m.p2 : m.p1;
+      if(!recordByName[m.winner]) recordByName[m.winner] = {wins:0, losses:0};
+      if(!recordByName[loser]) recordByName[loser] = {wins:0, losses:0};
+      recordByName[m.winner].wins++;
+      recordByName[loser].losses++;
+    });
+
+    Object.entries(data.draws||{}).forEach(([pIdxStr, entry])=>{
+      const pIdx = parseInt(pIdxStr, 10);
+      const playerName = players[pIdx];
+      const record = (playerName && recordByName[playerName]) || {wins:0, losses:0};
       (entry.random||[]).forEach(item=>{
         if(!item.mon) return;
-        processItem(item.mon, Object.assign({}, item, {__isFree:false}));
+        processItem(item.mon, Object.assign({}, item, {__isFree:false}), record);
       });
       (entry.free||[]).forEach(item=>{
         if(!item.name) return;
-        processItem(item.name, Object.assign({}, item, {__isFree:true}));
+        processItem(item.name, Object.assign({}, item, {__isFree:true}), record);
       });
     });
   });
@@ -539,13 +585,16 @@ function renderPokemonList(){
     const movesHtml = topMoves.length
       ? topMoves.map(([mv,c])=>`<span class="move-chip">${escapeHtml(mv)} <b>${c}x</b></span>`).join('')
       : '<span style="font-size:11.5px;color:var(--text-faint);">Sem golpes registrados</span>';
+    const totalGames = st.wins + st.losses;
+    const winrate = totalGames ? Math.round((st.wins/totalGames)*100) : null;
 
     return `<div class="poke-card">
       <div class="poke-name">${escapeHtml(name)}</div>
       <div class="poke-stat-row"><span>Apareceu</span><b>${st.total}x (${overallPct}% dos sorteios)</b></div>
       <div class="poke-stat-row"><span>Como escolha livre</span><b>${freePct}%</b></div>
       <div class="free-bar"><div class="free-bar-fill" style="width:${freePct}%"></div></div>
-      <div class="poke-stat-row" style="margin-top:8px;"><span>Ability mais comum</span><b>${topAbility ? escapeHtml(topAbility[0]) : '—'}</b></div>
+      <div class="poke-stat-row" style="margin-top:8px;"><span>Winrate do time*</span><b style="color:var(--tera-amber);">${winrate!==null ? winrate+'% ('+st.wins+'V-'+st.losses+'D)' : '—'}</b></div>
+      <div class="poke-stat-row"><span>Ability mais comum</span><b>${topAbility ? escapeHtml(topAbility[0]) : '—'}</b></div>
       <div class="poke-moves">
         <div class="label">Golpes mais usados</div>
         ${movesHtml}

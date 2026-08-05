@@ -251,13 +251,20 @@ const COSMETIC_CATALOG = {
     { id:'title_playin_king',  name:'Rei do Play-in',      price:40, text:'👑 Rei do Play-in' },
     { id:'title_bo3_legend',   name:'Lenda da Bo3',        price:40, text:'⚔️ Lenda da Bo3' },
     { id:'title_wall',         name:'Muralha Ambulante',   price:40, text:'🧱 Muralha Ambulante' },
-    { id:'title_underdog',     name:'Zebra do Torneio',    price:40, text:'🦓 Zebra do Torneio' }
+    { id:'title_underdog',     name:'Zebra do Torneio',    price:40, text:'🦓 Zebra do Torneio' },
+    { id:'title_untouchable',  name:'O Intocável',         price:60, text:'🛡️ O Intocável' },
+    { id:'title_roulette_king',name:'Rei da Roleta',       price:60, text:'🎰 Rei da Roleta' },
+    { id:'title_reroll_master',name:'Mestre das Trocas',   price:60, text:'🔄 Mestre das Trocas' }
   ],
   badges: [
     { id:'badge_stall',   name:'Fã de Stall',   price:30, emoji:'🐌' },
     { id:'badge_speed',   name:'Speedrunner',   price:30, emoji:'⚡' },
     { id:'badge_lucky',   name:'Sortudo',       price:30, emoji:'🍀' },
-    { id:'badge_veteran', name:'Veterano',      price:50, emoji:'🎖️' }
+    { id:'badge_veteran', name:'Veterano',      price:50, emoji:'🎖️' },
+    { id:'badge_hazards', name:'Fã de Hazards', price:30, emoji:'🕸️' },
+    { id:'badge_allin',   name:'All-in',        price:30, emoji:'🎲' },
+    { id:'badge_collector', name:'Colecionador', price:50, emoji:'🗂️' },
+    { id:'badge_analyst', name:'Analista',      price:30, emoji:'🔍' }
   ],
   features: [
     { id:'feature_custom_pagebg', name:'Fundo de perfil personalizado (foto)', price:120 }
@@ -993,6 +1000,7 @@ function computeAllCurrentStreaks(rows){
 // ---------- Conquistas automáticas (diferentes dos emblemas da loja — estas
 // não custam moedas, desbloqueiam-se sozinhas por mérito) ----------
 const ACHIEVEMENTS = [
+  { id:'first_tournament',     name:'Estreante',           emoji:'🌟', desc:'Jogou o seu primeiro torneio' },
   { id:'first_win',           name:'Primeira Vitória',    emoji:'🥇', desc:'Venceu a primeira partida' },
   { id:'ten_wins',             name:'Veterano de Guerra',  emoji:'⚔️', desc:'10 vitórias no total' },
   { id:'five_tournaments',     name:'Assíduo',             emoji:'🎮', desc:'Jogou 5 torneios' },
@@ -1008,6 +1016,7 @@ const ACHIEVEMENTS = [
 function computeAchievements(stats, streak){
   const earned = new Set();
   if(!stats) return earned;
+  if(stats.tournaments.length >= 1) earned.add('first_tournament');
   if(stats.wins >= 1) earned.add('first_win');
   if(stats.wins >= 10) earned.add('ten_wins');
   if(stats.tournaments.length >= 5) earned.add('five_tournaments');
@@ -1037,7 +1046,7 @@ function computeGlobalAchievementStats(playerStats, allRows){
   })).sort((a,b)=> a.pct - b.pct);
 }
 
-const MAX_FEATURED_ACHIEVEMENTS = 4;
+const MAX_FEATURED_ACHIEVEMENTS = 6;
 
 // Liga/desliga uma conquista em destaque no perfil (até MAX_FEATURED_ACHIEVEMENTS).
 async function toggleFeaturedAchievement(supabaseUrl, supabaseAnonKey, name, achievementId, currentFeatured){
@@ -1212,7 +1221,10 @@ async function claimDailyBonus(supabaseUrl, supabaseAnonKey, name){
 
 // ---------- Celebração ao desbloquear conquista nova ----------
 // Compara as conquistas já ganhas (earnedSet) com as já mostradas antes, devolve
-// só as NOVAS, e regista-as como já vistas para não repetir a celebração.
+// só as NOVAS, regista-as como já vistas para não repetir a celebração, e
+// credita um bónus único de moedas por cada conquista nova.
+const ACHIEVEMENT_COIN_BONUS = 15;
+
 async function checkNewAchievements(supabaseUrl, supabaseAnonKey, name, earnedSet){
   try{
     const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=seen_achievements`, {headers: sbAuthHeaders(supabaseAnonKey)});
@@ -1227,6 +1239,10 @@ async function checkNewAchievements(supabaseUrl, supabaseAnonKey, name, earnedSe
         headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
         body: JSON.stringify({ seen_achievements: updatedSeen })
       });
+      for(const id of newOnes){
+        const a = ACHIEVEMENTS.find(x=>x.id===id);
+        await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, ACHIEVEMENT_COIN_BONUS, `Conquista desbloqueada: ${a?a.name:id}`);
+      }
     }
     return newOnes;
   } catch(e){
@@ -1296,4 +1312,62 @@ function downloadCanvasAsPng(canvas, filename){
   link.download = filename;
   link.href = canvas.toDataURL('image/png');
   link.click();
+}
+
+// ---------- Temporadas anuais ----------
+// A âncora é a data do primeiro torneio já guardado — a "temporada" reinicia
+// sempre que se completa mais um ano a partir dessa data (mês/dia).
+function getSeasonAnchor(allRows){
+  if(!allRows || !allRows.length) return null;
+  const sorted = allRows.slice().sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+  return new Date(sorted[0].created_at);
+}
+
+function computeSeasonNumber(dateStr, anchorDate){
+  if(!anchorDate) return 1;
+  const d = new Date(dateStr);
+  const anniversaryThisYear = new Date(d.getFullYear(), anchorDate.getMonth(), anchorDate.getDate());
+  let seasonIndex = d.getFullYear() - anchorDate.getFullYear();
+  if(d < anniversaryThisYear) seasonIndex -= 1;
+  return seasonIndex + 1; // Temporada 1, 2, 3...
+}
+
+function getCurrentSeasonNumber(allRows){
+  const anchor = getSeasonAnchor(allRows);
+  if(!anchor) return 1;
+  return computeSeasonNumber(new Date().toISOString(), anchor);
+}
+
+function filterRowsBySeason(allRows, seasonNumber){
+  const anchor = getSeasonAnchor(allRows);
+  return allRows.filter(r => computeSeasonNumber(r.created_at, anchor) === seasonNumber);
+}
+
+// ---------- MVP automático a cada 3 torneios (usado como proxy de "por mês") ----------
+// Agrupa os torneios concluídos em blocos de 3 (por ordem cronológica) e
+// escolhe o MVP de cada bloco: mais vitórias nesses 3 torneios, com o
+// winrate nesse bloco como desempate.
+function computeMvpBatches(rows){
+  const concluded = rows.filter(r => r.data && r.data.champion).slice().sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+  const batches = [];
+  for(let i=0; i+3<=concluded.length; i+=3){
+    const batchRows = concluded.slice(i, i+3);
+    const stats = aggregatePlayers(batchRows);
+    let mvp = null;
+    Object.entries(stats).forEach(([name, s])=>{
+      const total = s.wins + s.losses;
+      const winrate = total ? s.wins/total : 0;
+      if(!mvp || s.wins > mvp.wins || (s.wins === mvp.wins && winrate > mvp.winrate)){
+        mvp = { name, wins: s.wins, losses: s.losses, winrate };
+      }
+    });
+    batches.push({
+      batchNumber: batches.length + 1,
+      tournamentNames: batchRows.map(r => (r.data.name || `Torneio ${r.tier||''}`)),
+      startDate: batchRows[0].created_at,
+      endDate: batchRows[batchRows.length-1].created_at,
+      mvp
+    });
+  }
+  return batches.reverse(); // mais recente primeiro
 }
