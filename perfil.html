@@ -29,6 +29,16 @@ body.light-theme{
   text-decoration:none;color:var(--text-main);font-family:'Chakra Petch',sans-serif;font-size:12.5px;font-weight:600;
 }
 .player-corner-badge:hover{border-color:var(--tera-cyan);}
+.daily-bonus-icon{
+  position:fixed;top:60px;left:16px;z-index:899;width:38px;height:38px;border-radius:10px;
+  background:var(--bg-panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
+  font-size:16px;opacity:0.3;filter:grayscale(1);cursor:default;padding:0;
+}
+.daily-bonus-icon.available{
+  opacity:1;filter:none;cursor:pointer;border-color:var(--tera-amber);
+  box-shadow:0 0 12px rgba(240,182,79,0.4);animation:vseGiftPulse 1.6s ease-in-out infinite;
+}
+@keyframes vseGiftPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
 .customize-toggle-btn{
   background:var(--bg-card);border:1px solid var(--line);color:var(--tera-cyan);padding:9px 16px;
   border-radius:8px;font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:13px;cursor:pointer;margin-top:12px;
@@ -221,6 +231,15 @@ function setStatus(ok, text){
   document.getElementById('statusText').textContent = text;
 }
 
+async function handleDailyBonusClick(){
+  const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+  const icon = document.getElementById('dailyBonusIcon');
+  if(result.awarded){
+    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+  }
+  if(icon) icon.classList.remove('available');
+}
+
 let allRows = [];
 let playerStats = {};
 let playerProfiles = {};
@@ -241,8 +260,8 @@ async function init(){
     eloRatings = computeEloRatings(allRows);
     myCoinTransactions = await fetchCoinTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 30);
     renderProfile();
-    claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(result=>{
-      if(result.awarded) showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
+      document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
@@ -378,13 +397,17 @@ function renderProfile(){
       <h2>🎖️ Conquistas</h2>
       <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">${achievements.size} de ${ACHIEVEMENTS.length} desbloqueadas — sem custar moedas, só por mérito.</div>
       <div class="shop-grid">
-        ${ACHIEVEMENTS.filter(a=>achievements.has(a.id)).slice(0,4).map(a=>`
-          <div class="shop-item" title="${escapeHtml(a.desc)}">
-            <div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:22px;">${a.emoji}</div>
-            <div class="shop-item-name">${escapeHtml(a.name)}</div>
-          </div>`).join('') || '<div class="empty-state" style="grid-column:1/-1;">Ainda nenhuma conquista — fica de olho!</div>'}
+        ${(()=>{
+          const featuredIds = (profile.featuredAchievements||[]).filter(id=>achievements.has(id));
+          const showIds = featuredIds.length ? featuredIds : [...achievements].slice(0,4);
+          return ACHIEVEMENTS.filter(a=>showIds.includes(a.id)).map(a=>`
+            <div class="shop-item" title="${escapeHtml(a.desc)}">
+              <div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:22px;">${a.emoji}</div>
+              <div class="shop-item-name">${escapeHtml(a.name)}</div>
+            </div>`).join('') || '<div class="empty-state" style="grid-column:1/-1;">Ainda nenhuma conquista — fica de olho!</div>';
+        })()}
       </div>
-      <a href="conquistas.html?jogador=${encodeURIComponent(name)}" class="customize-toggle-btn" style="display:inline-block;text-decoration:none;text-align:center;">Ver todas as conquistas →</a>
+      <a href="conquistas.html?jogador=${encodeURIComponent(name)}" class="customize-toggle-btn" style="display:inline-block;text-decoration:none;text-align:center;">Ver todas as conquistas${isOwnProfile ? ' e escolher destaques' : ''} →</a>
     </div>
 
     <div class="card">

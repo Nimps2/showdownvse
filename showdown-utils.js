@@ -191,7 +191,7 @@ async function fetchRegisteredPlayerNames(supabaseUrl, supabaseAnonKey){
 // ---------- Perfil: apelido, foto (por link), mensagem de estado, moedas e personalização ----------
 // Devolve um mapa { nomeReal: {nickname, photo_url, status_message, coins, ownedCosmetics, equippedBackground, equippedAccent} }.
 async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
-  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent,equipped_frame,equipped_name_effect,equipped_title,equipped_badges,profile_background_url,guaranteed_bye,elo_chart_unlocked`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent,equipped_frame,equipped_name_effect,equipped_title,equipped_badges,profile_background_url,guaranteed_bye,elo_chart_unlocked,featured_achievements`, {headers: sbAuthHeaders(supabaseAnonKey)});
   if(!res.ok) return {};
   const rows = await res.json();
   const map = {};
@@ -203,7 +203,7 @@ async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
       equippedFrame: r.equipped_frame || null, equippedNameEffect: r.equipped_name_effect || null,
       equippedTitle: r.equipped_title || null, equippedBadges: r.equipped_badges || [],
       profileBackgroundUrl: r.profile_background_url || null, guaranteedBye: !!r.guaranteed_bye,
-      eloChartUnlocked: !!r.elo_chart_unlocked
+      eloChartUnlocked: !!r.elo_chart_unlocked, featuredAchievements: r.featured_achievements || []
     };
   });
   return map;
@@ -1019,6 +1019,43 @@ function computeAchievements(stats, streak){
   return earned;
 }
 
+// Devolve, para cada conquista do catálogo, quantos e que % dos jogadores já a têm.
+// Ordenado da mais rara para a mais comum.
+function computeGlobalAchievementStats(playerStats, allRows){
+  const streaks = computeAllCurrentStreaks(allRows);
+  const names = Object.keys(playerStats);
+  const counts = {};
+  ACHIEVEMENTS.forEach(a=>{ counts[a.id] = 0; });
+  names.forEach(name=>{
+    const earned = computeAchievements(playerStats[name], streaks[name]);
+    earned.forEach(id=>{ counts[id] = (counts[id]||0) + 1; });
+  });
+  return ACHIEVEMENTS.map(a=>({
+    ...a,
+    count: counts[a.id] || 0,
+    pct: names.length ? Math.round(((counts[a.id]||0) / names.length) * 100) : 0
+  })).sort((a,b)=> a.pct - b.pct);
+}
+
+const MAX_FEATURED_ACHIEVEMENTS = 4;
+
+// Liga/desliga uma conquista em destaque no perfil (até MAX_FEATURED_ACHIEVEMENTS).
+async function toggleFeaturedAchievement(supabaseUrl, supabaseAnonKey, name, achievementId, currentFeatured){
+  let newFeatured;
+  if(currentFeatured.includes(achievementId)){
+    newFeatured = currentFeatured.filter(id=>id!==achievementId);
+  } else {
+    if(currentFeatured.length >= MAX_FEATURED_ACHIEVEMENTS) return {ok:false, reason:'limit'};
+    newFeatured = currentFeatured.concat([achievementId]);
+  }
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+    method:'PATCH',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify({ featured_achievements: newFeatured })
+  });
+  return {ok: res.ok};
+}
+
 // ---------- Aposta no Campeão da Semana (aposta única, antes do torneio começar) ----------
 function computeChampionBetMultiplier(playerCount){
   return Math.max(3, Math.round(playerCount / 2));
@@ -1126,6 +1163,29 @@ function showCelebrationToast(html, durationMs){
 
 // ---------- Bônus diário de login ----------
 const DAILY_BONUS_AMOUNT = 5;
+
+// Verifica se o bónus está disponível hoje, SEM o reclamar — usado para
+// desenhar o ícone (aceso/apagado) antes do jogador clicar.
+async function checkDailyBonusAvailable(supabaseUrl, supabaseAnonKey, name){
+  if(!name) return false;
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=last_daily_bonus`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const rows = await res.json();
+    if(!rows || !rows[0]) return false;
+    const today = new Date().toISOString().slice(0,10);
+    return rows[0].last_daily_bonus !== today;
+  } catch(e){
+    return false;
+  }
+}
+
+// Ícone de presente mostrado por baixo do avatar no canto — aceso e clicável
+// quando há bónus por reclamar, apagado quando já foi reclamado hoje.
+function renderDailyBonusIcon(available){
+  return `<button id="dailyBonusIcon" class="daily-bonus-icon${available?' available':''}"
+    onclick="handleDailyBonusClick()"
+    title="${available ? 'Bônus diário disponível! Clique para receber.' : 'Bônus diário já recebido hoje.'}">🎁</button>`;
+}
 
 // Devolve {awarded, amount} — awarded=true só na primeira visita de cada dia.
 async function claimDailyBonus(supabaseUrl, supabaseAnonKey, name){

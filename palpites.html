@@ -29,6 +29,16 @@ body.light-theme{
   text-decoration:none;color:var(--text-main);font-family:'Chakra Petch',sans-serif;font-size:12.5px;font-weight:600;
 }
 .player-corner-badge:hover{border-color:var(--tera-cyan);}
+.daily-bonus-icon{
+  position:fixed;top:60px;left:16px;z-index:899;width:38px;height:38px;border-radius:10px;
+  background:var(--bg-panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
+  font-size:16px;opacity:0.3;filter:grayscale(1);cursor:default;padding:0;
+}
+.daily-bonus-icon.available{
+  opacity:1;filter:none;cursor:pointer;border-color:var(--tera-amber);
+  box-shadow:0 0 12px rgba(240,182,79,0.4);animation:vseGiftPulse 1.6s ease-in-out infinite;
+}
+@keyframes vseGiftPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
 *{box-sizing:border-box;}
 body{
   margin:0;background:var(--bg-void);
@@ -228,6 +238,15 @@ function setStatus(ok, text){
   document.getElementById('statusText').textContent = text;
 }
 
+async function handleDailyBonusClick(){
+  const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+  const icon = document.getElementById('dailyBonusIcon');
+  if(result.awarded){
+    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+  }
+  if(icon) icon.classList.remove('available');
+}
+
 let activeTournament = null; // {id, tier, data}
 let myPredictionsForActive = {}; // match_id -> prediction row
 let playerCoins = 0;
@@ -244,8 +263,8 @@ async function init(){
 
     const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
-    claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(result=>{
-      if(result.awarded) showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
+      document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
     playerCoins = (profiles[loggedInPlayerName] && profiles[loggedInPlayerName].coins) || 0;
     document.getElementById('myCoinsDisplay').textContent = `🪙 ${playerCoins}`;

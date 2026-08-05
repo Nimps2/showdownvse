@@ -29,6 +29,16 @@ body.light-theme{
   text-decoration:none;color:var(--text-main);font-family:'Chakra Petch',sans-serif;font-size:12.5px;font-weight:600;
 }
 .player-corner-badge:hover{border-color:var(--tera-cyan);}
+.daily-bonus-icon{
+  position:fixed;top:60px;left:16px;z-index:899;width:38px;height:38px;border-radius:10px;
+  background:var(--bg-panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
+  font-size:16px;opacity:0.3;filter:grayscale(1);cursor:default;padding:0;
+}
+.daily-bonus-icon.available{
+  opacity:1;filter:none;cursor:pointer;border-color:var(--tera-amber);
+  box-shadow:0 0 12px rgba(240,182,79,0.4);animation:vseGiftPulse 1.6s ease-in-out infinite;
+}
+@keyframes vseGiftPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
 *{box-sizing:border-box;}
 body{
   margin:0;background:var(--bg-void);
@@ -126,6 +136,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let loggedInPlayerName = null;
 let allRows = [];
 let playerStats = {};
+let playerProfiles = {};
 
 async function doGateLogin(){
   const name = document.getElementById('gateNameSelect').value;
@@ -189,6 +200,15 @@ function setStatus(ok, text){
   document.getElementById('statusText').textContent = text;
 }
 
+async function handleDailyBonusClick(){
+  const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+  const icon = document.getElementById('dailyBonusIcon');
+  if(result.awarded){
+    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+  }
+  if(icon) icon.classList.remove('available');
+}
+
 function getRequestedPlayerName(){
   const params = new URLSearchParams(window.location.search);
   return params.get('jogador') || loggedInPlayerName;
@@ -202,9 +222,10 @@ async function init(){
     setStatus(true, `Ligado — ${allRows.length} torneio(s) encontrados.`);
     playerStats = aggregatePlayers(allRows);
     const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    playerProfiles = profiles;
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
-    claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(result=>{
-      if(result.awarded) showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
+      document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
 
     const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -229,6 +250,8 @@ function renderAchievements(){
   const stats = playerStats[name] || { wins:0, losses:0, titles:0, titlesByTier:{}, tournaments:[] };
   const streak = computeAllCurrentStreaks(allRows)[name] || null;
   const earned = computeAchievements(stats, streak);
+  const isOwn = name === loggedInPlayerName;
+  const featured = (playerProfiles[name] && playerProfiles[name].featuredAchievements) || [];
 
   document.getElementById('progressLabel').textContent = `${earned.size} de ${ACHIEVEMENTS.length} conquistas desbloqueadas`;
   const pct = Math.round((earned.size / ACHIEVEMENTS.length) * 100);
@@ -237,15 +260,33 @@ function renderAchievements(){
   const grid = document.getElementById('achievementsGrid');
   grid.innerHTML = ACHIEVEMENTS.map(a=>{
     const has = earned.has(a.id);
+    const isFeatured = featured.includes(a.id);
+    let featureBtn = '';
+    if(isOwn && has){
+      featureBtn = `<button class="shop-btn" style="margin-top:8px;" onclick="doToggleFeatured('${a.id}')">${isFeatured ? '✓ Em destaque — remover' : `📌 Destacar (até ${MAX_FEATURED_ACHIEVEMENTS})`}</button>`;
+    }
     return `<div class="achv-card ${has?'earned':''}">
       <div class="achv-emoji">${has ? a.emoji : '🔒'}</div>
-      <div>
+      <div style="flex:1;">
         <div class="achv-name">${escapeHtml(a.name)}</div>
         <div class="achv-desc">${escapeHtml(a.desc)}</div>
         <div class="achv-status ${has?'earned':'locked'}">${has ? '✓ Desbloqueada' : 'Por desbloquear'}</div>
+        ${featureBtn}
       </div>
     </div>`;
   }).join('');
+}
+
+async function doToggleFeatured(achievementId){
+  const featured = (playerProfiles[loggedInPlayerName] && playerProfiles[loggedInPlayerName].featuredAchievements) || [];
+  const result = await toggleFeaturedAchievement(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, achievementId, featured);
+  if(!result.ok){
+    if(result.reason === 'limit') alert(`Só pode destacar até ${MAX_FEATURED_ACHIEVEMENTS} conquistas ao mesmo tempo. Remova uma antes de adicionar outra.`);
+    else alert('Não foi possível atualizar. Tente novamente.');
+    return;
+  }
+  playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+  renderAchievements();
 }
 
 pageBoot();
