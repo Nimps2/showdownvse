@@ -959,3 +959,131 @@ async function fetchActivityLog(supabaseUrl, supabaseAnonKey, filters){
   if(!res.ok) return [];
   return await res.json();
 }
+
+// ---------- Sequência atual de TODOS os jogadores, calculada de uma vez só ----------
+// Devolve { nome: {type:'win'|'loss', count} }.
+function computeAllCurrentStreaks(rows){
+  const sequences = {};
+  const sorted = rows.slice().sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+  sorted.forEach(r=>{
+    const matches = (r.data||{}).matches || [];
+    matches.forEach(m=>{
+      if(!m.winner || !m.p1 || !m.p2) return;
+      const loser = m.winner === m.p1 ? m.p2 : m.p1;
+      if(!sequences[m.winner]) sequences[m.winner] = [];
+      if(!sequences[loser]) sequences[loser] = [];
+      sequences[m.winner].push('win');
+      sequences[loser].push('loss');
+    });
+  });
+  const streaks = {};
+  Object.entries(sequences).forEach(([name, seq])=>{
+    if(!seq.length) return;
+    const last = seq[seq.length-1];
+    let count = 0;
+    for(let i=seq.length-1;i>=0;i--){
+      if(seq[i] === last) count++;
+      else break;
+    }
+    streaks[name] = { type: last, count };
+  });
+  return streaks;
+}
+
+// ---------- Conquistas automáticas (diferentes dos emblemas da loja — estas
+// não custam moedas, desbloqueiam-se sozinhas por mérito) ----------
+const ACHIEVEMENTS = [
+  { id:'first_win',           name:'Primeira Vitória',    emoji:'🥇', desc:'Venceu a primeira partida' },
+  { id:'ten_wins',             name:'Veterano de Guerra',  emoji:'⚔️', desc:'10 vitórias no total' },
+  { id:'five_tournaments',     name:'Assíduo',             emoji:'🎮', desc:'Jogou 5 torneios' },
+  { id:'win_streak_3',         name:'Em Chamas',           emoji:'🔥', desc:'3 vitórias seguidas' },
+  { id:'win_streak_5',         name:'Imparável',           emoji:'⚡', desc:'5 vitórias seguidas' },
+  { id:'first_title',          name:'Campeão',             emoji:'🏆', desc:'Venceu o primeiro torneio' },
+  { id:'three_titles',         name:'Dinastia',            emoji:'💎', desc:'3 títulos conquistados' },
+  { id:'multi_tier_champion',  name:'Poliglota',           emoji:'👑', desc:'Campeão em 2 tiers diferentes' }
+];
+
+// stats vem de aggregatePlayers()[nome]; streak vem de computeAllCurrentStreaks()[nome].
+// Devolve um Set com os ids das conquistas já desbloqueadas.
+function computeAchievements(stats, streak){
+  const earned = new Set();
+  if(!stats) return earned;
+  if(stats.wins >= 1) earned.add('first_win');
+  if(stats.wins >= 10) earned.add('ten_wins');
+  if(stats.tournaments.length >= 5) earned.add('five_tournaments');
+  if(streak && streak.type === 'win' && streak.count >= 3) earned.add('win_streak_3');
+  if(streak && streak.type === 'win' && streak.count >= 5) earned.add('win_streak_5');
+  if(stats.titles >= 1) earned.add('first_title');
+  if(stats.titles >= 3) earned.add('three_titles');
+  if(Object.keys(stats.titlesByTier || {}).length >= 2) earned.add('multi_tier_champion');
+  return earned;
+}
+
+// ---------- Aposta no Campeão da Semana (aposta única, antes do torneio começar) ----------
+function computeChampionBetMultiplier(playerCount){
+  return Math.max(3, Math.round(playerCount / 2));
+}
+
+// Devolve {ok, reason} — 'insufficient' | 'invalid' | 'error' | true
+async function placeChampionBet(supabaseUrl, supabaseAnonKey, tournamentId, name, predictedChampion, wager, multiplier){
+  if(!wager || wager <= 0) return {ok:false, reason:'invalid'};
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const rows = await res.json();
+  if(!rows || !rows[0]) return {ok:false, reason:'error'};
+  if((rows[0].coins||0) < wager) return {ok:false, reason:'insufficient'};
+
+  const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, -wager, `Apostou no campeão da semana: ${predictedChampion}`);
+  if(!ok) return {ok:false, reason:'error'};
+
+  const insertRes = await fetch(`${supabaseUrl}/rest/v1/champion_bets`, {
+    method:'POST',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify([{ tournament_id: tournamentId, predictor_name: name, predicted_champion: predictedChampion, wager, multiplier }])
+  });
+  if(!insertRes.ok){
+    await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, wager, 'Estorno de aposta no campeão (falhou)');
+    return {ok:false, reason:'error'};
+  }
+  return {ok:true};
+}
+
+async function fetchMyChampionBet(supabaseUrl, supabaseAnonKey, tournamentId, name){
+  const res = await fetch(`${supabaseUrl}/rest/v1/champion_bets?tournament_id=eq.${tournamentId}&predictor_name=eq.${encodeURIComponent(name)}&select=*`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return null;
+  const rows = await res.json();
+  return (rows && rows[0]) ? rows[0] : null;
+}
+
+// Resolve apostas de campeão pendentes — chamado sempre que a página carrega,
+// tal como já fazemos com os palpites por partida.
+async function resolvePendingChampionBets(supabaseUrl, supabaseAnonKey, allRows){
+  const res = await fetch(`${supabaseUrl}/rest/v1/champion_bets?resolved=eq.false&select=*`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return;
+  const pending = await res.json();
+  if(!pending.length) return;
+
+  const tournamentsById = {};
+  allRows.forEach(r=>{ tournamentsById[r.id] = r.data || {}; });
+
+  for(const bet of pending){
+    const data = tournamentsById[bet.tournament_id];
+    if(!data || !data.champion) continue; // torneio ainda não tem campeão definido, deixa pendente
+
+    const correct = data.champion === bet.predicted_champion;
+    if(correct){
+      const payout = Math.round(bet.wager * bet.multiplier);
+      await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, bet.predictor_name, payout, `Acertou o campeão da semana: ${bet.predicted_champion} (${bet.multiplier}x)`);
+    }
+    await fetch(`${supabaseUrl}/rest/v1/champion_bets?id=eq.${bet.id}`, {
+      method:'PATCH',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify({ resolved:true, correct })
+    });
+  }
+}
+
+async function fetchChampionBetHistory(supabaseUrl, supabaseAnonKey, name, limit){
+  const res = await fetch(`${supabaseUrl}/rest/v1/champion_bets?predictor_name=eq.${encodeURIComponent(name)}&select=*&order=created_at.desc&limit=${limit||20}`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return [];
+  return await res.json();
+}

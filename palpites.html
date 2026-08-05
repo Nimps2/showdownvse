@@ -129,6 +129,12 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
   </div>
 
   <div class="card">
+    <h2>🏆 Campeão da Semana</h2>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Uma aposta única em quem vai ser campeão do torneio inteiro — antes de começar. Mais difícil de acertar, por isso os multiplicadores são bem maiores que o palpite partida a partida.</div>
+    <div id="championBetContainer"><div class="empty-state">A carregar…</div></div>
+  </div>
+
+  <div class="card">
     <h2>Palpites abertos</h2>
     <div id="openMatchesContainer"><div class="empty-state">A carregar partidas…</div></div>
   </div>
@@ -136,6 +142,11 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
   <div class="card">
     <h2>Meus palpites</h2>
     <div id="myPredictionsContainer"><div class="empty-state">Sem palpites ainda.</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Meu histórico de apostas no campeão</h2>
+    <div id="championBetHistoryContainer"><div class="empty-state">Sem apostas ainda.</div></div>
   </div>
 
   <div class="card">
@@ -229,6 +240,7 @@ async function init(){
     setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
 
     await resolvePendingPredictions(rows);
+    await resolvePendingChampionBets(SUPABASE_URL, SUPABASE_ANON_KEY, rows);
 
     const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
@@ -242,9 +254,76 @@ async function init(){
     renderOpenMatches();
     await renderMyPredictions();
     await renderRanking();
+    await renderChampionBetCard();
+    await renderChampionBetHistory();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
   }
+}
+
+async function renderChampionBetCard(){
+  const el = document.getElementById('championBetContainer');
+  if(!activeTournament){
+    el.innerHTML = '<div class="empty-state">Não há torneio em curso agora.</div>';
+    return;
+  }
+  const players = (activeTournament.data.players || []).filter(p=>p);
+  const matches = activeTournament.data.matches || [];
+  const tournamentStarted = matches.some(m=>m.winner);
+  const tournamentConcluded = !!activeTournament.data.champion;
+
+  if(tournamentConcluded){
+    el.innerHTML = `<div class="empty-state">Este torneio já foi concluído — o campeão foi <b style="color:var(--tera-amber);">${escapeHtml(activeTournament.data.champion)}</b>. Aguarde o próximo torneio para apostar de novo.</div>`;
+    return;
+  }
+
+  const myBet = await fetchMyChampionBet(SUPABASE_URL, SUPABASE_ANON_KEY, activeTournament.id, loggedInPlayerName);
+  if(myBet){
+    const payout = Math.round(myBet.wager * myBet.multiplier);
+    el.innerHTML = `<div class="bet-placed">Você apostou <b>🪙 ${myBet.wager}</b> em <b>${escapeHtml(myBet.predicted_champion)}</b> ser campeão (multiplicador ${myBet.multiplier}x — se acertar, recebe 🪙 ${payout}).</div>`;
+    return;
+  }
+
+  if(tournamentStarted){
+    el.innerHTML = '<div class="empty-state">As apostas fecharam — este torneio já começou. Aguarde o próximo para apostar no campeão.</div>';
+    return;
+  }
+
+  if(players.length < 2){
+    el.innerHTML = '<div class="empty-state">Aguardando o organizador preencher os jogadores do torneio.</div>';
+    return;
+  }
+
+  const multiplier = computeChampionBetMultiplier(players.length);
+  el.innerHTML = `
+    <select id="championPickSelect">
+      <option value="">— escolha quem vai ser campeão —</option>
+      ${players.map(p=>`<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
+    </select>
+    <input type="number" id="championBetAmount" placeholder="Quantas moedas apostar?" min="1">
+    <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:8px;">Multiplicador desta semana: <b style="color:var(--tera-amber);">${multiplier}x</b> (${players.length} jogadores no torneio)</div>
+    <button class="btn-primary" onclick="doPlaceChampionBet(${multiplier})">Apostar</button>
+  `;
+}
+
+async function doPlaceChampionBet(multiplier){
+  const picked = document.getElementById('championPickSelect').value;
+  const amount = parseInt(document.getElementById('championBetAmount').value, 10);
+  if(!picked){ alert('Escolha em quem vai apostar primeiro.'); return; }
+  if(!amount || amount <= 0){ alert('Digite uma quantidade de moedas válida.'); return; }
+  if(amount > playerCoins){ alert('Você não tem moedas suficientes para essa aposta.'); return; }
+
+  const result = await placeChampionBet(SUPABASE_URL, SUPABASE_ANON_KEY, activeTournament.id, loggedInPlayerName, picked, amount, multiplier);
+  if(!result.ok){
+    const msg = result.reason === 'insufficient' ? 'Você não tem moedas suficientes.' : 'Não foi possível processar. Tente novamente.';
+    alert(msg);
+    return;
+  }
+  playerCoins -= amount;
+  document.getElementById('myCoinsDisplay').textContent = `🪙 ${playerCoins}`;
+  await renderChampionBetCard();
+  await renderChampionBetHistory();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'palpite', `Apostou 🪙${amount} em ${picked} ser campeão da semana (${multiplier}x)`);
 }
 
 async function resolvePendingPredictions(allRows){
@@ -387,6 +466,21 @@ async function renderMyPredictions(){
       resText = r.correct ? `✅ Acertou (+${r.wager*2})` : `❌ Errou (-${r.wager})`;
     }
     return `<div class="history-row"><span>Apostou <b>🪙 ${r.wager}</b> em ${escapeHtml(r.predicted_winner)}</span><span class="res ${resClass}">${resText}</span></div>`;
+  }).join('');
+}
+
+async function renderChampionBetHistory(){
+  const container = document.getElementById('championBetHistoryContainer');
+  const rows = await fetchChampionBetHistory(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 20);
+  if(!rows.length){ container.innerHTML = '<div class="empty-state">Sem apostas ainda.</div>'; return; }
+
+  container.innerHTML = rows.map(r=>{
+    let resClass = 'pending', resText = '⏳ Pendente';
+    if(r.resolved){
+      resClass = r.correct ? 'win' : 'loss';
+      resText = r.correct ? `✅ Acertou (+${Math.round(r.wager*r.multiplier)})` : `❌ Errou (-${r.wager})`;
+    }
+    return `<div class="history-row"><span>Apostou <b>🪙 ${r.wager}</b> em ${escapeHtml(r.predicted_champion)} (${r.multiplier}x)</span><span class="res ${resClass}">${resText}</span></div>`;
   }).join('');
 }
 

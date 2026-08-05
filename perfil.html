@@ -270,6 +270,8 @@ function renderProfile(){
   const h2h = computeHeadToHead(allRows, name);
   currentH2H = h2h;
   const eloHistory = computeEloHistory(allRows, name);
+  const myStreak = computeAllCurrentStreaks(allRows)[name] || null;
+  const achievements = computeAchievements(st, myStreak);
 
   const historyRows = st.tournaments.slice().sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)).map(t=>{
     const label = t.name || (t.createdAt ? new Date(t.createdAt).toLocaleDateString('pt-BR') : 'Torneio');
@@ -358,6 +360,20 @@ function renderProfile(){
       ${profile.eloChartUnlocked
         ? buildEloChartSvg(eloHistory)
         : `<div class="empty-state">🔒 Desbloqueie este gráfico na <a class="nav-link" href="loja.html">loja</a> por 🪙${ELO_CHART_PRICE}.</div>`}
+    </div>
+
+    <div class="card">
+      <h2>🎖️ Conquistas</h2>
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">Desbloqueiam-se sozinhas por mérito — sem custar moedas.</div>
+      <div class="shop-grid">
+        ${ACHIEVEMENTS.map(a=>{
+          const earned = achievements.has(a.id);
+          return `<div class="shop-item" style="${earned?'':'opacity:0.4;'}" title="${escapeHtml(a.desc)}">
+            <div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:22px;">${earned?a.emoji:'🔒'}</div>
+            <div class="shop-item-name">${escapeHtml(a.name)}</div>
+          </div>`;
+        }).join('')}
+      </div>
     </div>
 
     <div class="card">

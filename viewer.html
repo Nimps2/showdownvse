@@ -312,9 +312,37 @@ async function init(){
       document.getElementById('tournamentSelect').value = active.id;
       loadTournamentData(active.id);
     }
+    startLivePolling();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
   }
+}
+
+// ---------- Bracket ao vivo: verifica sozinho se algo mudou, sem precisar de recarregar ----------
+const LIVE_POLL_INTERVAL_MS = 20000; // 20 segundos
+let livePollTimer = null;
+
+function startLivePolling(){
+  if(livePollTimer) clearInterval(livePollTimer);
+  livePollTimer = setInterval(pollForBracketUpdates, LIVE_POLL_INTERVAL_MS);
+}
+
+async function pollForBracketUpdates(){
+  if(!currentTournamentId) return;
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}&select=data,status`, {headers: sbHeaders()});
+    if(!res.ok) return;
+    const rows = await res.json();
+    if(!rows || !rows[0]) return;
+    const freshData = rows[0].data || {};
+    const oldMatchesStr = JSON.stringify(currentData.matches || []);
+    const newMatchesStr = JSON.stringify(freshData.matches || []);
+    if(oldMatchesStr !== newMatchesStr){
+      currentData.matches = freshData.matches;
+      currentData.champion = freshData.champion;
+      renderBracket();
+    }
+  } catch(e){ /* silencioso — tenta de novo na próxima verificação */ }
 }
 
 function renderTournamentSelect(){
@@ -412,7 +440,7 @@ function renderBracket(){
     return;
   }
   const nameLabel = currentData.name ? escapeHtml(currentData.name) + ' ' : '';
-  let html = `<h2>${nameLabel}<span class="tier-pill">${currentData.tier||''}</span></h2>`;
+  let html = `<h2>${nameLabel}<span class="tier-pill">${currentData.tier||''}</span> <span style="font-size:10.5px;color:var(--text-faint);font-weight:400;text-transform:none;">🔴 ao vivo — atualiza sozinho</span></h2>`;
   let lastLabel = null;
   matches.forEach(m=>{
     if(m.label !== lastLabel){
