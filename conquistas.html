@@ -203,6 +203,9 @@ async function init(){
     playerStats = aggregatePlayers(allRows);
     const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
+    claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(result=>{
+      if(result.awarded) showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    });
 
     const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
     const sel = document.getElementById('playerSelect');

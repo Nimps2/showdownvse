@@ -1087,3 +1087,153 @@ async function fetchChampionBetHistory(supabaseUrl, supabaseAnonKey, name, limit
   if(!res.ok) return [];
   return await res.json();
 }
+
+// ---------- Toast: notificação flutuante pequena, reaproveitada pelo bônus diário e pelas conquistas ----------
+function ensureToastStyles(){
+  if(document.getElementById('vseToastStyles')) return;
+  const style = document.createElement('style');
+  style.id = 'vseToastStyles';
+  style.textContent = `
+    @keyframes vseToastIn{from{opacity:0;transform:translateY(-12px) scale(0.95);}to{opacity:1;transform:translateY(0) scale(1);}}
+    #vseToastContainer{position:fixed;top:66px;left:50%;transform:translateX(-50%);z-index:2000;
+      display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;}
+    .vse-toast{background:linear-gradient(135deg,#4fd8d0,#a56bf0);color:#0a0c14;padding:13px 20px;border-radius:12px;
+      font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:13.5px;box-shadow:0 8px 24px rgba(0,0,0,0.35);
+      animation:vseToastIn .3s ease-out;text-align:center;max-width:320px;}
+  `;
+  document.head.appendChild(style);
+}
+
+function showCelebrationToast(html, durationMs){
+  ensureToastStyles();
+  let container = document.getElementById('vseToastContainer');
+  if(!container){
+    container = document.createElement('div');
+    container.id = 'vseToastContainer';
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  toast.className = 'vse-toast';
+  toast.innerHTML = html;
+  container.appendChild(toast);
+  setTimeout(()=>{
+    toast.style.transition = 'opacity .4s, transform .4s';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-10px)';
+    setTimeout(()=> toast.remove(), 400);
+  }, durationMs || 5000);
+}
+
+// ---------- Bônus diário de login ----------
+const DAILY_BONUS_AMOUNT = 5;
+
+// Devolve {awarded, amount} — awarded=true só na primeira visita de cada dia.
+async function claimDailyBonus(supabaseUrl, supabaseAnonKey, name){
+  if(!name) return {awarded:false};
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=last_daily_bonus`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const rows = await res.json();
+    if(!rows || !rows[0]) return {awarded:false};
+    const today = new Date().toISOString().slice(0,10);
+    if(rows[0].last_daily_bonus === today) return {awarded:false};
+
+    const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, DAILY_BONUS_AMOUNT, 'Bônus diário de login');
+    if(!ok) return {awarded:false};
+    await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+      method:'PATCH',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify({ last_daily_bonus: today })
+    });
+    return {awarded:true, amount: DAILY_BONUS_AMOUNT};
+  } catch(e){
+    return {awarded:false};
+  }
+}
+
+// ---------- Celebração ao desbloquear conquista nova ----------
+// Compara as conquistas já ganhas (earnedSet) com as já mostradas antes, devolve
+// só as NOVAS, e regista-as como já vistas para não repetir a celebração.
+async function checkNewAchievements(supabaseUrl, supabaseAnonKey, name, earnedSet){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=seen_achievements`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const rows = await res.json();
+    if(!rows || !rows[0]) return [];
+    const seen = new Set(rows[0].seen_achievements || []);
+    const newOnes = [...earnedSet].filter(id => !seen.has(id));
+    if(newOnes.length){
+      const updatedSeen = Array.from(new Set([...seen, ...newOnes]));
+      await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+        method:'PATCH',
+        headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+        body: JSON.stringify({ seen_achievements: updatedSeen })
+      });
+    }
+    return newOnes;
+  } catch(e){
+    return [];
+  }
+}
+
+// ---------- Cartão exportável de confronto direto entre dois jogadores ----------
+function generateHeadToHeadCardCanvas(nameA, nameB, winsA, winsB){
+  const canvas = document.createElement('canvas');
+  canvas.width = 800; canvas.height = 400;
+  const ctx = canvas.getContext('2d');
+
+  const bgGrad = ctx.createLinearGradient(0,0,800,400);
+  bgGrad.addColorStop(0, '#0a0c14');
+  bgGrad.addColorStop(1, '#171b28');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0,0,800,400);
+
+  const barGrad = ctx.createLinearGradient(0,0,800,0);
+  barGrad.addColorStop(0, '#4fd8d0');
+  barGrad.addColorStop(1, '#a56bf0');
+  ctx.fillStyle = barGrad;
+  ctx.fillRect(0,0,800,8);
+
+  ctx.textAlign = 'center';
+  ctx.font = '18px sans-serif';
+  ctx.fillStyle = '#8b91a8';
+  ctx.fillText('CONFRONTO DIRETO', 400, 60);
+
+  ctx.font = 'bold 38px sans-serif';
+  ctx.fillStyle = '#e9ecf5';
+  ctx.fillText(nameA, 220, 150);
+  ctx.fillText(nameB, 580, 150);
+
+  ctx.font = '24px sans-serif';
+  ctx.fillStyle = '#565d78';
+  ctx.fillText('vs', 400, 150);
+
+  ctx.font = 'bold 64px sans-serif';
+  ctx.fillStyle = winsA >= winsB ? '#f0b64f' : '#e9ecf5';
+  ctx.fillText(String(winsA), 220, 250);
+  ctx.fillStyle = winsB >= winsA ? '#f0b64f' : '#e9ecf5';
+  ctx.fillText(String(winsB), 580, 250);
+
+  const total = winsA + winsB;
+  const barW = 500, barX = 150, barY = 300, barH = 18;
+  ctx.fillStyle = '#262c3e';
+  ctx.fillRect(barX, barY, barW, barH);
+  if(total > 0){
+    const aWidth = (winsA/total) * barW;
+    ctx.fillStyle = '#4fd8d0';
+    ctx.fillRect(barX, barY, aWidth, barH);
+    ctx.fillStyle = '#a56bf0';
+    ctx.fillRect(barX+aWidth, barY, barW-aWidth, barH);
+  }
+
+  ctx.font = '14px sans-serif';
+  ctx.fillStyle = '#565d78';
+  ctx.fillText('Torneio Showdown - VSE', 400, 375);
+
+  return canvas;
+}
+
+function downloadCanvasAsPng(canvas, filename){
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}

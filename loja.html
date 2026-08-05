@@ -334,6 +334,9 @@ async function init(){
     setStatus(true, `Ligado — ${allRows.length} torneio(s) encontrados.`);
     playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, playerProfiles[loggedInPlayerName]);
+    claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(result=>{
+      if(result.awarded) showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    });
     remainingTiers = computeRemainingTiersInCycle(allRows);
     tierVoteStandings = await fetchTierVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY);
     generosityRanking = await fetchGenerosityRanking(SUPABASE_URL, SUPABASE_ANON_KEY);

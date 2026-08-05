@@ -244,6 +244,9 @@ async function init(){
 
     const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
+    claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(result=>{
+      if(result.awarded) showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    });
     playerCoins = (profiles[loggedInPlayerName] && profiles[loggedInPlayerName].coins) || 0;
     document.getElementById('myCoinsDisplay').textContent = `🪙 ${playerCoins}`;
 

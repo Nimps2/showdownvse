@@ -241,6 +241,9 @@ async function init(){
     eloRatings = computeEloRatings(allRows);
     myCoinTransactions = await fetchCoinTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 30);
     renderProfile();
+    claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(result=>{
+      if(result.awarded) showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    });
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
     document.getElementById('profileContent').innerHTML = '<div class="card"><div class="empty-state">Erro ao carregar dados.</div></div>';
@@ -272,6 +275,15 @@ function renderProfile(){
   const eloHistory = computeEloHistory(allRows, name);
   const myStreak = computeAllCurrentStreaks(allRows)[name] || null;
   const achievements = computeAchievements(st, myStreak);
+
+  if(isOwnProfile){
+    checkNewAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, achievements).then(newOnes=>{
+      newOnes.forEach((id, i)=>{
+        const a = ACHIEVEMENTS.find(x=>x.id===id);
+        if(a) setTimeout(()=> showCelebrationToast(`🎖️ Conquista desbloqueada!<br>${a.emoji} ${escapeHtml(a.name)}`, 6000), i*700);
+      });
+    });
+  }
 
   const historyRows = st.tournaments.slice().sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)).map(t=>{
     const label = t.name || (t.createdAt ? new Date(t.createdAt).toLocaleDateString('pt-BR') : 'Torneio');
@@ -586,13 +598,20 @@ function renderCompare(){
   }
   const total = rec.wins + rec.losses;
   const winrate = total ? Math.round((rec.wins/total)*100) : 0;
+  const myName = getViewedPlayerName();
   resultDiv.innerHTML = `
     <div class="stat-grid">
       <div class="stat-box"><div class="n">${rec.wins}</div><div class="l">Vitórias</div></div>
       <div class="stat-box"><div class="n">${rec.losses}</div><div class="l">Derrotas</div></div>
       <div class="stat-box"><div class="n">${winrate}%</div><div class="l">Winrate</div></div>
     </div>
+    <button class="shop-btn" style="margin-top:10px;width:100%;" onclick="downloadHeadToHeadCard('${myName.replace(/'/g,"\\'")}','${opponent.replace(/'/g,"\\'")}',${rec.wins},${rec.losses})">📸 Gerar cartão para partilhar</button>
   `;
+}
+
+function downloadHeadToHeadCard(myName, opponent, myWins, myLosses){
+  const canvas = generateHeadToHeadCardCanvas(myName, opponent, myWins, myLosses);
+  downloadCanvasAsPng(canvas, `confronto-${myName}-vs-${opponent}.png`);
 }
 
 pageBoot();

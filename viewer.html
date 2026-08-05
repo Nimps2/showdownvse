@@ -304,6 +304,9 @@ async function init(){
     playerStats = aggregatePlayers(tournaments);
     playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, playerProfiles[loggedInPlayerName]);
+    claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(result=>{
+      if(result.awarded) showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    });
     currentTrophies = computeCurrentTrophies(tournaments);
     eloRatings = computeEloRatings(tournaments);
     renderTournamentSelect();

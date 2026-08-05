@@ -114,6 +114,12 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 
   <div class="card">
     <h2>Campeões, torneio a torneio</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+      <input type="text" id="hofSearchBox" placeholder="Procurar por torneio ou jogador..." style="flex:2;min-width:160px;" oninput="onHofFilterChange()">
+      <select id="hofTierFilter" style="flex:1;min-width:120px;" onchange="onHofFilterChange()">
+        <option value="">Todos os tiers</option>
+      </select>
+    </div>
     <div id="timelineContainer"></div>
   </div>
 
@@ -192,14 +198,21 @@ function setStatus(ok, text){
   document.getElementById('statusText').textContent = text;
 }
 
+let allTournamentRows = [];
+
 async function init(){
   try{
     const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows = await res.json();
+    allTournamentRows = rows;
     setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
     playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, playerProfiles[loggedInPlayerName]);
+    claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(result=>{
+      if(result.awarded) showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    });
+    populateHofTierFilter(rows);
     renderTimeline(rows);
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
@@ -212,11 +225,38 @@ function displayName(name){
   return profile.nickname ? escapeHtml(profile.nickname) : escapeHtml(name);
 }
 
+function populateHofTierFilter(rows){
+  const sel = document.getElementById('hofTierFilter');
+  const tiers = Array.from(new Set(rows.map(r=>r.tier).filter(t=>t))).sort();
+  sel.innerHTML = '<option value="">Todos os tiers</option>' + tiers.map(t=>`<option value="${t}">${t}</option>`).join('');
+}
+
+function onHofFilterChange(){
+  const search = document.getElementById('hofSearchBox').value.trim().toLowerCase();
+  const tier = document.getElementById('hofTierFilter').value;
+
+  let filtered = allTournamentRows;
+  if(tier) filtered = filtered.filter(r => r.tier === tier);
+  if(search){
+    filtered = filtered.filter(r=>{
+      const data = r.data || {};
+      const title = (data.name || '').toLowerCase();
+      const champion = (data.champion || '').toLowerCase();
+      const matches = data.matches || [];
+      const finalMatch = matches.find(m => m.next === null);
+      const runnerUp = finalMatch ? ((finalMatch.winner === finalMatch.p1 ? finalMatch.p2 : finalMatch.p1) || '') : '';
+      return title.includes(search) || champion.includes(search) || runnerUp.toLowerCase().includes(search);
+    });
+  }
+  renderTimeline(filtered);
+}
+
 function renderTimeline(rows){
   const container = document.getElementById('timelineContainer');
   const concluded = rows.filter(r => r.data && r.data.champion);
   if(!concluded.length){
-    container.innerHTML = '<div class="empty-state">Ainda não há torneios concluídos.</div>';
+    const msg = allTournamentRows.length ? 'Nenhum torneio encontrado com estes filtros.' : 'Ainda não há torneios concluídos.';
+    container.innerHTML = `<div class="empty-state">${msg}</div>`;
     return;
   }
 
