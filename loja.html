@@ -151,6 +151,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
     <button class="tab-btn" onclick="switchShopTab('vantagens')">Vantagens</button>
     <button class="tab-btn" onclick="switchShopTab('social')">Social</button>
     <button class="tab-btn" onclick="switchShopTab('sorte')">Sorte</button>
+    <button class="tab-btn" onclick="switchShopTab('leilao')">Leilão</button>
   </div>
 
   <!-- ==================== PERSONALIZAÇÃO ==================== -->
@@ -272,6 +273,19 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
     </div>
   </div>
 
+  <div id="panel-leilao" class="shop-panel">
+    <div class="card" style="border-color:rgba(240,182,79,0.35);background:linear-gradient(135deg,rgba(240,182,79,0.06),rgba(165,107,240,0.04));">
+      <h2>🔨 Leilão de Item Raro</h2>
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:12px;">De vez em quando, um item exclusivo (nunca à venda direta) fica em leilão — licite moedas contra os outros jogadores. O lance mais alto quando o prazo acabar leva o item, desde que ainda tenha moedas suficientes na hora.</div>
+      <div id="auctionContainer"><div class="empty-state">A carregar…</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Leilões anteriores</h2>
+      <div id="pastAuctionsList"><div class="empty-state">A carregar…</div></div>
+    </div>
+  </div>
+
   <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
@@ -368,7 +382,7 @@ async function handleDailyBonusClick(){
 function switchShopTab(tab){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.shop-panel').forEach(p=>p.classList.remove('active'));
-  const map = {personalizacao:0, vantagens:1, social:2, sorte:3};
+  const map = {personalizacao:0, vantagens:1, social:2, sorte:3, leilao:4};
   document.querySelectorAll('.tab-btn')[map[tab]].classList.add('active');
   document.getElementById('panel-'+tab).classList.add('active');
 }
@@ -391,6 +405,8 @@ async function init(){
     rouletteRanking = await fetchRouletteRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
     refreshJackpotDisplay();
     renderAll();
+    renderAuction();
+    renderPastAuctions();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
   }
@@ -405,9 +421,9 @@ function renderAll(){
   // Personalização
   document.getElementById('shopBackgrounds').innerHTML = COSMETIC_CATALOG.backgrounds.map(item => shopItemHtml(item, 'background', myProfile)).join('');
   document.getElementById('shopAccents').innerHTML = COSMETIC_CATALOG.accents.map(item => shopItemHtml(item, 'accent', myProfile)).join('');
-  document.getElementById('shopFrames').innerHTML = COSMETIC_CATALOG.frames.map(item => shopItemHtml(item, 'frame', myProfile)).join('');
+  document.getElementById('shopFrames').innerHTML = COSMETIC_CATALOG.frames.filter(item=>!item.auctionOnly).map(item => shopItemHtml(item, 'frame', myProfile)).join('');
   document.getElementById('shopNameEffects').innerHTML = COSMETIC_CATALOG.nameEffects.map(item => shopItemHtml(item, 'nameEffect', myProfile)).join('');
-  document.getElementById('shopTitles').innerHTML = COSMETIC_CATALOG.titles.map(item => shopItemHtml(item, 'title', myProfile)).join('');
+  document.getElementById('shopTitles').innerHTML = COSMETIC_CATALOG.titles.filter(item=>!item.auctionOnly).map(item => shopItemHtml(item, 'title', myProfile)).join('');
   document.getElementById('shopBadges').innerHTML = COSMETIC_CATALOG.badges.map(item => shopBadgeItemHtml(item, myProfile)).join('');
   document.getElementById('shopCustomBg').innerHTML = shopCustomBgHtml(myProfile);
 
@@ -464,13 +480,92 @@ async function refreshJackpotDisplay(){
   if(el) el.textContent = `🪙 ${pot}`;
 }
 
+function formatTimeRemaining(endsAt){
+  const diffMs = new Date(endsAt) - new Date();
+  if(diffMs <= 0) return 'Prazo encerrado — a aguardar o organizador apurar o vencedor.';
+  const days = Math.floor(diffMs / (24*60*60*1000));
+  const hours = Math.floor((diffMs % (24*60*60*1000)) / (60*60*1000));
+  if(days > 0) return `${days} dia(s) e ${hours} hora(s) restantes`;
+  const mins = Math.floor((diffMs % (60*60*1000)) / (60*1000));
+  return `${hours}h ${mins}min restantes`;
+}
+
+async function renderAuction(){
+  const el = document.getElementById('auctionContainer');
+  const auction = await fetchActiveAuction(SUPABASE_URL, SUPABASE_ANON_KEY);
+  if(!auction){
+    el.innerHTML = '<div class="empty-state">Nenhum leilão ativo agora — volte mais tarde!</div>';
+    return;
+  }
+  const bids = await fetchAuctionBids(SUPABASE_URL, SUPABASE_ANON_KEY, auction.id);
+  const topBid = bids.length ? bids[0] : null;
+  const myProfile = playerProfiles[loggedInPlayerName] || {};
+  const minNextBid = topBid ? topBid.amount + 1 : 1;
+  const ended = new Date(auction.ends_at) < new Date();
+
+  let html = `
+    <div style="text-align:center;margin-bottom:14px;">
+      <div style="font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:20px;color:var(--tera-amber);">${escapeHtml(auction.item_name)}</div>
+      <div style="font-size:11.5px;color:var(--text-faint);">${formatTimeRemaining(auction.ends_at)}</div>
+    </div>
+    <div style="text-align:center;margin-bottom:14px;">
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">Lance mais alto</div>
+      <div style="font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:24px;">${topBid ? `🪙 ${topBid.amount} <span style="font-size:13px;color:var(--text-dim);">(${escapeHtml(topBid.bidder_name)})</span>` : 'Ainda sem lances'}</div>
+    </div>`;
+
+  if(!ended){
+    html += `
+      <input type="number" id="auctionBidAmount" placeholder="Seu lance (mínimo 🪙${minNextBid})" min="${minNextBid}">
+      <button class="btn-primary" onclick="doPlaceBid('${auction.id}', ${minNextBid})">Licitar</button>
+      <div id="bidResult" style="margin-top:10px;font-size:12.5px;"></div>`;
+  } else {
+    html += `<div class="empty-state">O prazo já acabou — aguarde o organizador apurar o vencedor.</div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+async function doPlaceBid(auctionId, minNextBid){
+  const input = document.getElementById('auctionBidAmount');
+  const amount = parseInt(input.value, 10);
+  const resultDiv = document.getElementById('bidResult');
+  const myProfile = playerProfiles[loggedInPlayerName] || {};
+  if(!amount || amount < minNextBid){ alert(`O lance precisa de ser pelo menos 🪙${minNextBid}.`); return; }
+  if(amount > (myProfile.coins||0)){ alert('Você não tem moedas suficientes para esse lance.'); return; }
+
+  const result = await placeBid(SUPABASE_URL, SUPABASE_ANON_KEY, auctionId, loggedInPlayerName, amount);
+  if(!result.ok){
+    const msg = result.reason === 'toolow' ? 'Alguém já licitou mais alto entretanto — atualize e tente de novo.'
+      : result.reason === 'ended' ? 'O leilão já terminou.'
+      : result.reason === 'insufficient' ? 'Você não tem moedas suficientes.'
+      : 'Não foi possível licitar. Tente novamente.';
+    resultDiv.innerHTML = `<span style="color:var(--danger);">${msg}</span>`;
+    return;
+  }
+  resultDiv.innerHTML = `<span style="color:var(--success);">✓ Lance de 🪙${amount} registado!</span>`;
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Licitou 🪙${amount} no leilão`);
+  await renderAuction();
+}
+
+async function renderPastAuctions(){
+  const el = document.getElementById('pastAuctionsList');
+  const rows = await fetchPastAuctions(SUPABASE_URL, SUPABASE_ANON_KEY, 10);
+  if(!rows.length){ el.innerHTML = '<div class="empty-state">Ainda não houve nenhum leilão concluído.</div>'; return; }
+  el.innerHTML = rows.map(a=>`
+    <div class="history-row">
+      <span>${escapeHtml(a.item_name)}</span>
+      <b style="color:var(--tera-amber);">${a.winner_name ? `${escapeHtml(a.winner_name)} — 🪙${a.winning_bid}` : 'Sem vencedor'}</b>
+    </div>
+  `).join('');
+}
+
 function shopItemHtml(item, type, profile){
   const fieldMap = {
     background: profile.equippedBackground, accent: profile.equippedAccent,
     frame: profile.equippedFrame, nameEffect: profile.equippedNameEffect, title: profile.equippedTitle
   };
   const equippedId = fieldMap[type];
-  const owned = item.price === 0 || (profile.ownedCosmetics||[]).includes(item.id);
+  const owned = (item.price === 0 && !item.auctionOnly) || (profile.ownedCosmetics||[]).includes(item.id);
   const equipped = equippedId ? equippedId === item.id : item.price === 0;
 
   let swatchHtml;

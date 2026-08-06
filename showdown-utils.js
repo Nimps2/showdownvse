@@ -241,7 +241,8 @@ const COSMETIC_CATALOG = {
     { id:'frame_none',  name:'Sem moldura',   price:0,   border:'none' },
     { id:'frame_gold',  name:'Moldura Dourada', price:60,  border:'3px solid #f0b64f' },
     { id:'frame_neon',  name:'Moldura Neon',    price:60,  border:'3px solid #4fd8d0' },
-    { id:'frame_royal', name:'Moldura Real',    price:100, border:'3px solid #a56bf0' }
+    { id:'frame_royal', name:'Moldura Real',    price:100, border:'3px solid #a56bf0' },
+    { id:'frame_diamond', name:'Moldura de Diamante', price:0, border:'3px solid #b9e6ff', auctionOnly:true }
   ],
   nameEffects: [
     { id:'effect_none',  name:'Nenhum',  price:0,  css:'' },
@@ -256,7 +257,8 @@ const COSMETIC_CATALOG = {
     { id:'title_underdog',     name:'Zebra do Torneio',    price:40, text:'🦓 Zebra do Torneio' },
     { id:'title_untouchable',  name:'O Intocável',         price:60, text:'🛡️ O Intocável' },
     { id:'title_roulette_king',name:'Rei da Roleta',       price:60, text:'🎰 Rei da Roleta' },
-    { id:'title_reroll_master',name:'Mestre das Trocas',   price:60, text:'🔄 Mestre das Trocas' }
+    { id:'title_reroll_master',name:'Mestre das Trocas',   price:60, text:'🔄 Mestre das Trocas' },
+    { id:'title_auction_legend', name:'Lenda do Leilão',   price:0, text:'💠 Lenda do Leilão', auctionOnly:true }
   ],
   badges: [
     { id:'badge_stall',   name:'Fã de Stall',   price:30, emoji:'🐌' },
@@ -1760,4 +1762,61 @@ async function buyFeaturedItem(supabaseUrl, supabaseAnonKey, name, item){
     await logCoinTransaction(supabaseUrl, supabaseAnonKey, name, -item.discountedPrice, `Comprou "${item.name}" na Loja Rotativa (${WEEKLY_FEATURED_DISCOUNT_PCT}% de desconto)`);
   }
   return {ok: patchRes.ok};
+}
+
+// ---------- Leilão de item raro ----------
+const AUCTION_DURATION_DAYS = 3;
+// Itens marcados como auctionOnly no catálogo — nunca à venda direta, só aqui.
+const AUCTIONABLE_ITEMS = ['frame_diamond', 'title_auction_legend'];
+
+function getCosmeticCategory(itemId){
+  for(const cat of Object.keys(COSMETIC_CATALOG)){
+    if(COSMETIC_CATALOG[cat].some(i=>i.id===itemId)) return cat;
+  }
+  return null;
+}
+
+async function fetchActiveAuction(supabaseUrl, supabaseAnonKey){
+  const res = await fetch(`${supabaseUrl}/rest/v1/auctions?status=eq.active&order=created_at.desc&limit=1&select=*`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return null;
+  const rows = await res.json();
+  return (rows && rows[0]) ? rows[0] : null;
+}
+
+async function fetchAuctionBids(supabaseUrl, supabaseAnonKey, auctionId){
+  const res = await fetch(`${supabaseUrl}/rest/v1/auction_bids?auction_id=eq.${auctionId}&order=amount.desc&select=*`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return [];
+  return await res.json();
+}
+
+async function fetchPastAuctions(supabaseUrl, supabaseAnonKey, limit){
+  const res = await fetch(`${supabaseUrl}/rest/v1/auctions?status=eq.concluded&order=created_at.desc&limit=${limit||10}&select=*`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return [];
+  return await res.json();
+}
+
+// Devolve {ok, reason} — 'invalid' | 'insufficient' | 'toolow' | 'ended' | 'error' | true
+async function placeBid(supabaseUrl, supabaseAnonKey, auctionId, bidderName, amount){
+  if(!amount || amount <= 0) return {ok:false, reason:'invalid'};
+  const auctionRes = await fetch(`${supabaseUrl}/rest/v1/auctions?id=eq.${auctionId}&select=*`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const auctionRows = await auctionRes.json();
+  if(!auctionRows || !auctionRows[0]) return {ok:false, reason:'error'};
+  const auction = auctionRows[0];
+  if(auction.status !== 'active' || new Date(auction.ends_at) < new Date()) return {ok:false, reason:'ended'};
+
+  const bids = await fetchAuctionBids(supabaseUrl, supabaseAnonKey, auctionId);
+  const highest = bids.length ? bids[0].amount : 0;
+  if(amount <= highest) return {ok:false, reason:'toolow'};
+
+  const playerRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(bidderName)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const playerRows = await playerRes.json();
+  if(!playerRows || !playerRows[0]) return {ok:false, reason:'error'};
+  if((playerRows[0].coins||0) < amount) return {ok:false, reason:'insufficient'};
+
+  const insertRes = await fetch(`${supabaseUrl}/rest/v1/auction_bids`, {
+    method:'POST',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify([{ auction_id: auctionId, bidder_name: bidderName, amount }])
+  });
+  return {ok: insertRes.ok};
 }

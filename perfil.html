@@ -581,7 +581,7 @@ function customizeItemHtml(item, type, profile){
     frame: profile.equippedFrame, nameEffect: profile.equippedNameEffect, title: profile.equippedTitle
   };
   const equippedId = fieldMap[type];
-  const owned = item.price === 0 || (profile.ownedCosmetics||[]).includes(item.id);
+  const owned = (item.price === 0 && !item.auctionOnly) || (profile.ownedCosmetics||[]).includes(item.id);
   if(!owned) return ''; // só mostra o que já possui — comprar é na loja
   const equipped = equippedId ? equippedId === item.id : item.price === 0;
 
