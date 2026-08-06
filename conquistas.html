@@ -256,12 +256,14 @@ function onPlayerChange(){
   renderAchievements();
 }
 
-function renderAchievements(){
+async function renderAchievements(){
   const name = document.getElementById('playerSelect').value;
   if(!name) return;
   const stats = playerStats[name] || { wins:0, losses:0, titles:0, titlesByTier:{}, tournaments:[] };
   const streak = computeAllCurrentStreaks(allRows)[name] || null;
-  const earned = computeAchievements(stats, streak);
+  const grid = document.getElementById('achievementsGrid');
+  grid.innerHTML = '<div class="empty-state">A calcular…</div>';
+  const earned = await computeAllAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, stats, streak, allRows);
   const isOwn = name === loggedInPlayerName;
   const featured = (playerProfiles[name] && playerProfiles[name].featuredAchievements) || [];
 
@@ -269,7 +271,6 @@ function renderAchievements(){
   const pct = Math.round((earned.size / ACHIEVEMENTS.length) * 100);
   document.getElementById('progressBarFill').style.width = pct + '%';
 
-  const grid = document.getElementById('achievementsGrid');
   grid.innerHTML = ACHIEVEMENTS.map(a=>{
     const has = earned.has(a.id);
     const isFeatured = featured.includes(a.id);

@@ -275,7 +275,7 @@ function getViewedPlayerName(){
   return requested || loggedInPlayerName;
 }
 
-function renderProfile(){
+async function renderProfile(){
   const name = getViewedPlayerName();
   const isOwnProfile = name === loggedInPlayerName;
   const container = document.getElementById('profileContent');
@@ -293,7 +293,7 @@ function renderProfile(){
   currentH2H = h2h;
   const eloHistory = computeEloHistory(allRows, name);
   const myStreak = computeAllCurrentStreaks(allRows)[name] || null;
-  const achievements = computeAchievements(st, myStreak);
+  const achievements = await computeAllAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, st, myStreak, allRows);
 
   if(isOwnProfile){
     checkNewAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, achievements).then(newOnes=>{
@@ -399,12 +399,14 @@ function renderProfile(){
       <div class="shop-grid">
         ${(()=>{
           const featuredIds = (profile.featuredAchievements||[]).filter(id=>achievements.has(id));
-          const showIds = featuredIds.length ? featuredIds : [...achievements].slice(0,4);
-          return ACHIEVEMENTS.filter(a=>showIds.includes(a.id)).map(a=>`
+          if(!featuredIds.length){
+            return `<div class="empty-state" style="grid-column:1/-1;">${isOwnProfile ? `Ainda não escolheu conquistas para destacar — escolha em "Ver todas as conquistas" abaixo.` : 'Este jogador ainda não escolheu conquistas para destacar.'}</div>`;
+          }
+          return ACHIEVEMENTS.filter(a=>featuredIds.includes(a.id)).map(a=>`
             <div class="shop-item" title="${escapeHtml(a.desc)}">
               <div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:22px;">${a.emoji}</div>
               <div class="shop-item-name">${escapeHtml(a.name)}</div>
-            </div>`).join('') || '<div class="empty-state" style="grid-column:1/-1;">Ainda nenhuma conquista — fica de olho!</div>';
+            </div>`).join('');
         })()}
       </div>
       <a href="conquistas.html?jogador=${encodeURIComponent(name)}" class="customize-toggle-btn" style="display:inline-block;text-decoration:none;text-align:center;">Ver todas as conquistas${isOwnProfile ? ' e escolher destaques' : ''} →</a>

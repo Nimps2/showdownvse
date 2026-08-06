@@ -1008,7 +1008,16 @@ const ACHIEVEMENTS = [
   { id:'win_streak_5',         name:'Imparável',           emoji:'⚡', desc:'5 vitórias seguidas' },
   { id:'first_title',          name:'Campeão',             emoji:'🏆', desc:'Venceu o primeiro torneio' },
   { id:'three_titles',         name:'Dinastia',            emoji:'💎', desc:'3 títulos conquistados' },
-  { id:'multi_tier_champion',  name:'Poliglota',           emoji:'👑', desc:'Campeão em 2 tiers diferentes' }
+  { id:'multi_tier_champion',  name:'Poliglota',           emoji:'👑', desc:'Campeão em 2 tiers diferentes' },
+  { id:'immortal',              name:'Imortal',             emoji:'🛡️', desc:'20 vitórias no total' },
+  { id:'legend',                name:'Lenda',               emoji:'🏵️', desc:'5 títulos conquistados' },
+  { id:'precision',             name:'Precisão',            emoji:'🎯', desc:'Winrate de 70%+ (mínimo 10 partidas)' },
+  { id:'omnipresent',           name:'Onipresente',         emoji:'🌍', desc:'Já jogou pelo menos uma vez em todos os 6 tiers' },
+  { id:'survivor',              name:'Sobrevivente',        emoji:'🌱', desc:'Foi campeão depois de ter passado pelo Play-in' },
+  { id:'perfectionist',         name:'Perfeição',           emoji:'💯', desc:'Foi campeão sem perder nenhuma partida no torneio' },
+  { id:'comeback',              name:'Reviravolta',         emoji:'🔄', desc:'Venceu uma Bo3 depois de perder o primeiro jogo' },
+  { id:'sharp_bettor',          name:'Apostador Fino',      emoji:'🔮', desc:'10 palpites certos no Palpiteiro' },
+  { id:'lucky_strike',          name:'Golpe de Sorte',      emoji:'🎰', desc:'Tirou o Jackpot (5x) na Roleta pelo menos uma vez' }
 ];
 
 // stats vem de aggregatePlayers()[nome]; streak vem de computeAllCurrentStreaks()[nome].
@@ -1019,12 +1028,75 @@ function computeAchievements(stats, streak){
   if(stats.tournaments.length >= 1) earned.add('first_tournament');
   if(stats.wins >= 1) earned.add('first_win');
   if(stats.wins >= 10) earned.add('ten_wins');
+  if(stats.wins >= 20) earned.add('immortal');
   if(stats.tournaments.length >= 5) earned.add('five_tournaments');
   if(streak && streak.type === 'win' && streak.count >= 3) earned.add('win_streak_3');
   if(streak && streak.type === 'win' && streak.count >= 5) earned.add('win_streak_5');
   if(stats.titles >= 1) earned.add('first_title');
   if(stats.titles >= 3) earned.add('three_titles');
+  if(stats.titles >= 5) earned.add('legend');
   if(Object.keys(stats.titlesByTier || {}).length >= 2) earned.add('multi_tier_champion');
+  const totalGames = stats.wins + stats.losses;
+  if(totalGames >= 10 && (stats.wins/totalGames) >= 0.7) earned.add('precision');
+  return earned;
+}
+
+// Conquistas que dependem do PERCURSO de torneios específicos (não só do
+// total agregado) — continuam síncronas, já que só precisam de allRows
+// (já carregado), sem consultas extra à base de dados.
+function computeMatchPathAchievements(name, allRows){
+  const earned = new Set();
+  const tiersPlayed = new Set();
+
+  allRows.forEach(r=>{
+    const data = r.data || {};
+    const players = data.players || [];
+    if(players.includes(name)) tiersPlayed.add(data.tier || r.tier);
+
+    const matches = data.matches || [];
+    if(data.champion === name){
+      const myMatches = matches.filter(m => m.winner && (m.p1===name || m.p2===name));
+      const anyLoss = myMatches.some(m => m.winner !== name);
+      if(!anyLoss && myMatches.length) earned.add('perfectionist');
+      const playedPlayIn = myMatches.some(m => m.label === 'Play-in');
+      if(playedPlayIn) earned.add('survivor');
+    }
+    matches.forEach(m=>{
+      if(m.bo === 3 && m.winner === name && m.games && m.games[0] && m.games[0] !== name){
+        earned.add('comeback');
+      }
+    });
+  });
+
+  if(tiersPlayed.size >= 6) earned.add('omnipresent');
+  return earned;
+}
+
+// Conquistas que dependem de OUTRAS tabelas (palpites, transações de moedas)
+// — precisam de consultas assíncronas extra à base de dados.
+async function computeAsyncAchievements(supabaseUrl, supabaseAnonKey, name){
+  const earned = new Set();
+  try{
+    const predRes = await fetch(`${supabaseUrl}/rest/v1/predictions?predictor_name=eq.${encodeURIComponent(name)}&correct=eq.true&select=id`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const predRows = await predRes.json();
+    if(Array.isArray(predRows) && predRows.length >= 10) earned.add('sharp_bettor');
+  } catch(e){ /* ignora silenciosamente */ }
+
+  try{
+    const jackpotRes = await fetch(`${supabaseUrl}/rest/v1/coin_transactions?player_name=eq.${encodeURIComponent(name)}&reason=like.*Jackpot*&select=id&limit=1`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const jackpotRows = await jackpotRes.json();
+    if(Array.isArray(jackpotRows) && jackpotRows.length >= 1) earned.add('lucky_strike');
+  } catch(e){ /* ignora silenciosamente */ }
+
+  return earned;
+}
+
+// Junta as três fontes (agregado, percurso, outras tabelas) numa só chamada.
+async function computeAllAchievements(supabaseUrl, supabaseAnonKey, name, stats, streak, allRows){
+  const earned = computeAchievements(stats, streak);
+  computeMatchPathAchievements(name, allRows).forEach(id=>earned.add(id));
+  const asyncOnes = await computeAsyncAchievements(supabaseUrl, supabaseAnonKey, name);
+  asyncOnes.forEach(id=>earned.add(id));
   return earned;
 }
 
@@ -1037,6 +1109,11 @@ function computeGlobalAchievementStats(playerStats, allRows){
   ACHIEVEMENTS.forEach(a=>{ counts[a.id] = 0; });
   names.forEach(name=>{
     const earned = computeAchievements(playerStats[name], streaks[name]);
+    computeMatchPathAchievements(name, allRows).forEach(id=>earned.add(id));
+    // Nota: as conquistas baseadas noutras tabelas (Apostador Fino, Golpe de
+    // Sorte) ficam de fora desta % global de propósito — evita multiplicar
+    // por N jogadores o número de consultas à base de dados só para uma
+    // estatística de resumo.
     earned.forEach(id=>{ counts[id] = (counts[id]||0) + 1; });
   });
   return ACHIEVEMENTS.map(a=>({
