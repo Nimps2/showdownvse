@@ -305,7 +305,7 @@ async function handleDailyBonusClick(){
   const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
   const icon = document.getElementById('dailyBonusIcon');
   if(result.awarded){
-    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
   }
   if(icon) icon.classList.remove('available');
 }
@@ -433,9 +433,13 @@ function matchRow(m){
     lowerBody = `<div class="bo3-tracker"><div class="bo3-score">${p1wins} - ${p2wins}</div></div>`;
   }
 
-  const nameLink = (n, cls) => n
-    ? `<a class="p ${cls}" style="text-decoration:none;color:inherit;" href="perfil.html?jogador=${encodeURIComponent(n)}" onmouseover="showHoverCard(event,'${n.replace(/'/g,"\\'")}')" onmousemove="positionHoverCard(event)" onmouseout="hideHoverCard()">${escapeHtml(n)}</a>`
-    : `<span class="p">—</span>`;
+  const nameLink = (n, cls) => {
+    if(!n) return `<span class="p">—</span>`;
+    const profile = playerProfiles[n] || {};
+    const accentCosmetic = profile.equippedAccent ? getCosmeticById(profile.equippedAccent) : null;
+    const color = accentCosmetic ? accentCosmetic.color : 'inherit';
+    return `<a class="p ${cls}" style="text-decoration:none;color:${color};" href="perfil.html?jogador=${encodeURIComponent(n)}" onmouseover="showHoverCard(event,'${n.replace(/'/g,"\\'")}')" onmousemove="positionHoverCard(event)" onmouseout="hideHoverCard()">${escapeHtml(n)}</a>`;
+  };
 
   const replayUrls = m.replayUrls || (m.replayUrl ? [m.replayUrl] : []);
   const replayLink = replayUrls.some(u=>u)

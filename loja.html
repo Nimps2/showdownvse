@@ -155,6 +155,12 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 
   <!-- ==================== PERSONALIZAÇÃO ==================== -->
   <div id="panel-personalizacao" class="shop-panel active">
+    <div class="card" style="border-color:rgba(240,182,79,0.35);background:linear-gradient(135deg,rgba(240,182,79,0.06),rgba(165,107,240,0.04));">
+      <h2>🔄 Loja Rotativa — Destaque da Semana</h2>
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:12px;">Um item diferente em destaque a cada semana, sempre com desconto. Volta cá regularmente!</div>
+      <div id="weeklyFeaturedContainer"><div class="empty-state">A carregar…</div></div>
+    </div>
+
     <div class="card">
       <h2>🎁 Caixa Surpresa</h2>
       <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">🪙<span id="lootBoxPriceLabel">?</span> por um item totalmente aleatório — pode ser qualquer fundo, cor, moldura, efeito, título ou emblema que você ainda não tenha. Você não escolhe o quê, só a sorte decide.</div>
@@ -226,6 +232,14 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
     </div>
 
     <div class="card">
+      <h2>🎀 Presente Surpresa</h2>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">Em vez de moedas, presenteie um cosmético aleatório — o destinatário não escolhe qual, só a sorte decide. Custa 🪙<span id="surpriseGiftPriceLabel">?</span>.</div>
+      <select id="surpriseGiftTargetSelect"></select>
+      <button class="btn-primary" onclick="doGiftSurpriseCosmetic()">Presentear surpresa</button>
+      <div id="surpriseGiftResult" style="margin-top:10px;font-size:13px;"></div>
+    </div>
+
+    <div class="card">
       <h2>💝 Ranking de Generosidade</h2>
       <div id="generosityList"><div class="empty-state">A carregar…</div></div>
     </div>
@@ -233,9 +247,14 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 
   <!-- ==================== SORTE ==================== -->
   <div id="panel-sorte" class="shop-panel">
-    <div class="card">
+    <div class="card" style="border-color:rgba(240,182,79,0.35);background:linear-gradient(135deg,rgba(240,182,79,0.06),rgba(165,107,240,0.04));">
       <h2>🎰 Roleta</h2>
-      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Aposte moedas e gire — pode perder tudo, ganhar de volta parte, ou multiplicar até 5x. É pura sorte, sem ligação com o resultado de nenhuma partida.</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">Aposte moedas e gire — pode perder tudo, ganhar de volta parte, ou multiplicar até 5x. É pura sorte, sem ligação com o resultado de nenhuma partida.</div>
+      <div style="text-align:center;background:var(--bg-panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px;">
+        <div style="font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">💎 Pote do Jackpot Progressivo</div>
+        <div id="jackpotPotDisplay" style="font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:22px;color:var(--tera-amber);">🪙 —</div>
+        <div style="font-size:10px;color:var(--text-faint);">Cresce com cada aposta perdida de qualquer jogador — quem tirar o Jackpot leva tudo!</div>
+      </div>
       <input type="number" id="rouletteBet" placeholder="Quantas moedas apostar?" min="1">
       <button class="btn-primary" onclick="doSpinRoulette()">Girar</button>
       <div id="rouletteResult" style="margin-top:12px;font-size:13px;"></div>
@@ -259,7 +278,9 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 <script src="showdown-utils.js"></script>
 <script>
 initTheme();
+ensureAnimatedBgStyles();
 document.getElementById('lootBoxPriceLabel').textContent = LOOT_BOX_PRICE;
+document.getElementById('surpriseGiftPriceLabel').textContent = SURPRISE_GIFT_PRICE;
 document.getElementById('sponsorshipPriceLabel').textContent = SPONSORSHIP_PRICE;
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
@@ -339,7 +360,7 @@ async function handleDailyBonusClick(){
   const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
   const icon = document.getElementById('dailyBonusIcon');
   if(result.awarded){
-    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
   }
   if(icon) icon.classList.remove('available');
 }
@@ -368,6 +389,7 @@ async function init(){
     generosityRanking = await fetchGenerosityRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
     rouletteHistory = await fetchRouletteTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 20);
     rouletteRanking = await fetchRouletteRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
+    refreshJackpotDisplay();
     renderAll();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
@@ -377,6 +399,8 @@ async function init(){
 function renderAll(){
   const myProfile = playerProfiles[loggedInPlayerName] || {};
   document.getElementById('myCoinsDisplay').textContent = `🪙 ${myProfile.coins || 0}`;
+
+  renderWeeklyFeatured(myProfile);
 
   // Personalização
   document.getElementById('shopBackgrounds').innerHTML = COSMETIC_CATALOG.backgrounds.map(item => shopItemHtml(item, 'background', myProfile)).join('');
@@ -408,6 +432,8 @@ function renderAll(){
   const giftSel = document.getElementById('giftTargetSelect');
   const otherNames = Object.keys(playerProfiles).filter(n=>n!==loggedInPlayerName).sort((a,b)=>a.localeCompare(b));
   giftSel.innerHTML = '<option value="">— selecione um jogador —</option>' + otherNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  const surpriseGiftSel = document.getElementById('surpriseGiftTargetSelect');
+  surpriseGiftSel.innerHTML = '<option value="">— selecione um jogador —</option>' + otherNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
   document.getElementById('generosityList').innerHTML = generosityRanking.length
     ? generosityRanking.map(([gname, total], i)=>`<div class="history-row"><span><span style="color:var(--text-faint);font-family:'Chakra Petch',sans-serif;margin-right:8px;">#${i+1}</span>${escapeHtml(gname)}</span><b style="color:var(--tera-amber);">🪙 ${total} doado(s)</b></div>`).join('')
     : '<div class="empty-state">Ainda ninguém presenteou moedas a outro jogador.</div>';
@@ -432,6 +458,12 @@ async function refreshAfterSpend(){
   renderAll();
 }
 
+async function refreshJackpotDisplay(){
+  const pot = await fetchRouletteJackpot(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const el = document.getElementById('jackpotPotDisplay');
+  if(el) el.textContent = `🪙 ${pot}`;
+}
+
 function shopItemHtml(item, type, profile){
   const fieldMap = {
     background: profile.equippedBackground, accent: profile.equippedAccent,
@@ -442,7 +474,7 @@ function shopItemHtml(item, type, profile){
   const equipped = equippedId ? equippedId === item.id : item.price === 0;
 
   let swatchHtml;
-  if(type === 'background') swatchHtml = `<div class="shop-swatch" style="background:${item.css};"></div>`;
+  if(type === 'background') swatchHtml = `<div class="shop-swatch" style="background:${item.css};${item.animated?'background-size:400% 400%;animation:vseAuroraShift 8s ease infinite;':''}"></div>`;
   else if(type === 'accent') swatchHtml = `<div class="shop-swatch" style="background:${item.color};"></div>`;
   else if(type === 'frame') swatchHtml = `<div class="shop-swatch" style="background:var(--bg-panel);border:${item.border==='none'?'2px dashed var(--line)':item.border};"></div>`;
   else if(type === 'nameEffect') swatchHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;font-weight:700;${item.css}">Abc</div>`;
@@ -480,6 +512,46 @@ function shopCustomBgHtml(profile){
     <div class="shop-item-name">${escapeHtml(item.name)}</div>
     <button class="shop-btn" onclick="doBuyCosmetic('feature_custom_pagebg')">Comprar 🪙${item.price}</button>
   </div>`;
+}
+
+function renderWeeklyFeatured(profile){
+  const el = document.getElementById('weeklyFeaturedContainer');
+  const item = getWeeklyFeaturedItem();
+  if(!item){ el.innerHTML = '<div class="empty-state">Sem itens disponíveis de momento.</div>'; return; }
+
+  const owned = (profile.ownedCosmetics || []).includes(item.id);
+  const categoryLabels = { backgrounds:'Fundo', accents:'Cor de destaque', frames:'Moldura', nameEffects:'Efeito no nome', titles:'Título', badges:'Emblema' };
+
+  let previewHtml;
+  if(item.category === 'backgrounds') previewHtml = `<div class="shop-swatch" style="background:${item.css};${item.animated?'background-size:400% 400%;animation:vseAuroraShift 8s ease infinite;':''}"></div>`;
+  else if(item.category === 'accents') previewHtml = `<div class="shop-swatch" style="background:${item.color};"></div>`;
+  else if(item.category === 'frames') previewHtml = `<div class="shop-swatch" style="background:var(--bg-panel);border:${item.border==='none'?'2px dashed var(--line)':item.border};"></div>`;
+  else if(item.category === 'nameEffects') previewHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;font-weight:700;${item.css}">Abc</div>`;
+  else if(item.category === 'titles') previewHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:11px;padding:4px;">${item.text ? escapeHtml(item.text) : '—'}</div>`;
+  else previewHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:20px;">${item.emoji||''}</div>`;
+
+  el.innerHTML = `<div class="shop-item" style="max-width:220px;">
+    ${previewHtml}
+    <div class="shop-item-name">${escapeHtml(item.name)} <span style="color:var(--text-faint);">(${categoryLabels[item.category]||''})</span></div>
+    ${owned
+      ? `<button class="shop-btn" disabled style="opacity:0.5;">Já possui ✓</button>`
+      : `<div style="font-size:11px;margin-bottom:6px;"><span style="text-decoration:line-through;color:var(--text-faint);">🪙${item.price}</span> <b style="color:var(--tera-amber);">🪙${item.discountedPrice}</b> <span style="color:var(--success);">(-${item.discountPct}%)</span></div>
+         <button class="shop-btn" onclick="doBuyFeaturedItem()">Comprar com desconto</button>`}
+  </div>`;
+}
+
+async function doBuyFeaturedItem(){
+  const item = getWeeklyFeaturedItem();
+  const result = await buyFeaturedItem(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, item);
+  if(!result.ok){
+    const msg = result.reason === 'insufficient' ? 'Moedas insuficientes para comprar este item.'
+      : result.reason === 'alreadyowned' ? 'Você já possui este item.'
+      : 'Não foi possível comprar. Tente novamente.';
+    alert(msg);
+    return;
+  }
+  await refreshAfterSpend();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Comprou "${item.name}" na Loja Rotativa (🪙${item.discountedPrice}, -${item.discountPct}%)`);
 }
 
 async function doBuyCosmetic(id){
@@ -596,6 +668,23 @@ async function doGiftCoins(){
   logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'moedas', `Presenteou 🪙${amount} para ${targetName}`);
 }
 
+async function doGiftSurpriseCosmetic(){
+  const targetName = document.getElementById('surpriseGiftTargetSelect').value;
+  const resultDiv = document.getElementById('surpriseGiftResult');
+  if(!targetName){ alert('Escolha um jogador.'); return; }
+  const result = await giftSurpriseCosmetic(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, targetName);
+  if(!result.ok){
+    const msg = result.reason === 'insufficient' ? `Você precisa de 🪙${SURPRISE_GIFT_PRICE} para este presente.`
+      : result.reason === 'nooptions' ? 'Esse jogador já tem todos os cosméticos possíveis!'
+      : 'Não foi possível processar. Tente novamente.';
+    resultDiv.innerHTML = `<span style="color:var(--danger);">${msg}</span>`;
+    return;
+  }
+  resultDiv.innerHTML = `<span style="color:var(--success);font-family:'Chakra Petch',sans-serif;font-weight:700;">🎀 Enviaste "${escapeHtml(result.item.name)}" para ${escapeHtml(targetName)}!</span>`;
+  await refreshAfterSpend();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Deu um Presente Surpresa a ${targetName}: "${result.item.name}" (🪙${SURPRISE_GIFT_PRICE})`);
+}
+
 let playerCoinsLocal = 0;
 async function doSpinRoulette(){
   const betInput = document.getElementById('rouletteBet');
@@ -629,11 +718,15 @@ async function doSpinRoulette(){
   }
   const net = result.payout - bet;
   const color = net > 0 ? 'var(--success)' : net === 0 ? 'var(--text-faint)' : 'var(--danger)';
-  resultDiv.innerHTML = `<div class="reveal-pop" style="color:${color};font-family:'Chakra Petch',sans-serif;font-weight:700;">${result.outcome.label} — ${net>=0?'+':''}${net} 🪙</div>`;
+  const resultLabel = result.jackpotWon
+    ? `💎 JACKPOT PROGRESSIVO! Levou o pote inteiro: 🪙${result.jackpotWon}`
+    : `${result.outcome.label} — ${net>=0?'+':''}${net} 🪙`;
+  resultDiv.innerHTML = `<div class="reveal-pop" style="color:${color};font-family:'Chakra Petch',sans-serif;font-weight:700;">${resultLabel}</div>`;
   if(spinBtn) spinBtn.disabled = false;
   betInput.value = '';
   rouletteHistory = await fetchRouletteTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 20);
   rouletteRanking = await fetchRouletteRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
+  refreshJackpotDisplay();
   await refreshAfterSpend();
   logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Girou a roleta com 🪙${bet} — ${result.outcome.label} (${net>=0?'+':''}${net})`);
 }

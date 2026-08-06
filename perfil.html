@@ -235,7 +235,7 @@ async function handleDailyBonusClick(){
   const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
   const icon = document.getElementById('dailyBonusIcon');
   if(result.awarded){
-    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
   }
   if(icon) icon.classList.remove('available');
 }
@@ -293,6 +293,9 @@ async function renderProfile(){
   currentH2H = h2h;
   const eloHistory = computeEloHistory(allRows, name);
   const myStreak = computeAllCurrentStreaks(allRows)[name] || null;
+  const seasonComparison = computeSeasonComparison(allRows, name);
+  const winrateByTier = computeWinrateByTier(allRows, name);
+  const iconicTeam = computeIconicTeam(allRows, name);
   const achievements = await computeAllAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, st, myStreak, allRows);
 
   if(isOwnProfile){
@@ -333,7 +336,7 @@ async function renderProfile(){
   const nameEffectCosmetic = profile.equippedNameEffect ? getCosmeticById(profile.equippedNameEffect) : null;
   const titleCosmetic = profile.equippedTitle ? getCosmeticById(profile.equippedTitle) : null;
   const equippedBadges = (profile.equippedBadges || []).map(id=>getCosmeticById(id)).filter(Boolean);
-  const avatar = avatarHtml(name, profile.photo_url, 56, bgCosmetic ? bgCosmetic.css : null, frameCosmetic ? frameCosmetic.border : null);
+  const avatar = avatarHtml(name, profile.photo_url, 56, bgCosmetic ? bgCosmetic.css : null, frameCosmetic ? frameCosmetic.border : null, bgCosmetic ? bgCosmetic.animated : false);
   const hasCustomPageBg = (profile.ownedCosmetics||[]).includes('feature_custom_pagebg') && profile.profileBackgroundUrl;
   const cardBgStyle = hasCustomPageBg
     ? `background-image:linear-gradient(rgba(10,12,20,0.72),rgba(10,12,20,0.72)),url('${profile.profileBackgroundUrl.replace(/'/g,"\\'")}');background-size:cover;background-position:center;`
@@ -429,6 +432,57 @@ async function renderProfile(){
         </div>
       </div>
     </div>
+
+    <div class="card">
+      <h2>⭐ Equipa Icônica</h2>
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">Os 6 Pokémon que mais definem o seu estilo — os mais usados de sempre.</div>
+      <div class="shop-grid">
+        ${iconicTeam.length ? iconicTeam.map(m=>`
+          <div class="shop-item">
+            <div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:11px;font-weight:700;">${escapeHtml(m.species)}</div>
+            <div class="shop-item-name">${m.count}x usado</div>
+          </div>`).join('') : '<div class="empty-state" style="grid-column:1/-1;">Sem dados suficientes ainda.</div>'}
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Winrate por Tier</h2>
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">Em qual tier joga melhor — só entram tiers com partidas registadas.</div>
+      ${winrateByTier.length ? winrateByTier.map(t=>`
+        <div class="history-row"><span><span class="tier-pill">${escapeHtml(t.tier)}</span> ${t.wins}V - ${t.losses}D</span><b style="color:var(--tera-amber);">${t.winrate}%</b></div>
+      `).join('') : '<div class="empty-state">Ainda sem partidas registadas.</div>'}
+    </div>
+
+    ${seasonComparison.length ? `
+    <div class="card">
+      <h2>Comparador de Temporadas</h2>
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">Temporadas anuais, a contar a partir do primeiro torneio do grupo.</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--line);text-align:left;color:var(--text-faint);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">
+              <th style="padding:6px 8px;">Temporada</th>
+              <th style="padding:6px 8px;">Torneios</th>
+              <th style="padding:6px 8px;">V - D</th>
+              <th style="padding:6px 8px;">Títulos</th>
+              <th style="padding:6px 8px;">Elo médio</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${seasonComparison.map(s=>`
+              <tr style="border-bottom:1px solid var(--line);">
+                <td style="padding:6px 8px;font-weight:700;">Temporada ${s.season}</td>
+                <td style="padding:6px 8px;">${s.tournamentsPlayed}</td>
+                <td style="padding:6px 8px;">${s.wins}V - ${s.losses}D</td>
+                <td style="padding:6px 8px;">${s.titles}</td>
+                <td style="padding:6px 8px;color:var(--tera-amber);">${s.avgElo !== null ? s.avgElo : '—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    ` : ''}
 
     <div class="card">
       <h2>Confrontos & Sequências</h2>
@@ -532,7 +586,7 @@ function customizeItemHtml(item, type, profile){
   const equipped = equippedId ? equippedId === item.id : item.price === 0;
 
   let swatchHtml;
-  if(type === 'background') swatchHtml = `<div class="shop-swatch" style="background:${item.css};"></div>`;
+  if(type === 'background') swatchHtml = `<div class="shop-swatch" style="background:${item.css};${item.animated?'background-size:400% 400%;animation:vseAuroraShift 8s ease infinite;':''}"></div>`;
   else if(type === 'accent') swatchHtml = `<div class="shop-swatch" style="background:${item.color};"></div>`;
   else if(type === 'frame') swatchHtml = `<div class="shop-swatch" style="background:var(--bg-panel);border:${item.border==='none'?'2px dashed var(--line)':item.border};"></div>`;
   else if(type === 'nameEffect') swatchHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;font-weight:700;${item.css}">Abc</div>`;

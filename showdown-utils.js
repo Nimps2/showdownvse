@@ -227,7 +227,8 @@ const COSMETIC_CATALOG = {
     { id:'bg_ocean',    name:'Oceano',       price:50,  css:'linear-gradient(135deg,#0e9488,#4fd8d0)' },
     { id:'bg_galaxy',   name:'Galáxia',      price:80,  css:'linear-gradient(135deg,#7c4dc4,#1a1d29)' },
     { id:'bg_fire',     name:'Fogo',         price:80,  css:'linear-gradient(135deg,#e0607a,#f0b64f)' },
-    { id:'bg_gold',     name:'Ouro Puro',    price:150, css:'linear-gradient(135deg,#f0b64f,#b8860b)' }
+    { id:'bg_gold',     name:'Ouro Puro',    price:150, css:'linear-gradient(135deg,#f0b64f,#b8860b)' },
+    { id:'bg_aurora',   name:'Aurora Animada', price:220, css:'linear-gradient(270deg,#4fd8d0,#a56bf0,#f0b64f,#4fd8d0)', animated:true }
   ],
   accents: [
     { id:'accent_default', name:'Ciano (padrão)', price:0,  color:'#4fd8d0' },
@@ -353,15 +354,31 @@ async function setProfileBackgroundUrl(supabaseUrl, supabaseAnonKey, name, url){
 
 // Devolve HTML de um avatar: <img> se houver photo_url, senão um círculo com
 // as iniciais, usando o fundo e a moldura personalizados equipados (se existirem).
-function avatarHtml(name, photoUrl, sizePx, backgroundCss, frameBorder){
+function ensureAnimatedBgStyles(){
+  if(document.getElementById('vseAnimatedBgStyles')) return;
+  const style = document.createElement('style');
+  style.id = 'vseAnimatedBgStyles';
+  style.textContent = `
+    @keyframes vseAuroraShift{0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
+    .vse-animated-bg{background-size:400% 400%;animation:vseAuroraShift 8s ease infinite;}
+  `;
+  document.head.appendChild(style);
+}
+
+function avatarHtml(name, photoUrl, sizePx, backgroundCss, frameBorder, animated){
+  if(animated) ensureAnimatedBgStyles();
   const size = sizePx || 44;
   const border = frameBorder && frameBorder !== 'none' ? `border:${frameBorder};` : '';
+  const bg = backgroundCss || 'linear-gradient(135deg,var(--tera-violet),var(--tera-cyan))';
+  const animClass = animated ? ' vse-animated-bg' : '';
   if(photoUrl){
-    return `<img src="${photoUrl.replace(/"/g,'&quot;')}" alt="${(name||'').replace(/"/g,'&quot;')}" style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;object-fit:cover;flex-shrink:0;${border}" onerror="this.style.display='none';">`;
+    const innerSize = Math.max(size - 4, 4); // deixa o fundo aparecer como um anel colorido à volta da foto
+    return `<div class="${animClass}" style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;flex-shrink:0;background:${bg};display:flex;align-items:center;justify-content:center;${border}">
+      <img src="${photoUrl.replace(/"/g,'&quot;')}" alt="${(name||'').replace(/"/g,'&quot;')}" style="width:${innerSize}px;height:${innerSize}px;border-radius:${Math.round(innerSize*0.28)}px;object-fit:cover;" onerror="this.parentElement.style.display='none';">
+    </div>`;
   }
   const initials = (name||'?').slice(0,2).toUpperCase();
-  const bg = backgroundCss || 'linear-gradient(135deg,var(--tera-violet),var(--tera-cyan))';
-  return `<div style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;flex-shrink:0;background:${bg};display:flex;align-items:center;justify-content:center;font-family:'Chakra Petch',sans-serif;font-size:${Math.round(size*0.4)}px;font-weight:700;color:#0a0c14;${border}">${initials}</div>`;
+  return `<div class="${animClass}" style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;flex-shrink:0;background:${bg};display:flex;align-items:center;justify-content:center;font-family:'Chakra Petch',sans-serif;font-size:${Math.round(size*0.4)}px;font-weight:700;color:#0a0c14;${border}">${initials}</div>`;
 }
 
 // ---------- Troféus do último torneio concluído (Ouro/Prata/Bronze) ----------
@@ -476,7 +493,7 @@ function buildHoverCardHtml(name, playerStats, playerProfiles, currentTrophies, 
   const titleCosmetic = profile.equippedTitle ? getCosmeticById(profile.equippedTitle) : null;
   const equippedBadgeEmojis = (profile.equippedBadges || []).map(id=>getCosmeticById(id)).filter(Boolean).map(b=>b.emoji).join(' ');
   const accentColor = accentCosmetic ? accentCosmetic.color : 'var(--text-main)';
-  const avatar = avatarHtml(name, profile.photo_url, 40, bgCosmetic ? bgCosmetic.css : null, frameCosmetic ? frameCosmetic.border : null);
+  const avatar = avatarHtml(name, profile.photo_url, 40, bgCosmetic ? bgCosmetic.css : null, frameCosmetic ? frameCosmetic.border : null, bgCosmetic ? bgCosmetic.animated : false);
   const trophy = trophyEmojiFor(name, currentTrophies);
   const elo = eloRatings ? (eloRatings[name] || 1000) : null;
 
@@ -648,6 +665,49 @@ async function giftCoins(supabaseUrl, supabaseAnonKey, fromName, toName, amount)
   }
   await logGift(supabaseUrl, supabaseAnonKey, fromName, toName, amount);
   return {ok:true};
+}
+
+// ---------- Presente Surpresa: compra um cosmético aleatório para OUTRO jogador ----------
+const SURPRISE_GIFT_PRICE = 40;
+
+// Devolve {ok, reason, item} — 'insufficient' | 'nooptions' | 'invalid' | 'error' | true
+async function giftSurpriseCosmetic(supabaseUrl, supabaseAnonKey, fromName, toName){
+  if(fromName === toName) return {ok:false, reason:'invalid'};
+
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(fromName)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const rows = await res.json();
+  if(!rows || !rows[0]) return {ok:false, reason:'error'};
+  if((rows[0].coins||0) < SURPRISE_GIFT_PRICE) return {ok:false, reason:'insufficient'};
+
+  const toRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(toName)}&select=owned_cosmetics`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const toRows = await toRes.json();
+  if(!toRows || !toRows[0]) return {ok:false, reason:'error'};
+  const toOwned = toRows[0].owned_cosmetics || [];
+
+  const allAvailable = [];
+  LOOT_BOX_CATEGORIES.forEach(cat=>{
+    (COSMETIC_CATALOG[cat]||[]).forEach(item=>{
+      if(item.price > 0 && !toOwned.includes(item.id)) allAvailable.push(item);
+    });
+  });
+  if(!allAvailable.length) return {ok:false, reason:'nooptions'};
+  const won = allAvailable[Math.floor(Math.random()*allAvailable.length)];
+
+  const fromOk = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, fromName, -SURPRISE_GIFT_PRICE, `Presente Surpresa para ${toName}: ${won.name}`);
+  if(!fromOk) return {ok:false, reason:'error'};
+
+  const newOwned = toOwned.concat([won.id]);
+  const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(toName)}`, {
+    method:'PATCH',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify({ owned_cosmetics: newOwned })
+  });
+  if(!patchRes.ok){
+    await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, fromName, SURPRISE_GIFT_PRICE, 'Estorno de Presente Surpresa (falhou)');
+    return {ok:false, reason:'error'};
+  }
+  await logCoinTransaction(supabaseUrl, supabaseAnonKey, toName, 0, `Recebeu Presente Surpresa de ${fromName}: ${won.name}`);
+  return {ok:true, item: won};
 }
 
 async function fetchGenerosityRanking(supabaseUrl, supabaseAnonKey){
@@ -884,7 +944,24 @@ function pickRouletteOutcome(){
   return ROULETTE_OUTCOMES[0];
 }
 
-// Devolve {ok, reason, outcome, payout} — 'insufficient' | 'invalid' | 'error' | true
+// ---------- Jackpot progressivo da Roleta ----------
+// Uma pequena % de cada aposta PERDIDA alimenta um pote partilhado por todos;
+// quem tirar o resultado de Jackpot leva o pote inteiro (não só 5x a aposta),
+// e o pote volta ao valor base.
+const ROULETTE_JACKPOT_BASE = 100;
+const ROULETTE_JACKPOT_FEED_PCT = 15;
+
+async function fetchRouletteJackpot(supabaseUrl, supabaseAnonKey){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/roulette_jackpot?id=eq.1&select=pot`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const rows = await res.json();
+    return (rows && rows[0]) ? rows[0].pot : ROULETTE_JACKPOT_BASE;
+  } catch(e){
+    return ROULETTE_JACKPOT_BASE;
+  }
+}
+
+// Devolve {ok, reason, outcome, payout, jackpotWon} — 'insufficient' | 'invalid' | 'error' | true
 async function spinRoulette(supabaseUrl, supabaseAnonKey, name, betAmount){
   if(!betAmount || betAmount <= 0) return {ok:false, reason:'invalid'};
   const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
@@ -893,12 +970,35 @@ async function spinRoulette(supabaseUrl, supabaseAnonKey, name, betAmount){
   if((rows[0].coins||0) < betAmount) return {ok:false, reason:'insufficient'};
 
   const outcome = pickRouletteOutcome();
-  const payout = Math.round(betAmount * outcome.multiplier);
-  const net = payout - betAmount; // pode ser negativo
+  let payout = Math.round(betAmount * outcome.multiplier);
+  let jackpotWon = null;
+  const currentPot = await fetchRouletteJackpot(supabaseUrl, supabaseAnonKey);
 
-  const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, net, `Roleta: ${outcome.label}`);
+  if(outcome.multiplier === 5){
+    // Jackpot! ganha o pote inteiro, que depois volta ao valor base.
+    jackpotWon = currentPot;
+    payout = currentPot;
+    try{
+      await fetch(`${supabaseUrl}/rest/v1/roulette_jackpot?id=eq.1`, {
+        method:'PATCH', headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+        body: JSON.stringify({ pot: ROULETTE_JACKPOT_BASE })
+      });
+    } catch(e){ /* nao critico */ }
+  } else if(outcome.multiplier === 0){
+    const feed = Math.max(1, Math.round(betAmount * ROULETTE_JACKPOT_FEED_PCT / 100));
+    try{
+      await fetch(`${supabaseUrl}/rest/v1/roulette_jackpot?id=eq.1`, {
+        method:'PATCH', headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+        body: JSON.stringify({ pot: currentPot + feed })
+      });
+    } catch(e){ /* nao critico */ }
+  }
+
+  const net = payout - betAmount;
+  const reason = jackpotWon ? `Roleta: 💎 JACKPOT PROGRESSIVO! (🪙${jackpotWon})` : `Roleta: ${outcome.label}`;
+  const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, net, reason);
   if(!ok) return {ok:false, reason:'error'};
-  return {ok:true, outcome, payout};
+  return {ok:true, outcome, payout, jackpotWon};
 }
 
 // ---------- Ícone do jogador logado (canto da tela, leva ao perfil) ----------
@@ -918,7 +1018,7 @@ function renderPlayerCornerBadge(name, profile){
   const bgCosmetic = profile.equippedBackground ? getCosmeticById(profile.equippedBackground) : null;
   const frameCosmetic = profile.equippedFrame ? getCosmeticById(profile.equippedFrame) : null;
   const accentCosmetic = profile.equippedAccent ? getCosmeticById(profile.equippedAccent) : null;
-  const avatar = avatarHtml(name, profile.photo_url, 28, bgCosmetic ? bgCosmetic.css : null, frameCosmetic ? frameCosmetic.border : null);
+  const avatar = avatarHtml(name, profile.photo_url, 28, bgCosmetic ? bgCosmetic.css : null, frameCosmetic ? frameCosmetic.border : null, bgCosmetic ? bgCosmetic.animated : false);
   return `<a href="perfil.html" class="player-corner-badge" title="Ver o meu perfil">
     ${avatar}
     <span class="player-corner-name" style="${accentCosmetic ? `color:${accentCosmetic.color};` : ''}">${escapeHtml(displayName)}</span>
@@ -1028,7 +1128,8 @@ const ACHIEVEMENTS = [
   { id:'comeback',              name:'Reviravolta',         emoji:'🔄', desc:'Venceu uma Bo3 depois de perder o primeiro jogo' },
   { id:'sharp_bettor',          name:'Apostador Fino',      emoji:'🔮', desc:'10 palpites certos no Palpiteiro' },
   { id:'lucky_strike',          name:'Golpe de Sorte',      emoji:'🎰', desc:'Tirou o Jackpot (5x) na Roleta pelo menos uma vez' },
-  { id:'creative_namer',        name:'Nomeador Criativo',   emoji:'✍️', desc:'Deu apelido a 10 Pokémon diferentes' }
+  { id:'creative_namer',        name:'Nomeador Criativo',   emoji:'✍️', desc:'Deu apelido a 10 Pokémon diferentes' },
+  { id:'perfect_attendance',    name:'Presença Perfeita',   emoji:'📅', desc:'Não faltou a 5 torneios seguidos' }
 ];
 
 // stats vem de aggregatePlayers()[nome]; streak vem de computeAllCurrentStreaks()[nome].
@@ -1086,7 +1187,22 @@ function computeMatchPathAchievements(name, allRows){
   );
   if(myNicknames.size >= 10) earned.add('creative_namer');
 
+  if(computeParticipationStreak(allRows, name) >= 5) earned.add('perfect_attendance');
+
   return earned;
+}
+
+// Quantos torneios seguidos (do mais recente para trás) o jogador participou
+// sem falhar nenhum — independente de ganhar ou perder.
+function computeParticipationStreak(allRows, name){
+  const sorted = allRows.slice().sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
+  let streak = 0;
+  for(const r of sorted){
+    const players = (r.data && r.data.players) || [];
+    if(players.includes(name)) streak++;
+    else break;
+  }
+  return streak;
 }
 
 // Conquistas que dependem de OUTRAS tabelas (palpites, transações de moedas)
@@ -1265,7 +1381,10 @@ function showCelebrationToast(html, durationMs){
 }
 
 // ---------- Bônus diário de login ----------
-const DAILY_BONUS_AMOUNT = 5;
+const DAILY_BONUS_AMOUNT = 5; // mantido para compatibilidade, mas o valor real agora vem de DAILY_STREAK_AMOUNTS
+// Escala por dia de sequência seguida (dia 1 a 7); a partir do dia 8 repete o valor do dia 7,
+// para não crescer sem limite e desequilibrar a economia.
+const DAILY_STREAK_AMOUNTS = [5, 6, 8, 10, 12, 15, 20];
 
 // Verifica se o bónus está disponível hoje, SEM o reclamar — usado para
 // desenhar o ícone (aceso/apagado) antes do jogador clicar.
@@ -1290,24 +1409,29 @@ function renderDailyBonusIcon(available){
     title="${available ? 'Bônus diário disponível! Clique para receber.' : 'Bônus diário já recebido hoje.'}">🎁</button>`;
 }
 
-// Devolve {awarded, amount} — awarded=true só na primeira visita de cada dia.
+// Devolve {awarded, amount, streak} — awarded=true só na primeira visita de cada dia.
+// A sequência quebra (volta ao dia 1) se faltar um dia inteiro sem reclamar.
 async function claimDailyBonus(supabaseUrl, supabaseAnonKey, name){
   if(!name) return {awarded:false};
   try{
-    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=last_daily_bonus`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=last_daily_bonus,daily_streak_count`, {headers: sbAuthHeaders(supabaseAnonKey)});
     const rows = await res.json();
     if(!rows || !rows[0]) return {awarded:false};
     const today = new Date().toISOString().slice(0,10);
     if(rows[0].last_daily_bonus === today) return {awarded:false};
 
-    const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, DAILY_BONUS_AMOUNT, 'Bônus diário de login');
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0,10);
+    const newStreak = (rows[0].last_daily_bonus === yesterday) ? ((rows[0].daily_streak_count || 0) + 1) : 1;
+    const amount = DAILY_STREAK_AMOUNTS[Math.min(newStreak, DAILY_STREAK_AMOUNTS.length) - 1];
+
+    const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, amount, `Bônus diário de login (sequência: dia ${newStreak})`);
     if(!ok) return {awarded:false};
     await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
       method:'PATCH',
       headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-      body: JSON.stringify({ last_daily_bonus: today })
+      body: JSON.stringify({ last_daily_bonus: today, daily_streak_count: newStreak })
     });
-    return {awarded:true, amount: DAILY_BONUS_AMOUNT};
+    return {awarded:true, amount, streak:newStreak};
   } catch(e){
     return {awarded:false};
   }
@@ -1542,4 +1666,98 @@ async function fetchNicknameVoteStandings(supabaseUrl, supabaseAnonKey, tourname
     tally[key].votes++;
   });
   return Object.values(tally).sort((a,b)=>b.votes-a.votes);
+}
+
+// ---------- Comparador de Temporadas ----------
+// Devolve um array com uma linha por temporada já existente: vitórias,
+// derrotas, títulos, e o Elo médio registado nessa temporada.
+function computeSeasonComparison(allRows, name){
+  const anchor = getSeasonAnchor(allRows);
+  if(!anchor) return [];
+  const maxSeason = Math.max(1, ...allRows.map(r => computeSeasonNumber(r.created_at, anchor)));
+  const eloHistory = computeEloHistory(allRows, name);
+  const seasons = [];
+  for(let s=1; s<=maxSeason; s++){
+    const seasonRows = filterRowsBySeason(allRows, s);
+    const stats = aggregatePlayers(seasonRows)[name] || {wins:0, losses:0, titles:0, tournaments:[]};
+    const seasonEloPoints = eloHistory.filter(p => computeSeasonNumber(p.date, anchor) === s);
+    const avgElo = seasonEloPoints.length ? Math.round(seasonEloPoints.reduce((a,p)=>a+p.rating,0)/seasonEloPoints.length) : null;
+    seasons.push({
+      season: s, wins: stats.wins, losses: stats.losses, titles: stats.titles,
+      avgElo, tournamentsPlayed: stats.tournaments.length
+    });
+  }
+  return seasons;
+}
+
+// ---------- Winrate por tier, por jogador ----------
+function computeWinrateByTier(allRows, name){
+  const byTier = {};
+  allRows.forEach(r=>{
+    const data = r.data || {};
+    const tier = data.tier || r.tier;
+    if(!tier) return;
+    const matches = data.matches || [];
+    matches.forEach(m=>{
+      if(!m.winner || (m.p1!==name && m.p2!==name)) return;
+      if(!byTier[tier]) byTier[tier] = {wins:0, losses:0};
+      if(m.winner === name) byTier[tier].wins++;
+      else byTier[tier].losses++;
+    });
+  });
+  return Object.entries(byTier).map(([tier, rec])=>{
+    const total = rec.wins + rec.losses;
+    return { tier, wins: rec.wins, losses: rec.losses, total, winrate: total ? Math.round((rec.wins/total)*100) : 0 };
+  }).sort((a,b)=> b.winrate - a.winrate);
+}
+
+// ---------- Equipa Icônica ----------
+// Os 6 Pokémon mais usados por um jogador ao longo de toda a história —
+// a "assinatura" do seu estilo de jogo.
+function computeIconicTeam(allRows, name){
+  const { mons } = aggregatePlayerPokemon(allRows, name);
+  return Object.entries(mons).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([species,count])=>({species,count}));
+}
+
+// ---------- Loja Rotativa: item em destaque com desconto, muda toda a semana ----------
+const WEEKLY_FEATURED_DISCOUNT_PCT = 30;
+
+// Determinístico — a mesma semana calendário dá sempre o mesmo item para
+// toda a gente, sem precisar de nenhuma tabela nova na base de dados.
+function getWeeklyFeaturedItem(){
+  const allPurchasable = [];
+  ['backgrounds','accents','frames','nameEffects','titles','badges'].forEach(cat=>{
+    (COSMETIC_CATALOG[cat]||[]).forEach(item=>{
+      if(item.price > 0) allPurchasable.push(Object.assign({category:cat}, item));
+    });
+  });
+  if(!allPurchasable.length) return null;
+  const weekNumber = Math.floor(Date.now() / (7*24*60*60*1000));
+  const item = allPurchasable[weekNumber % allPurchasable.length];
+  const discountedPrice = Math.max(1, Math.round(item.price * (1 - WEEKLY_FEATURED_DISCOUNT_PCT/100)));
+  return Object.assign({}, item, { discountedPrice, discountPct: WEEKLY_FEATURED_DISCOUNT_PCT });
+}
+
+// Compra o item em destaque da semana, usando o preço com desconto.
+// Devolve {ok, reason} — 'insufficient' | 'alreadyowned' | 'error' | true.
+async function buyFeaturedItem(supabaseUrl, supabaseAnonKey, name, item){
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins,owned_cosmetics`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const rows = await res.json();
+  if(!rows || !rows[0]) return {ok:false, reason:'error'};
+  const current = rows[0];
+  const owned = current.owned_cosmetics || [];
+  if(owned.includes(item.id)) return {ok:false, reason:'alreadyowned'};
+  if((current.coins||0) < item.discountedPrice) return {ok:false, reason:'insufficient'};
+
+  const newCoins = (current.coins||0) - item.discountedPrice;
+  const newOwned = owned.concat([item.id]);
+  const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+    method:'PATCH',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify({ coins: newCoins, owned_cosmetics: newOwned })
+  });
+  if(patchRes.ok){
+    await logCoinTransaction(supabaseUrl, supabaseAnonKey, name, -item.discountedPrice, `Comprou "${item.name}" na Loja Rotativa (${WEEKLY_FEATURED_DISCOUNT_PCT}% de desconto)`);
+  }
+  return {ok: patchRes.ok};
 }
