@@ -61,6 +61,22 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0
 .status-dot.off{background:var(--danger);}
 
 .card{background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px;}
+.tabs{display:flex;gap:2px;margin-bottom:20px;border-bottom:1px solid var(--line);}
+.tab-btn{
+  flex:1;padding:12px 10px;background:none;border:none;color:var(--text-faint);
+  font-family:'Chakra Petch',sans-serif;font-size:14px;font-weight:600;
+  cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;letter-spacing:0.3px;
+}
+.tab-btn:hover{color:var(--text-dim);}
+.tab-btn.active{color:var(--tera-cyan);border-bottom-color:var(--tera-cyan);}
+.hof-panel{display:none;}
+.hof-panel.active{display:block;}
+.pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;}
+.page-btn{background:var(--bg-card);border:1px solid var(--line);color:var(--text-dim);padding:8px 14px;
+  border-radius:8px;cursor:pointer;font-family:'Chakra Petch',sans-serif;font-size:13px;}
+.page-btn:hover:not(:disabled){border-color:var(--tera-cyan);color:var(--tera-cyan);}
+.page-btn:disabled{opacity:0.35;cursor:not-allowed;}
+.page-info{font-size:12px;color:var(--text-faint);}
 .card h2{font-family:'Chakra Petch',sans-serif;font-size:15px;margin:0 0 14px 0;color:var(--text-main);
   display:flex;align-items:center;gap:8px;}
 .card h2::before{content:'';width:4px;height:15px;background:var(--tera-violet);border-radius:2px;}
@@ -122,28 +138,38 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
   <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
   <div class="subtitle" style="margin-top:-14px;">Ligado como <b id="loggedInNameTop" style="color:var(--tera-cyan);"></b> — <a href="#" class="nav-link" onclick="doPlayerLogout(); return false;">Trocar jogador</a></div>
 
-  <div class="card">
-    <h2>🌟 MVP a cada 3 torneios</h2>
-    <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:14px;">Quem teve mais vitórias em cada bloco de 3 torneios seguidos — o proxy que usamos para um "MVP mensal".</div>
-    <div id="mvpContainer"><div class="empty-state">A carregar…</div></div>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchHofTab('torneios')">Torneios</button>
+    <button class="tab-btn" onclick="switchHofTab('apelidos')">Apelidos</button>
   </div>
 
-  <div class="card">
-    <h2>😂 Salão dos Apelidos</h2>
-    <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:14px;">Todos os apelidos já dados a Pokémon ao longo da história do grupo.</div>
-    <input type="text" id="nicknameSearchBox" placeholder="Procurar por apelido, Pokémon ou jogador..." style="margin-bottom:12px;" oninput="renderNicknameHall()">
-    <div id="nicknameHallContainer"><div class="empty-state">A carregar…</div></div>
-  </div>
-
-  <div class="card">
-    <h2>Campeões, torneio a torneio</h2>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
-      <input type="text" id="hofSearchBox" placeholder="Procurar por torneio, jogador ou apelido..." style="flex:2;min-width:160px;" oninput="onHofFilterChange()">
-      <select id="hofTierFilter" style="flex:1;min-width:120px;" onchange="onHofFilterChange()">
-        <option value="">Todos os tiers</option>
-      </select>
+  <div id="panel-torneios" class="hof-panel active">
+    <div class="card">
+      <h2>🌟 MVP a cada 3 torneios</h2>
+      <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:14px;">Quem teve mais vitórias em cada bloco de 3 torneios seguidos — o proxy que usamos para um "MVP mensal".</div>
+      <div id="mvpContainer"><div class="empty-state">A carregar…</div></div>
     </div>
-    <div id="timelineContainer"></div>
+
+    <div class="card">
+      <h2>Campeões, torneio a torneio</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+        <input type="text" id="hofSearchBox" placeholder="Procurar por torneio, jogador ou apelido..." style="flex:2;min-width:160px;" oninput="onHofFilterChange()">
+        <select id="hofTierFilter" style="flex:1;min-width:120px;" onchange="onHofFilterChange()">
+          <option value="">Todos os tiers</option>
+        </select>
+      </div>
+      <div id="timelineContainer"></div>
+    </div>
+  </div>
+
+  <div id="panel-apelidos" class="hof-panel">
+    <div class="card">
+      <h2>😂 Salão dos Apelidos</h2>
+      <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:14px;">Todos os apelidos já dados a Pokémon ao longo da história do grupo.</div>
+      <input type="text" id="nicknameSearchBox" placeholder="Procurar por apelido, Pokémon ou jogador..." style="margin-bottom:12px;" oninput="onNicknameFilterChange()">
+      <div id="nicknameHallContainer"><div class="empty-state">A carregar…</div></div>
+      <div id="nicknamePagination" class="pagination"></div>
+    </div>
   </div>
 
   <div class="footer-note">Linha do tempo calculada a partir de todos os torneios concluídos guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
@@ -225,13 +251,23 @@ async function handleDailyBonusClick(){
   const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
   const icon = document.getElementById('dailyBonusIcon');
   if(result.awarded){
-    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
   }
   if(icon) icon.classList.remove('available');
 }
 
 let allTournamentRows = [];
 let allNicknames = [];
+let nicknamePage = 1;
+const NICKNAMES_PER_PAGE = 12;
+
+function switchHofTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.hof-panel').forEach(p=>p.classList.remove('active'));
+  const map = {torneios:0, apelidos:1};
+  document.querySelectorAll('.tab-btn')[map[tab]].classList.add('active');
+  document.getElementById('panel-'+tab).classList.add('active');
+}
 
 async function init(){
   try{
@@ -291,8 +327,19 @@ function onHofFilterChange(){
   renderTimeline(filtered);
 }
 
+function onNicknameFilterChange(){
+  nicknamePage = 1; // volta à primeira página sempre que a busca mudar
+  renderNicknameHall();
+}
+
+function changeNicknamePage(delta){
+  nicknamePage += delta;
+  renderNicknameHall();
+}
+
 function renderNicknameHall(){
   const el = document.getElementById('nicknameHallContainer');
+  const pagination = document.getElementById('nicknamePagination');
   const search = document.getElementById('nicknameSearchBox').value.trim().toLowerCase();
   let list = allNicknames.slice().sort((a,b)=> new Date(b.date) - new Date(a.date));
   if(search){
@@ -304,9 +351,17 @@ function renderNicknameHall(){
   }
   if(!list.length){
     el.innerHTML = `<div class="empty-state">${allNicknames.length ? 'Nenhum apelido encontrado com esta busca.' : 'Ainda não há apelidos registados.'}</div>`;
+    pagination.innerHTML = '';
     return;
   }
-  el.innerHTML = list.slice(0, 60).map(n=>`
+
+  const totalPages = Math.max(1, Math.ceil(list.length / NICKNAMES_PER_PAGE));
+  if(nicknamePage > totalPages) nicknamePage = totalPages;
+  if(nicknamePage < 1) nicknamePage = 1;
+  const startIdx = (nicknamePage-1) * NICKNAMES_PER_PAGE;
+  const pageItems = list.slice(startIdx, startIdx + NICKNAMES_PER_PAGE);
+
+  el.innerHTML = pageItems.map(n=>`
     <div class="timeline-card" style="margin-bottom:8px;">
       <div class="champ-row">
         <b>${escapeHtml(n.nickname)}</b> <span style="color:var(--text-faint);font-size:11.5px;">(${escapeHtml(n.species)})</span>
@@ -314,6 +369,12 @@ function renderNicknameHall(){
       <div class="timeline-date">de ${displayName(n.playerName)} — ${escapeHtml(n.tournamentName)}</div>
     </div>
   `).join('');
+
+  pagination.innerHTML = `
+    <button class="page-btn" onclick="changeNicknamePage(-1)" ${nicknamePage<=1 ? 'disabled' : ''}>← Anterior</button>
+    <span class="page-info">Página ${nicknamePage} de ${totalPages} (${list.length} apelido(s))</span>
+    <button class="page-btn" onclick="changeNicknamePage(1)" ${nicknamePage>=totalPages ? 'disabled' : ''}>Próxima →</button>
+  `;
 }
 
 function renderMvpList(rows){
