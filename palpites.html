@@ -145,6 +145,12 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
   </div>
 
   <div class="card">
+    <h2>😂 Apelido da Semana</h2>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Vote no apelido mais engraçado/criativo usado neste torneio. Quem vencer ganha 🪙<span id="nicknamePrizeLabel">?</span> quando o próximo torneio for criado.</div>
+    <div id="nicknameVoteContainer"><div class="empty-state">A carregar…</div></div>
+  </div>
+
+  <div class="card">
     <h2>Palpites abertos</h2>
     <div id="openMatchesContainer"><div class="empty-state">A carregar partidas…</div></div>
   </div>
@@ -170,6 +176,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 <script src="showdown-utils.js"></script>
 <script>
 initTheme();
+document.getElementById('nicknamePrizeLabel').textContent = NICKNAME_VOTE_PRIZE;
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
 
@@ -278,6 +285,7 @@ async function init(){
     await renderRanking();
     await renderChampionBetCard();
     await renderChampionBetHistory();
+    await renderNicknameVoteCard();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
   }
@@ -504,6 +512,46 @@ async function renderChampionBetHistory(){
     }
     return `<div class="history-row"><span>Apostou <b>🪙 ${r.wager}</b> em ${escapeHtml(r.predicted_champion)} (${r.multiplier}x)</span><span class="res ${resClass}">${resText}</span></div>`;
   }).join('');
+}
+
+async function renderNicknameVoteCard(){
+  const el = document.getElementById('nicknameVoteContainer');
+  if(!activeTournament || !activeTournament.id){
+    el.innerHTML = '<div class="empty-state">Não há torneio em curso agora.</div>';
+    return;
+  }
+  const allNicknamesData = aggregateNicknames([{ id: activeTournament.id, tier: activeTournament.tier, data: activeTournament.data, created_at: new Date().toISOString() }]);
+  const votable = allNicknamesData.filter(n=>n.playerName !== loggedInPlayerName);
+  if(!votable.length){
+    el.innerHTML = '<div class="empty-state">Ainda não há apelidos de outros jogadores neste torneio para votar.</div>';
+    return;
+  }
+
+  const myVote = await fetchMyNicknameVote(SUPABASE_URL, SUPABASE_ANON_KEY, activeTournament.id, loggedInPlayerName);
+  const standings = await fetchNicknameVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY, activeTournament.id);
+
+  let html = '';
+  if(myVote){
+    html += `<div class="bet-placed">Você votou em <b>${escapeHtml(myVote.nickname)}</b> (${escapeHtml(myVote.species)}) de ${escapeHtml(myVote.owner_name)}. Pode trocar o voto abaixo, se mudar de ideias.</div>`;
+  }
+  html += `<select id="nicknameVoteSelect">`;
+  html += votable.map(n=>`<option value="${escapeHtml(n.playerName)}|${escapeHtml(n.nickname)}|${escapeHtml(n.species)}" ${myVote && myVote.nickname===n.nickname && myVote.owner_name===n.playerName ? 'selected' : ''}>${escapeHtml(n.nickname)} (${escapeHtml(n.species)}) — de ${escapeHtml(n.playerName)}</option>`).join('');
+  html += `</select>`;
+  html += `<button class="btn-primary" onclick="doCastNicknameVote()">${myVote ? 'Trocar voto' : 'Votar'}</button>`;
+
+  if(standings.length){
+    html += `<div style="margin-top:14px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">Votação atual</div>`;
+    html += standings.map(s=>`<div class="history-row"><span>${escapeHtml(s.nickname)} (${escapeHtml(s.species)}) — ${escapeHtml(s.ownerName)}</span><b style="color:var(--tera-amber);">${s.votes} voto(s)</b></div>`).join('');
+  }
+  el.innerHTML = html;
+}
+
+async function doCastNicknameVote(){
+  const [ownerName, nickname, species] = document.getElementById('nicknameVoteSelect').value.split('|');
+  const result = await castNicknameVote(SUPABASE_URL, SUPABASE_ANON_KEY, activeTournament.id, loggedInPlayerName, ownerName, nickname, species);
+  if(!result.ok){ alert('Não foi possível registar o voto. Tente novamente.'); return; }
+  await renderNicknameVoteCard();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'palpite', `Votou em "${nickname}" (${species}) de ${ownerName} para Apelido da Semana`);
 }
 
 async function renderRanking(){

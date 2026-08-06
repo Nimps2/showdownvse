@@ -35,7 +35,7 @@ function parseStatString(str){
 function parseShowdownImport(text){
   const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
   if(!lines.length) return null;
-  const result = { name:null, item:null, ability:null, nature:null, evs:{}, ivs:{}, teraType:null, moves:[] };
+  const result = { name:null, nickname:null, item:null, ability:null, nature:null, evs:{}, ivs:{}, teraType:null, moves:[] };
 
   const first = lines[0];
   let namePart = first, item = null;
@@ -48,6 +48,7 @@ function parseShowdownImport(text){
   let species = namePart;
   if(nickMatch && nickMatch[2] && !/^(M|F)$/i.test(nickMatch[2])){
     species = nickMatch[2].trim();
+    result.nickname = nickMatch[1].trim();
   }
   species = species.replace(/\s*\((M|F)\)\s*$/i,'').trim();
   result.name = species;
@@ -1026,7 +1027,8 @@ const ACHIEVEMENTS = [
   { id:'perfectionist',         name:'Perfeição',           emoji:'💯', desc:'Foi campeão sem perder nenhuma partida no torneio' },
   { id:'comeback',              name:'Reviravolta',         emoji:'🔄', desc:'Venceu uma Bo3 depois de perder o primeiro jogo' },
   { id:'sharp_bettor',          name:'Apostador Fino',      emoji:'🔮', desc:'10 palpites certos no Palpiteiro' },
-  { id:'lucky_strike',          name:'Golpe de Sorte',      emoji:'🎰', desc:'Tirou o Jackpot (5x) na Roleta pelo menos uma vez' }
+  { id:'lucky_strike',          name:'Golpe de Sorte',      emoji:'🎰', desc:'Tirou o Jackpot (5x) na Roleta pelo menos uma vez' },
+  { id:'creative_namer',        name:'Nomeador Criativo',   emoji:'✍️', desc:'Deu apelido a 10 Pokémon diferentes' }
 ];
 
 // stats vem de aggregatePlayers()[nome]; streak vem de computeAllCurrentStreaks()[nome].
@@ -1078,6 +1080,12 @@ function computeMatchPathAchievements(name, allRows){
   });
 
   if(tiersPlayed.size >= 6) earned.add('omnipresent');
+
+  const myNicknames = new Set(
+    aggregateNicknames(allRows).filter(n=>n.playerName===name).map(n=>n.nickname.toLowerCase())
+  );
+  if(myNicknames.size >= 10) earned.add('creative_namer');
+
   return earned;
 }
 
@@ -1456,4 +1464,82 @@ function computeMvpBatches(rows){
     });
   }
   return batches.reverse(); // mais recente primeiro
+}
+
+// ---------- Apelidos de Pokémon (extraídos do formato "Apelido (Espécie)") ----------
+// Devolve uma lista de {species, nickname, playerName, tournamentName, tournamentId, date}
+// para cada Pokémon com apelido já importado em qualquer torneio.
+function aggregateNicknames(rows){
+  const results = [];
+  rows.forEach(r=>{
+    const data = r.data || {};
+    const players = data.players || [];
+    Object.entries(data.draws || {}).forEach(([pIdxStr, entry])=>{
+      const pIdx = parseInt(pIdxStr, 10);
+      const playerName = players[pIdx];
+      if(!playerName) return;
+      const items = [...(entry.random||[]), ...(entry.free||[])];
+      items.forEach(item=>{
+        if(!item || !item.text) return;
+        const parsed = parseShowdownImport(item.text);
+        if(parsed && parsed.nickname && parsed.name){
+          results.push({
+            species: parsed.name,
+            nickname: parsed.nickname,
+            playerName,
+            tournamentName: data.name || `Torneio ${r.tier||''}`,
+            tournamentId: r.id || null,
+            date: r.created_at
+          });
+        }
+      });
+    });
+  });
+  return results;
+}
+
+// ---------- Votação do "Apelido da Semana" ----------
+const NICKNAME_VOTE_PRIZE = 30;
+
+async function fetchMyNicknameVote(supabaseUrl, supabaseAnonKey, tournamentId, voterName){
+  const res = await fetch(`${supabaseUrl}/rest/v1/nickname_votes?tournament_id=eq.${tournamentId}&voter_name=eq.${encodeURIComponent(voterName)}&select=*`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return null;
+  const rows = await res.json();
+  return (rows && rows[0]) ? rows[0] : null;
+}
+
+// Devolve {ok, reason} — 'error' | true. Um voto por jogador por torneio (upsert).
+async function castNicknameVote(supabaseUrl, supabaseAnonKey, tournamentId, voterName, ownerName, nickname, species){
+  const existing = await fetchMyNicknameVote(supabaseUrl, supabaseAnonKey, tournamentId, voterName);
+  try{
+    if(existing){
+      const res = await fetch(`${supabaseUrl}/rest/v1/nickname_votes?id=eq.${existing.id}`, {
+        method:'PATCH',
+        headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+        body: JSON.stringify({ owner_name: ownerName, nickname, species })
+      });
+      return {ok: res.ok};
+    }
+    const res = await fetch(`${supabaseUrl}/rest/v1/nickname_votes`, {
+      method:'POST',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify([{ tournament_id: tournamentId, voter_name: voterName, owner_name: ownerName, nickname, species }])
+    });
+    return {ok: res.ok};
+  } catch(e){
+    return {ok:false, reason:'error'};
+  }
+}
+
+async function fetchNicknameVoteStandings(supabaseUrl, supabaseAnonKey, tournamentId){
+  const res = await fetch(`${supabaseUrl}/rest/v1/nickname_votes?tournament_id=eq.${tournamentId}&select=*`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!res.ok) return [];
+  const rows = await res.json();
+  const tally = {};
+  rows.forEach(r=>{
+    const key = `${r.owner_name}|${r.nickname}|${r.species}`;
+    if(!tally[key]) tally[key] = { ownerName:r.owner_name, nickname:r.nickname, species:r.species, votes:0 };
+    tally[key].votes++;
+  });
+  return Object.values(tally).sort((a,b)=>b.votes-a.votes);
 }

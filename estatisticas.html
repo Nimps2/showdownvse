@@ -359,6 +359,7 @@ let totalTournaments = 0;
 let totalSlots = 0;
 
 let allTournamentRows = [];
+let allNicknames = [];
 
 async function init(){
   try{
@@ -369,6 +370,7 @@ async function init(){
     setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
     populateTierFilter(rows);
     aggregate(rows);
+    allNicknames = aggregateNicknames(rows);
     populateSeasonFilter(rows);
     recomputePlayerData(rows);
     playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -561,7 +563,12 @@ function renderPokemonList(){
   const sortBy = document.getElementById('sortSelect').value;
 
   let entries = Object.entries(pokeStats);
-  if(search) entries = entries.filter(([name])=>name.toLowerCase().includes(search));
+  if(search){
+    const speciesWithMatchingNickname = new Set(
+      allNicknames.filter(n=>n.nickname.toLowerCase().includes(search)).map(n=>n.species)
+    );
+    entries = entries.filter(([name])=>name.toLowerCase().includes(search) || speciesWithMatchingNickname.has(name));
+  }
 
   if(sortBy === 'total_desc') entries.sort((a,b)=>b[1].total - a[1].total);
   else if(sortBy === 'total_asc') entries.sort((a,b)=>a[1].total - b[1].total);
@@ -602,6 +609,7 @@ function renderPokemonList(){
       : '<span style="font-size:11.5px;color:var(--text-faint);">Sem golpes registrados</span>';
     const totalGames = st.wins + st.losses;
     const winrate = totalGames ? Math.round((st.wins/totalGames)*100) : null;
+    const nicksForThis = Array.from(new Set(allNicknames.filter(n=>n.species===name).map(n=>n.nickname))).slice(0,5);
 
     return `<div class="poke-card">
       <div class="poke-name">${escapeHtml(name)}</div>
@@ -614,6 +622,7 @@ function renderPokemonList(){
         <div class="label">Golpes mais usados</div>
         ${movesHtml}
       </div>
+      ${nicksForThis.length ? `<div class="poke-moves"><div class="label">Apelidos vistos</div><span style="font-size:11.5px;color:var(--text-dim);">${nicksForThis.map(n=>escapeHtml(n)).join(', ')}</span></div>` : ''}
     </div>`;
   }).join('');
 

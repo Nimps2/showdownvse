@@ -129,9 +129,16 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
   </div>
 
   <div class="card">
+    <h2>😂 Salão dos Apelidos</h2>
+    <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:14px;">Todos os apelidos já dados a Pokémon ao longo da história do grupo.</div>
+    <input type="text" id="nicknameSearchBox" placeholder="Procurar por apelido, Pokémon ou jogador..." style="margin-bottom:12px;" oninput="renderNicknameHall()">
+    <div id="nicknameHallContainer"><div class="empty-state">A carregar…</div></div>
+  </div>
+
+  <div class="card">
     <h2>Campeões, torneio a torneio</h2>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
-      <input type="text" id="hofSearchBox" placeholder="Procurar por torneio ou jogador..." style="flex:2;min-width:160px;" oninput="onHofFilterChange()">
+      <input type="text" id="hofSearchBox" placeholder="Procurar por torneio, jogador ou apelido..." style="flex:2;min-width:160px;" oninput="onHofFilterChange()">
       <select id="hofTierFilter" style="flex:1;min-width:120px;" onchange="onHofFilterChange()">
         <option value="">Todos os tiers</option>
       </select>
@@ -224,6 +231,7 @@ async function handleDailyBonusClick(){
 }
 
 let allTournamentRows = [];
+let allNicknames = [];
 
 async function init(){
   try{
@@ -240,6 +248,8 @@ async function init(){
     populateHofTierFilter(rows);
     renderTimeline(rows);
     renderMvpList(rows);
+    allNicknames = aggregateNicknames(rows);
+    renderNicknameHall();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
     document.getElementById('timelineContainer').innerHTML = '<div class="empty-state">Erro ao carregar dados.</div>';
@@ -264,6 +274,9 @@ function onHofFilterChange(){
   let filtered = allTournamentRows;
   if(tier) filtered = filtered.filter(r => r.tier === tier);
   if(search){
+    const tournamentsWithMatchingNickname = new Set(
+      allNicknames.filter(n=>n.nickname.toLowerCase().includes(search)).map(n=>n.tournamentName)
+    );
     filtered = filtered.filter(r=>{
       const data = r.data || {};
       const title = (data.name || '').toLowerCase();
@@ -271,10 +284,36 @@ function onHofFilterChange(){
       const matches = data.matches || [];
       const finalMatch = matches.find(m => m.next === null);
       const runnerUp = finalMatch ? ((finalMatch.winner === finalMatch.p1 ? finalMatch.p2 : finalMatch.p1) || '') : '';
-      return title.includes(search) || champion.includes(search) || runnerUp.toLowerCase().includes(search);
+      const nicknameMatch = tournamentsWithMatchingNickname.has(data.name || `Torneio ${r.tier||''}`);
+      return title.includes(search) || champion.includes(search) || runnerUp.toLowerCase().includes(search) || nicknameMatch;
     });
   }
   renderTimeline(filtered);
+}
+
+function renderNicknameHall(){
+  const el = document.getElementById('nicknameHallContainer');
+  const search = document.getElementById('nicknameSearchBox').value.trim().toLowerCase();
+  let list = allNicknames.slice().sort((a,b)=> new Date(b.date) - new Date(a.date));
+  if(search){
+    list = list.filter(n =>
+      n.nickname.toLowerCase().includes(search) ||
+      n.species.toLowerCase().includes(search) ||
+      n.playerName.toLowerCase().includes(search)
+    );
+  }
+  if(!list.length){
+    el.innerHTML = `<div class="empty-state">${allNicknames.length ? 'Nenhum apelido encontrado com esta busca.' : 'Ainda não há apelidos registados.'}</div>`;
+    return;
+  }
+  el.innerHTML = list.slice(0, 60).map(n=>`
+    <div class="timeline-card" style="margin-bottom:8px;">
+      <div class="champ-row">
+        <b>${escapeHtml(n.nickname)}</b> <span style="color:var(--text-faint);font-size:11.5px;">(${escapeHtml(n.species)})</span>
+      </div>
+      <div class="timeline-date">de ${displayName(n.playerName)} — ${escapeHtml(n.tournamentName)}</div>
+    </div>
+  `).join('');
 }
 
 function renderMvpList(rows){

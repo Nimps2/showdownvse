@@ -550,9 +550,11 @@ function renderMyDraw(){
   (d.random||[]).forEach((r,i)=>{
     const boxId = `box-r-${i}`;
     const pasteId = `paste-r-${i}`;
+    const nick = r.text ? (parseShowdownImport(r.text)||{}).nickname : null;
+    const monLabel = nick ? `${escapeHtml(nick)} <span style="color:var(--text-faint);font-weight:400;">(${r.mon})</span>` : r.mon;
     html += `<div class="mon-block">
       <div class="mon-head">
-        <span class="mon-name">${r.mon}</span>
+        <span class="mon-name">${monLabel}</span>
         <span><button class="copy-btn" onclick="copyText('${boxId}', this)">Copiar</button><span class="copied-msg">Copiado!</span></span>
       </div>
       <div class="import-box" id="${boxId}">${escapeHtml(r.text || r.mon)}</div>
@@ -570,9 +572,11 @@ function renderMyDraw(){
       </div>`;
       return;
     }
+    const freeNick = f.text ? (parseShowdownImport(f.text)||{}).nickname : null;
+    const freeLabel = freeNick ? `${escapeHtml(freeNick)} <span style="color:var(--text-faint);font-weight:400;">(${f.name})</span>` : f.name;
     html += `<div class="mon-block free">
       <div class="mon-head">
-        <span class="mon-name free-label">Escolha livre ${i+1}: ${f.name}</span>
+        <span class="mon-name free-label">Escolha livre ${i+1}: ${freeLabel}</span>
         <span><button class="copy-btn" onclick="copyText('${boxId}', this)">Copiar</button><span class="copied-msg">Copiado!</span></span>
       </div>
       <div class="import-box" id="${boxId}">${escapeHtml(f.text || f.name)}</div>
