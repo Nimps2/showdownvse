@@ -102,6 +102,13 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 .shop-btn:hover:not(:disabled){border-color:var(--tera-cyan);color:var(--tera-cyan);}
 .shop-btn:disabled{cursor:not-allowed;}
 
+.roulette-spinner{font-size:42px;text-align:center;padding:10px 0;animation:vseSpinPulse .3s ease-in-out infinite;}
+@keyframes vseSpinPulse{0%,100%{transform:scale(1) rotate(0deg);}50%{transform:scale(1.15) rotate(10deg);}}
+.lootbox-shake{font-size:42px;text-align:center;padding:10px 0;animation:vseBoxShake .15s ease-in-out infinite;}
+@keyframes vseBoxShake{0%,100%{transform:rotate(0deg) translateX(0);}25%{transform:rotate(-10deg) translateX(-3px);}75%{transform:rotate(10deg) translateX(3px);}}
+.reveal-pop{animation:vseRevealPop .4s ease-out;text-align:center;font-size:15px;padding:8px 0;}
+@keyframes vseRevealPop{0%{transform:scale(0.6);opacity:0;}60%{transform:scale(1.12);}100%{transform:scale(1);opacity:1;}}
+
 .history-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--text-dim);
   padding:8px 0;gap:8px;border-bottom:1px solid var(--line);}
 .history-row:last-child{border-bottom:none;}
@@ -491,15 +498,25 @@ async function doBuyCosmetic(id){
 
 async function doOpenLootBox(){
   const resultDiv = document.getElementById('lootBoxResult');
-  const result = await openLootBox(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+  const openBtn = document.querySelector('button[onclick="doOpenLootBox()"]');
+  if(openBtn) openBtn.disabled = true;
+  resultDiv.innerHTML = `<div class="lootbox-shake">🎁</div>`;
+
+  const [result] = await Promise.all([
+    openLootBox(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName),
+    new Promise(r=>setTimeout(r, 900))
+  ]);
+
   if(!result.ok){
     const msg = result.reason === 'insufficient' ? `Você precisa de 🪙${LOOT_BOX_PRICE} para abrir a caixa.`
       : result.reason === 'nooptions' ? 'Você já tem todos os itens possíveis!'
       : 'Não foi possível processar. Tente novamente.';
     resultDiv.innerHTML = `<span style="color:var(--danger);">${msg}</span>`;
+    if(openBtn) openBtn.disabled = false;
     return;
   }
-  resultDiv.innerHTML = `<span style="color:var(--success);font-family:'Chakra Petch',sans-serif;font-weight:700;">🎉 Ganhaste: ${escapeHtml(result.item.name)}!</span>`;
+  resultDiv.innerHTML = `<div class="reveal-pop" style="color:var(--success);font-family:'Chakra Petch',sans-serif;font-weight:700;">🎉 Ganhaste: ${escapeHtml(result.item.name)}!</div>`;
+  if(openBtn) openBtn.disabled = false;
   await refreshAfterSpend();
   logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Abriu caixa surpresa (🪙${LOOT_BOX_PRICE}) e ganhou "${result.item.name}"`);
 }
@@ -588,14 +605,32 @@ async function doSpinRoulette(){
   if(!bet || bet <= 0){ alert('Digite uma quantidade de moedas válida.'); return; }
   if(bet > (myProfile.coins||0)){ alert('Você não tem moedas suficientes para essa aposta.'); return; }
 
-  const result = await spinRoulette(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, bet);
+  const spinBtn = document.querySelector('button[onclick="doSpinRoulette()"]');
+  if(spinBtn) spinBtn.disabled = true;
+  resultDiv.innerHTML = `<div id="rouletteSpinner" class="roulette-spinner">🎰</div>`;
+  const spinnerEl = document.getElementById('rouletteSpinner');
+  const spinFaces = ['💀','📉','➖','📈','🎉','💎'];
+  let spinIdx = 0;
+  const spinTimer = setInterval(()=>{
+    if(spinnerEl) spinnerEl.textContent = spinFaces[spinIdx % spinFaces.length];
+    spinIdx++;
+  }, 100);
+
+  const [result] = await Promise.all([
+    spinRoulette(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, bet),
+    new Promise(r=>setTimeout(r, 1000))
+  ]);
+  clearInterval(spinTimer);
+
   if(!result.ok){
     resultDiv.innerHTML = `<div style="color:var(--danger);">Não foi possível processar. Tente novamente.</div>`;
+    if(spinBtn) spinBtn.disabled = false;
     return;
   }
   const net = result.payout - bet;
   const color = net > 0 ? 'var(--success)' : net === 0 ? 'var(--text-faint)' : 'var(--danger)';
-  resultDiv.innerHTML = `<div style="color:${color};font-family:'Chakra Petch',sans-serif;font-weight:700;">${result.outcome.label} — ${net>=0?'+':''}${net} 🪙</div>`;
+  resultDiv.innerHTML = `<div class="reveal-pop" style="color:${color};font-family:'Chakra Petch',sans-serif;font-weight:700;">${result.outcome.label} — ${net>=0?'+':''}${net} 🪙</div>`;
+  if(spinBtn) spinBtn.disabled = false;
   betInput.value = '';
   rouletteHistory = await fetchRouletteTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 20);
   rouletteRanking = await fetchRouletteRanking(SUPABASE_URL, SUPABASE_ANON_KEY);

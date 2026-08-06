@@ -203,6 +203,8 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
           <option value="total_desc">Mais usados</option>
           <option value="total_asc">Menos usados</option>
           <option value="free_desc">Mais como escolha livre</option>
+          <option value="winrate_desc">Melhor winrate</option>
+          <option value="winrate_asc">Pior winrate</option>
           <option value="az">Ordem alfabética</option>
         </select>
       </div>
@@ -564,6 +566,19 @@ function renderPokemonList(){
   if(sortBy === 'total_desc') entries.sort((a,b)=>b[1].total - a[1].total);
   else if(sortBy === 'total_asc') entries.sort((a,b)=>a[1].total - b[1].total);
   else if(sortBy === 'free_desc') entries.sort((a,b)=>(b[1].free/b[1].total) - (a[1].free/a[1].total));
+  else if(sortBy === 'winrate_desc' || sortBy === 'winrate_asc'){
+    const winrateOf = (st)=>{
+      const total = st.wins + st.losses;
+      return total ? st.wins/total : null;
+    };
+    entries.sort((a,b)=>{
+      const wrA = winrateOf(a[1]), wrB = winrateOf(b[1]);
+      if(wrA === null && wrB === null) return 0;
+      if(wrA === null) return 1; // sem partidas registadas fica sempre no fim
+      if(wrB === null) return -1;
+      return sortBy === 'winrate_desc' ? wrB - wrA : wrA - wrB;
+    });
+  }
   else if(sortBy === 'az') entries.sort((a,b)=>a[0].localeCompare(b[0]));
 
   if(!entries.length){

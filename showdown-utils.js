@@ -468,7 +468,14 @@ function buildHoverCardHtml(name, playerStats, playerProfiles, currentTrophies, 
   const st = (playerStats && playerStats[name]) || null;
   const profile = (playerProfiles && playerProfiles[name]) || {};
   const displayName = profile.nickname ? profile.nickname : name;
-  const avatar = avatarHtml(name, profile.photo_url, 40);
+  const bgCosmetic = profile.equippedBackground ? getCosmeticById(profile.equippedBackground) : null;
+  const frameCosmetic = profile.equippedFrame ? getCosmeticById(profile.equippedFrame) : null;
+  const accentCosmetic = profile.equippedAccent ? getCosmeticById(profile.equippedAccent) : null;
+  const nameEffectCosmetic = profile.equippedNameEffect ? getCosmeticById(profile.equippedNameEffect) : null;
+  const titleCosmetic = profile.equippedTitle ? getCosmeticById(profile.equippedTitle) : null;
+  const equippedBadgeEmojis = (profile.equippedBadges || []).map(id=>getCosmeticById(id)).filter(Boolean).map(b=>b.emoji).join(' ');
+  const accentColor = accentCosmetic ? accentCosmetic.color : 'var(--text-main)';
+  const avatar = avatarHtml(name, profile.photo_url, 40, bgCosmetic ? bgCosmetic.css : null, frameCosmetic ? frameCosmetic.border : null);
   const trophy = trophyEmojiFor(name, currentTrophies);
   const elo = eloRatings ? (eloRatings[name] || 1000) : null;
 
@@ -483,8 +490,9 @@ function buildHoverCardHtml(name, playerStats, playerProfiles, currentTrophies, 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
       ${avatar}
       <div>
-        <div style="font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;color:var(--text-main);">${trophy} ${escapeHtml(displayName)}</div>
+        <div style="font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;color:${accentColor};${nameEffectCosmetic ? nameEffectCosmetic.css : ''}">${trophy} ${escapeHtml(displayName)} ${equippedBadgeEmojis}</div>
         ${profile.nickname ? `<div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(name)}</div>` : ''}
+        ${titleCosmetic && titleCosmetic.text ? `<div style="font-size:10.5px;color:var(--text-dim);">${escapeHtml(titleCosmetic.text)}</div>` : ''}
       </div>
     </div>
     ${elo!==null ? `<div style="font-size:11.5px;color:var(--tera-amber);margin-bottom:4px;">Elo: ${elo}</div>` : ''}
@@ -908,10 +916,11 @@ function renderPlayerCornerBadge(name, profile){
   const displayName = profile.nickname || name;
   const bgCosmetic = profile.equippedBackground ? getCosmeticById(profile.equippedBackground) : null;
   const frameCosmetic = profile.equippedFrame ? getCosmeticById(profile.equippedFrame) : null;
+  const accentCosmetic = profile.equippedAccent ? getCosmeticById(profile.equippedAccent) : null;
   const avatar = avatarHtml(name, profile.photo_url, 28, bgCosmetic ? bgCosmetic.css : null, frameCosmetic ? frameCosmetic.border : null);
   return `<a href="perfil.html" class="player-corner-badge" title="Ver o meu perfil">
     ${avatar}
-    <span class="player-corner-name">${escapeHtml(displayName)}</span>
+    <span class="player-corner-name" style="${accentCosmetic ? `color:${accentCosmetic.color};` : ''}">${escapeHtml(displayName)}</span>
   </a>`;
 }
 
