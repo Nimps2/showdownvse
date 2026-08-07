@@ -1319,7 +1319,10 @@ async function computeAsyncAchievements(supabaseUrl, supabaseAnonKey, name, allR
   } catch(e){ /* ignora silenciosamente */ }
 
   try{
-    const jackpotRes = await fetch(`${supabaseUrl}/rest/v1/coin_transactions?player_name=eq.${encodeURIComponent(name)}&reason=like.*Jackpot*&select=id&limit=1`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    // "ilike" (sem diferenciar maiúsculas/minúsculas) para apanhar tanto o texto
+    // atual ("Jackpot 5x!") como o texto antigo de quando tínhamos o jackpot
+    // progressivo ("JACKPOT PROGRESSIVO", em maiúsculas) — histórico incluído.
+    const jackpotRes = await fetch(`${supabaseUrl}/rest/v1/coin_transactions?player_name=eq.${encodeURIComponent(name)}&reason=ilike.*jackpot*&select=id&limit=1`, {headers: sbAuthHeaders(supabaseAnonKey)});
     const jackpotRows = await jackpotRes.json();
     if(Array.isArray(jackpotRows) && jackpotRows.length >= 1) earned.add('lucky_strike');
   } catch(e){ /* ignora silenciosamente */ }
