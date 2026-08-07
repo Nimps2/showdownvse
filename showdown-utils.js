@@ -2005,17 +2005,18 @@ async function placeBid(supabaseUrl, supabaseAnonKey, auctionId, bidderName, amo
 const LOTTERY_TICKET_PRICE = 10;
 const LOTTERY_HOUSE_CUT_PCT = 10; // fica de fora do pote, funciona como dreno da economia
 const LOTTERY_NUMBER_RANGE = 50;
+const LOTTERY_POT_BASE = 30; // toda rodada NOVA (não acumulada) começa com este valor de brinde
 
 async function fetchActiveLotteryRound(supabaseUrl, supabaseAnonKey){
   try{
     const res = await fetch(`${supabaseUrl}/rest/v1/lottery_rounds?status=eq.active&order=created_at.desc&limit=1&select=*`, {headers: sbAuthHeaders(supabaseAnonKey)});
     const rows = await res.json();
     if(rows && rows[0]) return rows[0];
-    // Nenhuma rodada ativa — cria uma nova automaticamente.
+    // Nenhuma rodada ativa — cria uma nova automaticamente, já com o valor base.
     const createRes = await fetch(`${supabaseUrl}/rest/v1/lottery_rounds`, {
       method:'POST',
       headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=representation'}),
-      body: JSON.stringify([{ status:'active', pot:0, total_tickets:0 }])
+      body: JSON.stringify([{ status:'active', pot: LOTTERY_POT_BASE, total_tickets:0 }])
     });
     if(!createRes.ok) return null;
     const createdRows = await createRes.json();
