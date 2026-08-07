@@ -192,7 +192,7 @@ async function fetchRegisteredPlayerNames(supabaseUrl, supabaseAnonKey){
 // ---------- Perfil: apelido, foto (por link), mensagem de estado, moedas e personalização ----------
 // Devolve um mapa { nomeReal: {nickname, photo_url, status_message, coins, ownedCosmetics, equippedBackground, equippedAccent} }.
 async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
-  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent,equipped_frame,equipped_name_effect,equipped_title,equipped_badges,profile_background_url,guaranteed_bye,elo_chart_unlocked,featured_achievements`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent,equipped_frame,equipped_name_effect,equipped_title,equipped_badges,profile_background_url,guaranteed_bye,elo_chart_unlocked,featured_achievements,total_daily_claims`, {headers: sbAuthHeaders(supabaseAnonKey)});
   if(!res.ok) return {};
   const rows = await res.json();
   const map = {};
@@ -204,7 +204,8 @@ async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
       equippedFrame: r.equipped_frame || null, equippedNameEffect: r.equipped_name_effect || null,
       equippedTitle: r.equipped_title || null, equippedBadges: r.equipped_badges || [],
       profileBackgroundUrl: r.profile_background_url || null, guaranteedBye: !!r.guaranteed_bye,
-      eloChartUnlocked: !!r.elo_chart_unlocked, featuredAchievements: r.featured_achievements || []
+      eloChartUnlocked: !!r.elo_chart_unlocked, featuredAchievements: r.featured_achievements || [],
+      totalDailyClaims: r.total_daily_claims || 0, loyaltyDiscountPct: computeLoyaltyDiscountPct(r.total_daily_claims)
     };
   });
   return map;
@@ -289,25 +290,28 @@ function getCosmeticById(id){
 async function buyCosmetic(supabaseUrl, supabaseAnonKey, name, cosmeticId){
   const item = getCosmeticById(cosmeticId);
   if(!item) return {ok:false, reason:'notfound'};
-  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins,owned_cosmetics`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins,owned_cosmetics,total_daily_claims`, {headers: sbAuthHeaders(supabaseAnonKey)});
   const rows = await res.json();
   if(!rows || !rows[0]) return {ok:false, reason:'notfound'};
   const current = rows[0];
   const owned = current.owned_cosmetics || [];
   if(owned.includes(cosmeticId)) return {ok:false, reason:'alreadyowned'};
-  if((current.coins||0) < item.price) return {ok:false, reason:'insufficient'};
+  const discountPct = computeLoyaltyDiscountPct(current.total_daily_claims);
+  const finalPrice = applyLoyaltyDiscount(item.price, discountPct);
+  if((current.coins||0) < finalPrice) return {ok:false, reason:'insufficient'};
 
-  const newCoins = (current.coins||0) - item.price;
+  const newCoins = (current.coins||0) - finalPrice;
   const newOwned = owned.concat([cosmeticId]);
   const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
     method:'PATCH',
     headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
     body: JSON.stringify({ coins: newCoins, owned_cosmetics: newOwned })
   });
-  if(patchRes.ok && item.price > 0){
-    await logCoinTransaction(supabaseUrl, supabaseAnonKey, name, -item.price, `Compra na loja: ${item.name}`);
+  if(patchRes.ok && finalPrice > 0){
+    const reason = discountPct > 0 ? `Compra na loja: ${item.name} (${discountPct}% de desconto por fidelidade)` : `Compra na loja: ${item.name}`;
+    await logCoinTransaction(supabaseUrl, supabaseAnonKey, name, -finalPrice, reason);
   }
-  return {ok: patchRes.ok};
+  return {ok: patchRes.ok, finalPrice, discountPct};
 }
 
 // type: 'background' | 'accent' | 'frame' | 'nameEffect' | 'title'
@@ -746,14 +750,15 @@ async function fetchCoinTransactions(supabaseUrl, supabaseAnonKey, name, limit){
 async function adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, amount, reason){
   if(!name || !amount) return false;
   try{
-    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins,max_coins_reached`, {headers: sbAuthHeaders(supabaseAnonKey)});
     const rows = await res.json();
     if(!rows || !rows[0]) return false;
     const newCoins = Math.max(0, (rows[0].coins || 0) + amount);
+    const newMax = Math.max(rows[0].max_coins_reached || 0, newCoins);
     const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
       method:'PATCH',
       headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-      body: JSON.stringify({ coins: newCoins })
+      body: JSON.stringify({ coins: newCoins, max_coins_reached: newMax })
     });
     if(patchRes.ok && reason){
       await logCoinTransaction(supabaseUrl, supabaseAnonKey, name, amount, reason);
@@ -946,61 +951,38 @@ function pickRouletteOutcome(){
   return ROULETTE_OUTCOMES[0];
 }
 
-// ---------- Jackpot progressivo da Roleta ----------
-// Uma pequena % de cada aposta PERDIDA alimenta um pote partilhado por todos;
-// quem tirar o resultado de Jackpot leva o pote inteiro (não só 5x a aposta),
-// e o pote volta ao valor base.
-const ROULETTE_JACKPOT_BASE = 100;
-const ROULETTE_JACKPOT_FEED_PCT = 15;
-
-async function fetchRouletteJackpot(supabaseUrl, supabaseAnonKey){
+// Devolve {ok, reason, outcome, payout} — 'insufficient' | 'invalid' | 'error' | true
+// Regista quando um jogador aposta TODO o saldo que tinha, de uma vez —
+// usado pela conquista secreta "Sem Medo".
+async function recordAllInIfApplicable(supabaseUrl, supabaseAnonKey, name, betAmount, currentCoins){
+  if(betAmount < currentCoins || currentCoins <= 0) return;
   try{
-    const res = await fetch(`${supabaseUrl}/rest/v1/roulette_jackpot?id=eq.1&select=pot`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=all_in_count`, {headers: sbAuthHeaders(supabaseAnonKey)});
     const rows = await res.json();
-    return (rows && rows[0]) ? rows[0].pot : ROULETTE_JACKPOT_BASE;
-  } catch(e){
-    return ROULETTE_JACKPOT_BASE;
-  }
+    if(!rows || !rows[0]) return;
+    await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+      method:'PATCH',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify({ all_in_count: (rows[0].all_in_count || 0) + 1 })
+    });
+  } catch(e){ /* nao critico */ }
 }
 
-// Devolve {ok, reason, outcome, payout, jackpotWon} — 'insufficient' | 'invalid' | 'error' | true
 async function spinRoulette(supabaseUrl, supabaseAnonKey, name, betAmount){
   if(!betAmount || betAmount <= 0) return {ok:false, reason:'invalid'};
   const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
   const rows = await res.json();
   if(!rows || !rows[0]) return {ok:false, reason:'error'};
   if((rows[0].coins||0) < betAmount) return {ok:false, reason:'insufficient'};
+  await recordAllInIfApplicable(supabaseUrl, supabaseAnonKey, name, betAmount, rows[0].coins||0);
 
   const outcome = pickRouletteOutcome();
-  let payout = Math.round(betAmount * outcome.multiplier);
-  let jackpotWon = null;
-  const currentPot = await fetchRouletteJackpot(supabaseUrl, supabaseAnonKey);
-
-  if(outcome.multiplier === 5){
-    // Jackpot! ganha o pote inteiro, que depois volta ao valor base.
-    jackpotWon = currentPot;
-    payout = currentPot;
-    try{
-      await fetch(`${supabaseUrl}/rest/v1/roulette_jackpot?id=eq.1`, {
-        method:'PATCH', headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-        body: JSON.stringify({ pot: ROULETTE_JACKPOT_BASE })
-      });
-    } catch(e){ /* nao critico */ }
-  } else if(outcome.multiplier === 0){
-    const feed = Math.max(1, Math.round(betAmount * ROULETTE_JACKPOT_FEED_PCT / 100));
-    try{
-      await fetch(`${supabaseUrl}/rest/v1/roulette_jackpot?id=eq.1`, {
-        method:'PATCH', headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-        body: JSON.stringify({ pot: currentPot + feed })
-      });
-    } catch(e){ /* nao critico */ }
-  }
-
+  const payout = Math.round(betAmount * outcome.multiplier);
   const net = payout - betAmount;
-  const reason = jackpotWon ? `Roleta: 💎 JACKPOT PROGRESSIVO! (🪙${jackpotWon})` : `Roleta: ${outcome.label}`;
-  const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, net, reason);
+
+  const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, net, `Roleta: ${outcome.label}`);
   if(!ok) return {ok:false, reason:'error'};
-  return {ok:true, outcome, payout, jackpotWon};
+  return {ok:true, outcome, payout};
 }
 
 // ---------- Ícone do jogador logado (canto da tela, leva ao perfil) ----------
@@ -1112,26 +1094,41 @@ function computeAllCurrentStreaks(rows){
 // ---------- Conquistas automáticas (diferentes dos emblemas da loja — estas
 // não custam moedas, desbloqueiam-se sozinhas por mérito) ----------
 const ACHIEVEMENTS = [
-  { id:'first_tournament',     name:'Estreante',           emoji:'🌟', desc:'Jogou o seu primeiro torneio' },
-  { id:'first_win',           name:'Primeira Vitória',    emoji:'🥇', desc:'Venceu a primeira partida' },
-  { id:'ten_wins',             name:'Veterano de Guerra',  emoji:'⚔️', desc:'10 vitórias no total' },
-  { id:'five_tournaments',     name:'Assíduo',             emoji:'🎮', desc:'Jogou 5 torneios' },
-  { id:'win_streak_3',         name:'Em Chamas',           emoji:'🔥', desc:'3 vitórias seguidas' },
-  { id:'win_streak_5',         name:'Imparável',           emoji:'⚡', desc:'5 vitórias seguidas' },
-  { id:'first_title',          name:'Campeão',             emoji:'🏆', desc:'Venceu o primeiro torneio' },
-  { id:'three_titles',         name:'Dinastia',            emoji:'💎', desc:'3 títulos conquistados' },
-  { id:'multi_tier_champion',  name:'Poliglota',           emoji:'👑', desc:'Campeão em 2 tiers diferentes' },
-  { id:'immortal',              name:'Imortal',             emoji:'🛡️', desc:'20 vitórias no total' },
-  { id:'legend',                name:'Lenda',               emoji:'🏵️', desc:'5 títulos conquistados' },
-  { id:'precision',             name:'Precisão',            emoji:'🎯', desc:'Winrate de 70%+ (mínimo 10 partidas)' },
-  { id:'omnipresent',           name:'Onipresente',         emoji:'🌍', desc:'Já jogou pelo menos uma vez em todos os 6 tiers' },
-  { id:'survivor',              name:'Sobrevivente',        emoji:'🌱', desc:'Foi campeão depois de ter passado pelo Play-in' },
-  { id:'perfectionist',         name:'Perfeição',           emoji:'💯', desc:'Foi campeão sem perder nenhuma partida no torneio' },
-  { id:'comeback',              name:'Reviravolta',         emoji:'🔄', desc:'Venceu uma Bo3 depois de perder o primeiro jogo' },
-  { id:'sharp_bettor',          name:'Apostador Fino',      emoji:'🔮', desc:'10 palpites certos no Palpiteiro' },
-  { id:'lucky_strike',          name:'Golpe de Sorte',      emoji:'🎰', desc:'Tirou o Jackpot (5x) na Roleta pelo menos uma vez' },
-  { id:'creative_namer',        name:'Nomeador Criativo',   emoji:'✍️', desc:'Deu apelido a 10 Pokémon diferentes' },
-  { id:'perfect_attendance',    name:'Presença Perfeita',   emoji:'📅', desc:'Não faltou a 5 torneios seguidos' }
+  { id:'first_tournament',     name:'Estreante',           emoji:'🌟', desc:'Jogou o seu primeiro torneio', tier:'bronze' },
+  { id:'first_win',           name:'Primeira Vitória',    emoji:'🥇', desc:'Venceu a primeira partida', tier:'bronze' },
+  { id:'ten_wins',             name:'Veterano de Guerra',  emoji:'⚔️', desc:'10 vitórias no total', tier:'silver' },
+  { id:'five_tournaments',     name:'Assíduo',             emoji:'🎮', desc:'Jogou 5 torneios', tier:'bronze' },
+  { id:'win_streak_3',         name:'Em Chamas',           emoji:'🔥', desc:'3 vitórias seguidas', tier:'bronze' },
+  { id:'win_streak_5',         name:'Imparável',           emoji:'⚡', desc:'5 vitórias seguidas', tier:'silver' },
+  { id:'first_title',          name:'Campeão',             emoji:'🏆', desc:'Venceu o primeiro torneio', tier:'silver' },
+  { id:'three_titles',         name:'Dinastia',            emoji:'💎', desc:'3 títulos conquistados', tier:'gold' },
+  { id:'multi_tier_champion',  name:'Poliglota',           emoji:'👑', desc:'Campeão em 2 tiers diferentes', tier:'gold' },
+  { id:'immortal',              name:'Imortal',             emoji:'🛡️', desc:'20 vitórias no total', tier:'gold' },
+  { id:'legend',                name:'Lenda',               emoji:'🏵️', desc:'5 títulos conquistados', tier:'gold' },
+  { id:'precision',             name:'Precisão',            emoji:'🎯', desc:'Winrate de 70%+ (mínimo 10 partidas)', tier:'silver' },
+  { id:'omnipresent',           name:'Onipresente',         emoji:'🌍', desc:'Já jogou pelo menos uma vez em todos os 6 tiers', tier:'silver' },
+  { id:'survivor',              name:'Sobrevivente',        emoji:'🌱', desc:'Foi campeão depois de ter passado pelo Play-in', tier:'gold' },
+  { id:'perfectionist',         name:'Perfeição',           emoji:'💯', desc:'Foi campeão sem perder nenhuma partida — e sem perder nenhum jogo em nenhuma Bo3 (só vitórias 2-0)', tier:'gold' },
+  { id:'comeback',              name:'Reviravolta',         emoji:'🔄', desc:'Venceu uma Bo3 depois de perder o primeiro jogo', tier:'silver' },
+  { id:'sharp_bettor',          name:'Apostador Fino',      emoji:'🔮', desc:'10 palpites certos no Palpiteiro', tier:'silver' },
+  { id:'lucky_strike',          name:'Golpe de Sorte',      emoji:'🎰', desc:'Tirou o Jackpot (5x) na Roleta pelo menos uma vez', tier:'bronze' },
+  { id:'creative_namer',        name:'Nomeador Criativo',   emoji:'✍️', desc:'Deu apelido a 10 Pokémon diferentes', tier:'bronze' },
+  { id:'perfect_attendance',    name:'Presença Perfeita',   emoji:'📅', desc:'Participou de 5 torneios seguidos', tier:'silver' },
+  { id:'eternal_rival',         name:'Rival Eterno',        emoji:'🗡️', desc:'Venceu o mesmo adversário pelo menos 5 vezes', tier:'silver' },
+  { id:'serial_underdog',       name:'Zebra em Série',      emoji:'🦓', desc:'Venceu como underdog (Elo pelo menos 100 pontos mais baixo) pelo menos 3 vezes', tier:'gold' },
+  { id:'recognized_mvp',        name:'MVP Reconhecido',     emoji:'🌠', desc:'Foi eleito MVP de um bloco de 3 torneios pelo menos uma vez', tier:'silver' },
+  { id:'back_to_back',          name:'Bicampeão',           emoji:'🏛️', desc:'Foi campeão em pelo menos 2 temporadas diferentes', tier:'gold' },
+  { id:'lucky_streak_bettor',   name:'Apostador Nato',      emoji:'🎟️', desc:'Acertou 3 palpites seguidos no Palpiteiro', tier:'bronze' },
+  { id:'voice_of_the_people',   name:'Voz do Povo',         emoji:'📣', desc:'Venceu a votação de Apelido da Semana pelo menos uma vez', tier:'bronze' },
+  { id:'investor',              name:'Investidor',          emoji:'💰', desc:'Chegou a ter 1000 moedas de saldo ao mesmo tempo', tier:'silver' },
+  { id:'phoenix',                name:'Fênix',               emoji:'🐦‍🔥', desc:'Perdeu 5 partidas seguidas, mas continuou a participar no torneio seguinte', tier:'silver', secret:true },
+  { id:'close_call',             name:'Sortudo do Destino',  emoji:'🎲', desc:'Venceu uma Bo3 decidida por pouco (2x1)', tier:'bronze', secret:true },
+  { id:'impossible_hunt',        name:'Caçada Impossível',   emoji:'🐺', desc:'Venceu um jogador com pelo menos 200 pontos de Elo a mais', tier:'gold', secret:true },
+  { id:'early_bird',             name:'Madrugador',          emoji:'🌅', desc:'Importou um set no mesmo dia em que o torneio foi criado, em 3 torneios diferentes', tier:'silver', secret:true },
+  { id:'philanthropist',         name:'Filantropo',          emoji:'💝', desc:'Deu mais de 500 moedas em presentes ao longo do tempo', tier:'gold', secret:true },
+  { id:'no_fear',                name:'Sem Medo',            emoji:'🃏', desc:'Apostou todo o saldo que tinha de uma vez, na Roleta ou numa aposta de campeão', tier:'bronze', secret:true },
+  { id:'full_collector',         name:'Colecionador Completo', emoji:'🏅', desc:'Comprou todos os cosméticos de uma categoria inteira', tier:'gold', secret:true },
+  { id:'night_owl',              name:'Coruja Noturna',      emoji:'🦉', desc:'Reclamou o bónus diário entre meia-noite e as 5 da manhã', tier:'bronze', secret:true }
 ];
 
 // stats vem de aggregatePlayers()[nome]; streak vem de computeAllCurrentStreaks()[nome].
@@ -1158,9 +1155,11 @@ function computeAchievements(stats, streak){
 // Conquistas que dependem do PERCURSO de torneios específicos (não só do
 // total agregado) — continuam síncronas, já que só precisam de allRows
 // (já carregado), sem consultas extra à base de dados.
-function computeMatchPathAchievements(name, allRows){
+function computeMatchPathAchievements(name, allRows, profile){
   const earned = new Set();
   const tiersPlayed = new Set();
+  const winsByOpponent = {};
+  let closeBo3Win = false;
 
   allRows.forEach(r=>{
     const data = r.data || {};
@@ -1170,8 +1169,15 @@ function computeMatchPathAchievements(name, allRows){
     const matches = data.matches || [];
     if(data.champion === name){
       const myMatches = matches.filter(m => m.winner && (m.p1===name || m.p2===name));
-      const anyLoss = myMatches.some(m => m.winner !== name);
-      if(!anyLoss && myMatches.length) earned.add('perfectionist');
+      const wonEveryMatch = myMatches.length > 0 && myMatches.every(m => m.winner === name);
+      // Numa Bo3, "perfeição" exige 2x0 — perder qualquer jogo dentro da série já invalida.
+      const wonEveryGameCleanly = myMatches.every(m => {
+        if(m.bo === 3 && Array.isArray(m.games)){
+          return m.games.every(g => !g || g === name);
+        }
+        return true;
+      });
+      if(wonEveryMatch && wonEveryGameCleanly) earned.add('perfectionist');
       const playedPlayIn = myMatches.some(m => m.label === 'Play-in');
       if(playedPlayIn) earned.add('survivor');
     }
@@ -1179,10 +1185,22 @@ function computeMatchPathAchievements(name, allRows){
       if(m.bo === 3 && m.winner === name && m.games && m.games[0] && m.games[0] !== name){
         earned.add('comeback');
       }
+      // Rival Eterno: contagem de vitórias contra cada adversário específico.
+      if(m.winner === name && (m.p1===name || m.p2===name)){
+        const opponent = m.p1 === name ? m.p2 : m.p1;
+        if(opponent) winsByOpponent[opponent] = (winsByOpponent[opponent]||0) + 1;
+      }
+      // Sortudo do Destino: venceu uma Bo3 apertada, decidida 2x1.
+      if(m.bo === 3 && m.winner === name && Array.isArray(m.games) && m.games.length === 3){
+        closeBo3Win = true;
+      }
     });
   });
 
   if(tiersPlayed.size >= 6) earned.add('omnipresent');
+  if(Object.values(winsByOpponent).some(c => c >= 5)) earned.add('eternal_rival');
+  if(closeBo3Win) earned.add('close_call');
+  if(computePhoenixComeback(allRows, name)) earned.add('phoenix');
 
   const myNicknames = new Set(
     aggregateNicknames(allRows).filter(n=>n.playerName===name).map(n=>n.nickname.toLowerCase())
@@ -1191,7 +1209,82 @@ function computeMatchPathAchievements(name, allRows){
 
   if(computeParticipationStreak(allRows, name) >= 5) earned.add('perfect_attendance');
 
+  if(computeUpsetWins(allRows, name, 100) >= 3) earned.add('serial_underdog');
+  if(computeUpsetWins(allRows, name, 200) >= 1) earned.add('impossible_hunt');
+
+  if(computeMvpBatches(allRows).some(b => b.mvp && b.mvp.name === name)) earned.add('recognized_mvp');
+
+  if(computeChampionSeasonsCount(allRows, name) >= 2) earned.add('back_to_back');
+
+  if(computeCompletedCosmeticCategory(profile)) earned.add('full_collector');
+
   return earned;
+}
+
+// Conta quantas vezes o jogador venceu como "underdog" — o adversário tinha
+// pelo menos minGap pontos de Elo a mais, calculado com o Elo de CADA UM no
+// momento exato dessa partida (replica a mesma evolução usada em computeEloRatings).
+function computeUpsetWins(allRows, name, minGap){
+  const ratings = {};
+  const K = 32, BASE = 1000;
+  function getRating(n){ if(!(n in ratings)) ratings[n] = BASE; return ratings[n]; }
+  let count = 0;
+  const sorted = allRows.slice().sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  sorted.forEach(r=>{
+    const matches = (r.data || {}).matches || [];
+    matches.forEach(m=>{
+      if(!m.winner || !m.p1 || !m.p2) return;
+      const winner = m.winner, loser = winner === m.p1 ? m.p2 : m.p1;
+      const rWinner = getRating(winner), rLoser = getRating(loser);
+      if(winner === name && (rLoser - rWinner) >= minGap) count++;
+      const expectedWinner = 1 / (1 + Math.pow(10, (rLoser - rWinner) / 400));
+      ratings[winner] = rWinner + K * (1 - expectedWinner);
+      ratings[loser] = rLoser + K * (0 - (1 - expectedWinner));
+    });
+  });
+  return count;
+}
+
+// Fênix: teve uma sequência de 5 derrotas seguidas, mas continuou a jogar depois.
+function computePhoenixComeback(allRows, name){
+  const sequence = [];
+  const sorted = allRows.slice().sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+  sorted.forEach(r=>{
+    ((r.data||{}).matches || []).forEach(m=>{
+      if(!m.winner || (m.p1!==name && m.p2!==name)) return;
+      sequence.push(m.winner === name ? 'win' : 'loss');
+    });
+  });
+  let run = 0;
+  for(let i=0;i<sequence.length;i++){
+    run = sequence[i]==='loss' ? run+1 : 0;
+    if(run >= 5 && i < sequence.length-1) return true;
+  }
+  return false;
+}
+
+// Bicampeão: foi campeão em pelo menos 2 temporadas diferentes.
+function computeChampionSeasonsCount(allRows, name){
+  const anchor = getSeasonAnchor(allRows);
+  if(!anchor) return 0;
+  const maxSeason = Math.max(1, ...allRows.map(r => computeSeasonNumber(r.created_at, anchor)));
+  let count = 0;
+  for(let s=1; s<=maxSeason; s++){
+    const seasonRows = filterRowsBySeason(allRows, s);
+    const stats = aggregatePlayers(seasonRows)[name];
+    if(stats && stats.titles > 0) count++;
+  }
+  return count;
+}
+
+// Colecionador Completo: já possui TODOS os itens compráveis de uma categoria inteira.
+function computeCompletedCosmeticCategory(profile){
+  if(!profile) return false;
+  const owned = new Set(profile.ownedCosmetics || []);
+  return ['backgrounds','accents','frames','nameEffects','titles','badges'].some(cat=>{
+    const purchasable = (COSMETIC_CATALOG[cat]||[]).filter(i=>i.price > 0 && !i.auctionOnly);
+    return purchasable.length > 0 && purchasable.every(i => owned.has(i.id));
+  });
 }
 
 // Quantos torneios seguidos (do mais recente para trás) o jogador participou
@@ -1209,12 +1302,20 @@ function computeParticipationStreak(allRows, name){
 
 // Conquistas que dependem de OUTRAS tabelas (palpites, transações de moedas)
 // — precisam de consultas assíncronas extra à base de dados.
-async function computeAsyncAchievements(supabaseUrl, supabaseAnonKey, name){
+async function computeAsyncAchievements(supabaseUrl, supabaseAnonKey, name, allRows){
   const earned = new Set();
+
   try{
-    const predRes = await fetch(`${supabaseUrl}/rest/v1/predictions?predictor_name=eq.${encodeURIComponent(name)}&correct=eq.true&select=id`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const predRes = await fetch(`${supabaseUrl}/rest/v1/predictions?predictor_name=eq.${encodeURIComponent(name)}&select=correct,created_at&order=created_at.asc`, {headers: sbAuthHeaders(supabaseAnonKey)});
     const predRows = await predRes.json();
-    if(Array.isArray(predRows) && predRows.length >= 10) earned.add('sharp_bettor');
+    if(Array.isArray(predRows)){
+      const resolved = predRows.filter(p=>p.correct !== null);
+      if(resolved.filter(p=>p.correct===true).length >= 10) earned.add('sharp_bettor');
+      // Apostador Nato: alguma vez teve 3 palpites certos SEGUIDOS (ordem cronológica).
+      let run = 0, bestRun = 0;
+      resolved.forEach(p=>{ run = p.correct ? run+1 : 0; bestRun = Math.max(bestRun, run); });
+      if(bestRun >= 3) earned.add('lucky_streak_bettor');
+    }
   } catch(e){ /* ignora silenciosamente */ }
 
   try{
@@ -1223,28 +1324,80 @@ async function computeAsyncAchievements(supabaseUrl, supabaseAnonKey, name){
     if(Array.isArray(jackpotRows) && jackpotRows.length >= 1) earned.add('lucky_strike');
   } catch(e){ /* ignora silenciosamente */ }
 
+  try{
+    // Voz do Povo: já venceu a votação de Apelido da Semana pelo menos uma vez
+    // (procura no registo de auditoria, onde fica registado quando é apurado).
+    const pattern = encodeURIComponent(`*de ${name} venceu a vota*`);
+    const voiceRes = await fetch(`${supabaseUrl}/rest/v1/activity_log?category=eq.jogadores&action=ilike.${pattern}&select=id&limit=1`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const voiceRows = await voiceRes.json();
+    if(Array.isArray(voiceRows) && voiceRows.length >= 1) earned.add('voice_of_the_people');
+  } catch(e){ /* ignora silenciosamente */ }
+
+  try{
+    const giftsRes = await fetch(`${supabaseUrl}/rest/v1/gifts?from_name=eq.${encodeURIComponent(name)}&select=amount`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const giftsRows = await giftsRes.json();
+    if(Array.isArray(giftsRows)){
+      const total = giftsRows.reduce((s,g)=>s+(g.amount||0), 0);
+      if(total >= 500) earned.add('philanthropist');
+    }
+  } catch(e){ /* ignora silenciosamente */ }
+
+  try{
+    const playerRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=max_coins_reached,all_in_count`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const playerRows = await playerRes.json();
+    if(Array.isArray(playerRows) && playerRows[0]){
+      if((playerRows[0].max_coins_reached||0) >= 1000) earned.add('investor');
+      if((playerRows[0].all_in_count||0) >= 1) earned.add('no_fear');
+    }
+  } catch(e){ /* ignora silenciosamente */ }
+
+  try{
+    // Coruja Noturna: reclamou o bónus diário entre meia-noite e as 5h.
+    const nightRes = await fetch(`${supabaseUrl}/rest/v1/coin_transactions?player_name=eq.${encodeURIComponent(name)}&reason=like.Bônus%20diário*&select=created_at`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const nightRows = await nightRes.json();
+    if(Array.isArray(nightRows) && nightRows.some(t=>{
+      const h = new Date(t.created_at).getHours();
+      return h >= 0 && h < 5;
+    })) earned.add('night_owl');
+  } catch(e){ /* ignora silenciosamente */ }
+
+  try{
+    // Madrugador: importou um set no MESMO DIA em que o torneio foi criado, em 3 torneios diferentes.
+    const importRes = await fetch(`${supabaseUrl}/rest/v1/activity_log?actor_name=eq.${encodeURIComponent(name)}&category=eq.sorteio&action=like.Importou%20um%20set*&select=created_at`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const importRows = await importRes.json();
+    if(Array.isArray(importRows) && importRows.length && allRows){
+      const importDates = new Set(importRows.map(l => new Date(l.created_at).toISOString().slice(0,10)));
+      let sameDayCount = 0;
+      allRows.forEach(r=>{
+        const tDate = new Date(r.created_at).toISOString().slice(0,10);
+        if(importDates.has(tDate)) sameDayCount++;
+      });
+      if(sameDayCount >= 3) earned.add('early_bird');
+    }
+  } catch(e){ /* ignora silenciosamente */ }
+
   return earned;
 }
 
 // Junta as três fontes (agregado, percurso, outras tabelas) numa só chamada.
-async function computeAllAchievements(supabaseUrl, supabaseAnonKey, name, stats, streak, allRows){
+async function computeAllAchievements(supabaseUrl, supabaseAnonKey, name, stats, streak, allRows, profile){
   const earned = computeAchievements(stats, streak);
-  computeMatchPathAchievements(name, allRows).forEach(id=>earned.add(id));
-  const asyncOnes = await computeAsyncAchievements(supabaseUrl, supabaseAnonKey, name);
+  computeMatchPathAchievements(name, allRows, profile).forEach(id=>earned.add(id));
+  const asyncOnes = await computeAsyncAchievements(supabaseUrl, supabaseAnonKey, name, allRows);
   asyncOnes.forEach(id=>earned.add(id));
   return earned;
 }
 
 // Devolve, para cada conquista do catálogo, quantos e que % dos jogadores já a têm.
 // Ordenado da mais rara para a mais comum.
-function computeGlobalAchievementStats(playerStats, allRows){
+function computeGlobalAchievementStats(playerStats, allRows, playerProfiles){
   const streaks = computeAllCurrentStreaks(allRows);
   const names = Object.keys(playerStats);
   const counts = {};
   ACHIEVEMENTS.forEach(a=>{ counts[a.id] = 0; });
   names.forEach(name=>{
     const earned = computeAchievements(playerStats[name], streaks[name]);
-    computeMatchPathAchievements(name, allRows).forEach(id=>earned.add(id));
+    computeMatchPathAchievements(name, allRows, playerProfiles ? playerProfiles[name] : null).forEach(id=>earned.add(id));
     // Nota: as conquistas baseadas noutras tabelas (Apostador Fino, Golpe de
     // Sorte) ficam de fora desta % global de propósito — evita multiplicar
     // por N jogadores o número de consultas à base de dados só para uma
@@ -1289,6 +1442,7 @@ async function placeChampionBet(supabaseUrl, supabaseAnonKey, tournamentId, name
   const rows = await res.json();
   if(!rows || !rows[0]) return {ok:false, reason:'error'};
   if((rows[0].coins||0) < wager) return {ok:false, reason:'insufficient'};
+  await recordAllInIfApplicable(supabaseUrl, supabaseAnonKey, name, wager, rows[0].coins||0);
 
   const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, -wager, `Apostou no campeão da semana: ${predictedChampion}`);
   if(!ok) return {ok:false, reason:'error'};
@@ -1416,7 +1570,7 @@ function renderDailyBonusIcon(available){
 async function claimDailyBonus(supabaseUrl, supabaseAnonKey, name){
   if(!name) return {awarded:false};
   try{
-    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=last_daily_bonus,daily_streak_count`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=last_daily_bonus,daily_streak_count,total_daily_claims`, {headers: sbAuthHeaders(supabaseAnonKey)});
     const rows = await res.json();
     if(!rows || !rows[0]) return {awarded:false};
     const today = new Date().toISOString().slice(0,10);
@@ -1425,18 +1579,36 @@ async function claimDailyBonus(supabaseUrl, supabaseAnonKey, name){
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0,10);
     const newStreak = (rows[0].last_daily_bonus === yesterday) ? ((rows[0].daily_streak_count || 0) + 1) : 1;
     const amount = DAILY_STREAK_AMOUNTS[Math.min(newStreak, DAILY_STREAK_AMOUNTS.length) - 1];
+    const newTotalClaims = (rows[0].total_daily_claims || 0) + 1;
 
     const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, amount, `Bônus diário de login (sequência: dia ${newStreak})`);
     if(!ok) return {awarded:false};
     await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
       method:'PATCH',
       headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-      body: JSON.stringify({ last_daily_bonus: today, daily_streak_count: newStreak })
+      body: JSON.stringify({ last_daily_bonus: today, daily_streak_count: newStreak, total_daily_claims: newTotalClaims })
     });
     return {awarded:true, amount, streak:newStreak};
   } catch(e){
     return {awarded:false};
   }
+}
+
+// ---------- Desconto por fidelidade ----------
+// 5% de desconto na loja a cada 30 bónus diários reclamados ao longo da vida
+// da conta (não precisa ser sequência contínua) — máximo de 20% (aos 120 dias).
+const LOYALTY_DISCOUNT_PER_STEP_PCT = 5;
+const LOYALTY_DISCOUNT_STEP_DAYS = 30;
+const LOYALTY_DISCOUNT_MAX_PCT = 20;
+
+function computeLoyaltyDiscountPct(totalClaims){
+  const steps = Math.floor((totalClaims||0) / LOYALTY_DISCOUNT_STEP_DAYS);
+  return Math.min(LOYALTY_DISCOUNT_MAX_PCT, steps * LOYALTY_DISCOUNT_PER_STEP_PCT);
+}
+
+function applyLoyaltyDiscount(price, discountPct){
+  if(!discountPct) return price;
+  return Math.max(1, Math.round(price * (1 - discountPct/100)));
 }
 
 // ---------- Celebração ao desbloquear conquista nova ----------
@@ -1819,4 +1991,97 @@ async function placeBid(supabaseUrl, supabaseAnonKey, auctionId, bidderName, amo
     body: JSON.stringify([{ auction_id: auctionId, bidder_name: bidderName, amount }])
   });
   return {ok: insertRes.ok};
+}
+
+// ---------- Lotaria ----------
+// Bilhete barato e de preço fixo (sempre acessível), o pote cresce com as
+// compras de todos, e o sorteio é ponderado pelo número de bilhetes de cada
+// um — matematicamente justo por construção, sem o problema de "aposta
+// mínima" que tínhamos com o jackpot progressivo da roleta.
+const LOTTERY_TICKET_PRICE = 10;
+const LOTTERY_HOUSE_CUT_PCT = 10; // fica de fora do pote, funciona como dreno da economia
+
+async function fetchActiveLotteryRound(supabaseUrl, supabaseAnonKey){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/lottery_rounds?status=eq.active&order=created_at.desc&limit=1&select=*`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const rows = await res.json();
+    if(rows && rows[0]) return rows[0];
+    // Nenhuma rodada ativa — cria uma nova automaticamente.
+    const createRes = await fetch(`${supabaseUrl}/rest/v1/lottery_rounds`, {
+      method:'POST',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=representation'}),
+      body: JSON.stringify([{ status:'active', pot:0, total_tickets:0 }])
+    });
+    if(!createRes.ok) return null;
+    const createdRows = await createRes.json();
+    return (createdRows && createdRows[0]) ? createdRows[0] : null;
+  } catch(e){
+    return null;
+  }
+}
+
+async function fetchMyLotteryTickets(supabaseUrl, supabaseAnonKey, roundId, name){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/lottery_tickets?round_id=eq.${roundId}&buyer_name=eq.${encodeURIComponent(name)}&select=ticket_count`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const rows = await res.json();
+    return rows.reduce((s,r)=>s+(r.ticket_count||0), 0);
+  } catch(e){
+    return 0;
+  }
+}
+
+// Devolve {ok, reason} — 'insufficient' | 'invalid' | 'error' | true
+async function buyLotteryTickets(supabaseUrl, supabaseAnonKey, name, roundId, count){
+  if(!count || count <= 0) return {ok:false, reason:'invalid'};
+  const cost = count * LOTTERY_TICKET_PRICE;
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const rows = await res.json();
+  if(!rows || !rows[0]) return {ok:false, reason:'error'};
+  if((rows[0].coins||0) < cost) return {ok:false, reason:'insufficient'};
+
+  const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, -cost, `Comprou ${count} bilhete(s) da Lotaria`);
+  if(!ok) return {ok:false, reason:'error'};
+
+  const insertRes = await fetch(`${supabaseUrl}/rest/v1/lottery_tickets`, {
+    method:'POST',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify([{ round_id: roundId, buyer_name: name, ticket_count: count }])
+  });
+  if(!insertRes.ok) return {ok:false, reason:'error'};
+
+  try{
+    const roundRes = await fetch(`${supabaseUrl}/rest/v1/lottery_rounds?id=eq.${roundId}&select=pot,total_tickets`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const roundRows = await roundRes.json();
+    if(roundRows && roundRows[0]){
+      const potIncrease = Math.round(cost * (1 - LOTTERY_HOUSE_CUT_PCT/100));
+      await fetch(`${supabaseUrl}/rest/v1/lottery_rounds?id=eq.${roundId}`, {
+        method:'PATCH',
+        headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+        body: JSON.stringify({ pot: (roundRows[0].pot||0) + potIncrease, total_tickets: (roundRows[0].total_tickets||0) + count })
+      });
+    }
+  } catch(e){ /* nao critico */ }
+
+  return {ok:true};
+}
+
+async function fetchLotteryTicketHolders(supabaseUrl, supabaseAnonKey, roundId){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/lottery_tickets?round_id=eq.${roundId}&select=buyer_name,ticket_count`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const rows = await res.json();
+    const tally = {};
+    rows.forEach(r=>{ tally[r.buyer_name] = (tally[r.buyer_name]||0) + (r.ticket_count||0); });
+    return Object.entries(tally).map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count);
+  } catch(e){
+    return [];
+  }
+}
+
+async function fetchPastLotteryRounds(supabaseUrl, supabaseAnonKey, limit){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/lottery_rounds?status=eq.concluded&order=created_at.desc&limit=${limit||10}&select=*`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    return await res.json();
+  } catch(e){
+    return [];
+  }
 }

@@ -296,7 +296,7 @@ async function renderProfile(){
   const seasonComparison = computeSeasonComparison(allRows, name);
   const winrateByTier = computeWinrateByTier(allRows, name);
   const iconicTeam = computeIconicTeam(allRows, name);
-  const achievements = await computeAllAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, st, myStreak, allRows);
+  const achievements = await computeAllAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, st, myStreak, allRows, playerProfiles[name] || {});
 
   if(isOwnProfile){
     checkNewAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, achievements).then(newOnes=>{

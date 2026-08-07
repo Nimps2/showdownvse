@@ -348,7 +348,7 @@ async function handleDailyBonusClick(){
   const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
   const icon = document.getElementById('dailyBonusIcon');
   if(result.awarded){
-    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
   }
   if(icon) icon.classList.remove('available');
 }
@@ -434,7 +434,7 @@ function onPokemonTierFilterChange(){
 
 function renderAchievementStats(rows){
   const el = document.getElementById('achievementStatsList');
-  const stats = computeGlobalAchievementStats(playerStats, rows);
+  const stats = computeGlobalAchievementStats(playerStats, rows, playerProfiles);
   if(!Object.keys(playerStats).length){
     el.innerHTML = '<div class="empty-state">Ainda não há jogadores com histórico.</div>';
     return;

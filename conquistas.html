@@ -216,7 +216,7 @@ async function handleDailyBonusClick(){
   const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
   const icon = document.getElementById('dailyBonusIcon');
   if(result.awarded){
-    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
   }
   if(icon) icon.classList.remove('available');
 }
@@ -263,7 +263,7 @@ async function renderAchievements(){
   const streak = computeAllCurrentStreaks(allRows)[name] || null;
   const grid = document.getElementById('achievementsGrid');
   grid.innerHTML = '<div class="empty-state">A calcular…</div>';
-  const earned = await computeAllAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, stats, streak, allRows);
+  const earned = await computeAllAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, stats, streak, allRows, playerProfiles[name] || {});
   const isOwn = name === loggedInPlayerName;
   const featured = (playerProfiles[name] && playerProfiles[name].featuredAchievements) || [];
 
@@ -271,7 +271,13 @@ async function renderAchievements(){
   const pct = Math.round((earned.size / ACHIEVEMENTS.length) * 100);
   document.getElementById('progressBarFill').style.width = pct + '%';
 
-  grid.innerHTML = ACHIEVEMENTS.map(a=>{
+  const tierMeta = {
+    bronze: { label: '🥉 Bronze', color: '#cd7f32' },
+    silver: { label: '🥈 Prata', color: '#c0c0c0' },
+    gold:   { label: '🥇 Ouro', color: '#f0b64f' }
+  };
+
+  const achievementCardHtml = (a)=>{
     const has = earned.has(a.id);
     const isFeatured = featured.includes(a.id);
     const pinBtn = (isOwn && has)
@@ -286,7 +292,26 @@ async function renderAchievements(){
         <div class="achv-status ${has?'earned':'locked'}">${has ? '✓ Desbloqueada' : 'Por desbloquear'}${isFeatured ? ' · ⭐ Em destaque' : ''}</div>
       </div>
     </div>`;
+  };
+
+  grid.innerHTML = ['bronze','silver','gold'].map(tierKey=>{
+    const tierAchievements = ACHIEVEMENTS.filter(a=>a.tier===tierKey && (!a.secret || earned.has(a.id)));
+    if(!tierAchievements.length) return '';
+    const totalInTier = ACHIEVEMENTS.filter(a=>a.tier===tierKey).length;
+    const tierEarnedCount = ACHIEVEMENTS.filter(a=>a.tier===tierKey).filter(a=>earned.has(a.id)).length;
+    const meta = tierMeta[tierKey];
+    return `<div style="margin-bottom:20px;">
+      <div style="font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;color:${meta.color};margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+        ${meta.label} <span style="font-size:11px;color:var(--text-faint);font-weight:400;">(${tierEarnedCount}/${totalInTier})</span>
+      </div>
+      <div class="achv-grid">${tierAchievements.map(achievementCardHtml).join('')}</div>
+    </div>`;
   }).join('');
+
+  const undiscoveredSecrets = ACHIEVEMENTS.filter(a=>a.secret && !earned.has(a.id)).length;
+  if(undiscoveredSecrets > 0){
+    grid.innerHTML += `<div class="empty-state" style="margin-top:8px;">🔒 ${undiscoveredSecrets} conquista(s) secreta(s) ainda por descobrir — não aparecem aqui até serem desbloqueadas.</div>`;
+  }
 }
 
 async function doToggleFeatured(achievementId){

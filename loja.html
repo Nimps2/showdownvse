@@ -145,6 +145,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
     <span>Seu saldo</span>
     <b id="myCoinsDisplay">🪙 0</b>
   </div>
+  <div id="loyaltyBanner" style="display:none;text-align:center;font-size:11.5px;color:var(--success);margin:-10px 0 18px 0;"></div>
 
   <div class="tabs">
     <button class="tab-btn active" onclick="switchShopTab('personalizacao')">Personalização</button>
@@ -248,14 +249,9 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 
   <!-- ==================== SORTE ==================== -->
   <div id="panel-sorte" class="shop-panel">
-    <div class="card" style="border-color:rgba(240,182,79,0.35);background:linear-gradient(135deg,rgba(240,182,79,0.06),rgba(165,107,240,0.04));">
+    <div class="card">
       <h2>🎰 Roleta</h2>
-      <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">Aposte moedas e gire — pode perder tudo, ganhar de volta parte, ou multiplicar até 5x. É pura sorte, sem ligação com o resultado de nenhuma partida.</div>
-      <div style="text-align:center;background:var(--bg-panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px;">
-        <div style="font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">💎 Pote do Jackpot Progressivo</div>
-        <div id="jackpotPotDisplay" style="font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:22px;color:var(--tera-amber);">🪙 —</div>
-        <div style="font-size:10px;color:var(--text-faint);">Cresce com cada aposta perdida de qualquer jogador — quem tirar o Jackpot leva tudo!</div>
-      </div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Aposte moedas e gire — pode perder tudo, ganhar de volta parte, ou multiplicar até 5x. É pura sorte, sem ligação com o resultado de nenhuma partida.</div>
       <input type="number" id="rouletteBet" placeholder="Quantas moedas apostar?" min="1">
       <button class="btn-primary" onclick="doSpinRoulette()">Girar</button>
       <div id="rouletteResult" style="margin-top:12px;font-size:13px;"></div>
@@ -270,6 +266,17 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
       <h2>🏆 Ranking da Roleta</h2>
       <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">Mínimo de 3 giros para entrar no ranking. Ordenado por lucro líquido total.</div>
       <div id="rouletteRankingList"><div class="empty-state">A carregar…</div></div>
+    </div>
+
+    <div class="card" style="border-color:rgba(240,182,79,0.35);background:linear-gradient(135deg,rgba(240,182,79,0.06),rgba(165,107,240,0.04));">
+      <h2>🎟️ Lotaria</h2>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Compre bilhetes baratos (🪙<span id="lotteryTicketPriceLabel">?</span> cada) — o pote cresce com as compras de todos, e o sorteio é ponderado pelos bilhetes de cada um: quantos mais tiver, mais chances tem, mas todos participam de forma justa. Sorteio acontece sempre que um torneio novo é criado.</div>
+      <div id="lotteryContainer"><div class="empty-state">A carregar…</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Últimos vencedores da Lotaria</h2>
+      <div id="pastLotteryList"><div class="empty-state">A carregar…</div></div>
     </div>
   </div>
 
@@ -294,6 +301,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 initTheme();
 ensureAnimatedBgStyles();
 document.getElementById('lootBoxPriceLabel').textContent = LOOT_BOX_PRICE;
+document.getElementById('lotteryTicketPriceLabel').textContent = LOTTERY_TICKET_PRICE;
 document.getElementById('surpriseGiftPriceLabel').textContent = SURPRISE_GIFT_PRICE;
 document.getElementById('sponsorshipPriceLabel').textContent = SPONSORSHIP_PRICE;
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -403,10 +411,11 @@ async function init(){
     generosityRanking = await fetchGenerosityRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
     rouletteHistory = await fetchRouletteTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 20);
     rouletteRanking = await fetchRouletteRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
-    refreshJackpotDisplay();
     renderAll();
     renderAuction();
     renderPastAuctions();
+    renderLottery();
+    renderPastLotteryRounds();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
   }
@@ -415,6 +424,17 @@ async function init(){
 function renderAll(){
   const myProfile = playerProfiles[loggedInPlayerName] || {};
   document.getElementById('myCoinsDisplay').textContent = `🪙 ${myProfile.coins || 0}`;
+  const loyaltyBanner = document.getElementById('loyaltyBanner');
+  const loyaltyPct = myProfile.loyaltyDiscountPct || 0;
+  if(loyaltyPct > 0){
+    const daysToNext = loyaltyPct < LOYALTY_DISCOUNT_MAX_PCT
+      ? LOYALTY_DISCOUNT_STEP_DAYS - ((myProfile.totalDailyClaims||0) % LOYALTY_DISCOUNT_STEP_DAYS)
+      : 0;
+    loyaltyBanner.style.display = 'block';
+    loyaltyBanner.innerHTML = `💚 Desconto de fidelidade ativo: -${loyaltyPct}% em cosméticos${daysToNext ? ` (mais ${daysToNext} dia(s) de bônus para o próximo nível)` : ' (nível máximo!)'}`;
+  } else {
+    loyaltyBanner.style.display = 'none';
+  }
 
   renderWeeklyFeatured(myProfile);
 
@@ -472,12 +492,6 @@ function renderAll(){
 async function refreshAfterSpend(){
   playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
   renderAll();
-}
-
-async function refreshJackpotDisplay(){
-  const pot = await fetchRouletteJackpot(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const el = document.getElementById('jackpotPotDisplay');
-  if(el) el.textContent = `🪙 ${pot}`;
 }
 
 function formatTimeRemaining(endsAt){
@@ -559,6 +573,65 @@ async function renderPastAuctions(){
   `).join('');
 }
 
+let currentLotteryRound = null;
+
+async function renderLottery(){
+  const el = document.getElementById('lotteryContainer');
+  currentLotteryRound = await fetchActiveLotteryRound(SUPABASE_URL, SUPABASE_ANON_KEY);
+  if(!currentLotteryRound){
+    el.innerHTML = '<div class="empty-state">Não foi possível carregar a rodada atual. Tente novamente.</div>';
+    return;
+  }
+  const myTickets = await fetchMyLotteryTickets(SUPABASE_URL, SUPABASE_ANON_KEY, currentLotteryRound.id, loggedInPlayerName);
+  const myOdds = currentLotteryRound.total_tickets > 0 ? Math.round((myTickets / currentLotteryRound.total_tickets) * 100) : 0;
+
+  el.innerHTML = `
+    <div style="text-align:center;margin-bottom:14px;">
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">Pote atual</div>
+      <div style="font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:26px;color:var(--tera-amber);">🪙 ${currentLotteryRound.pot}</div>
+      <div style="font-size:11px;color:var(--text-faint);">${currentLotteryRound.total_tickets} bilhete(s) vendido(s) no total</div>
+    </div>
+    ${myTickets > 0 ? `<div class="bet-placed">Você tem <b>${myTickets}</b> bilhete(s) nesta rodada — cerca de <b>${myOdds}%</b> de chance de ganhar.</div>` : ''}
+    <input type="number" id="lotteryTicketCount" placeholder="Quantos bilhetes comprar?" min="1">
+    <button class="btn-primary" onclick="doBuyLotteryTickets()">Comprar bilhetes</button>
+    <div id="lotteryBuyResult" style="margin-top:10px;font-size:12.5px;"></div>
+  `;
+}
+
+async function doBuyLotteryTickets(){
+  const input = document.getElementById('lotteryTicketCount');
+  const count = parseInt(input.value, 10);
+  const resultDiv = document.getElementById('lotteryBuyResult');
+  const myProfile = playerProfiles[loggedInPlayerName] || {};
+  if(!count || count <= 0){ alert('Digite uma quantidade de bilhetes válida.'); return; }
+  const cost = count * LOTTERY_TICKET_PRICE;
+  if(cost > (myProfile.coins||0)){ alert('Você não tem moedas suficientes para essa quantidade de bilhetes.'); return; }
+
+  const result = await buyLotteryTickets(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, currentLotteryRound.id, count);
+  if(!result.ok){
+    const msg = result.reason === 'insufficient' ? 'Você não tem moedas suficientes.' : 'Não foi possível comprar. Tente novamente.';
+    resultDiv.innerHTML = `<span style="color:var(--danger);">${msg}</span>`;
+    return;
+  }
+  resultDiv.innerHTML = `<span style="color:var(--success);">✓ Comprou ${count} bilhete(s) por 🪙${cost}!</span>`;
+  input.value = '';
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Comprou ${count} bilhete(s) da Lotaria (🪙${cost})`);
+  await refreshAfterSpend();
+  await renderLottery();
+}
+
+async function renderPastLotteryRounds(){
+  const el = document.getElementById('pastLotteryList');
+  const rows = await fetchPastLotteryRounds(SUPABASE_URL, SUPABASE_ANON_KEY, 10);
+  if(!rows.length){ el.innerHTML = '<div class="empty-state">Ainda não houve nenhuma rodada concluída.</div>'; return; }
+  el.innerHTML = rows.map(r=>`
+    <div class="history-row">
+      <span>${r.total_tickets} bilhete(s) vendido(s)</span>
+      <b style="color:var(--tera-amber);">${r.winner_name ? `${escapeHtml(r.winner_name)} — 🪙${r.pot}` : 'Sem vencedor'}</b>
+    </div>
+  `).join('');
+}
+
 function shopItemHtml(item, type, profile){
   const fieldMap = {
     background: profile.equippedBackground, accent: profile.equippedAccent,
@@ -579,7 +652,12 @@ function shopItemHtml(item, type, profile){
   if(owned){
     actionBtn = `<button class="shop-btn" disabled style="opacity:0.5;">${equipped?'Equipado':'Possui'} ✓</button>`;
   } else {
-    actionBtn = `<button class="shop-btn" onclick="doBuyCosmetic('${item.id}')">Comprar 🪙${item.price}</button>`;
+    const discountPct = profile.loyaltyDiscountPct || 0;
+    const finalPrice = discountPct ? applyLoyaltyDiscount(item.price, discountPct) : item.price;
+    const priceLabel = discountPct
+      ? `<span style="text-decoration:line-through;color:var(--text-faint);font-size:9px;">🪙${item.price}</span> 🪙${finalPrice}`
+      : `🪙${item.price}`;
+    actionBtn = `<button class="shop-btn" onclick="doBuyCosmetic('${item.id}')">Comprar ${priceLabel}</button>`;
   }
   return `<div class="shop-item">
     ${swatchHtml}
@@ -590,10 +668,15 @@ function shopItemHtml(item, type, profile){
 
 function shopBadgeItemHtml(item, profile){
   const owned = (profile.ownedCosmetics||[]).includes(item.id);
+  const discountPct = profile.loyaltyDiscountPct || 0;
+  const finalPrice = discountPct ? applyLoyaltyDiscount(item.price, discountPct) : item.price;
+  const priceLabel = discountPct
+    ? `<span style="text-decoration:line-through;color:var(--text-faint);font-size:9px;">🪙${item.price}</span> 🪙${finalPrice}`
+    : `🪙${item.price}`;
   return `<div class="shop-item">
     <div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:20px;">${item.emoji}</div>
     <div class="shop-item-name">${escapeHtml(item.name)}</div>
-    ${owned ? `<button class="shop-btn" disabled style="opacity:0.5;">Possui ✓</button>` : `<button class="shop-btn" onclick="doBuyCosmetic('${item.id}')">Comprar 🪙${item.price}</button>`}
+    ${owned ? `<button class="shop-btn" disabled style="opacity:0.5;">Possui ✓</button>` : `<button class="shop-btn" onclick="doBuyCosmetic('${item.id}')">Comprar ${priceLabel}</button>`}
   </div>`;
 }
 
@@ -813,15 +896,11 @@ async function doSpinRoulette(){
   }
   const net = result.payout - bet;
   const color = net > 0 ? 'var(--success)' : net === 0 ? 'var(--text-faint)' : 'var(--danger)';
-  const resultLabel = result.jackpotWon
-    ? `💎 JACKPOT PROGRESSIVO! Levou o pote inteiro: 🪙${result.jackpotWon}`
-    : `${result.outcome.label} — ${net>=0?'+':''}${net} 🪙`;
-  resultDiv.innerHTML = `<div class="reveal-pop" style="color:${color};font-family:'Chakra Petch',sans-serif;font-weight:700;">${resultLabel}</div>`;
+  resultDiv.innerHTML = `<div class="reveal-pop" style="color:${color};font-family:'Chakra Petch',sans-serif;font-weight:700;">${result.outcome.label} — ${net>=0?'+':''}${net} 🪙</div>`;
   if(spinBtn) spinBtn.disabled = false;
   betInput.value = '';
   rouletteHistory = await fetchRouletteTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 20);
   rouletteRanking = await fetchRouletteRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
-  refreshJackpotDisplay();
   await refreshAfterSpend();
   logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Girou a roleta com 🪙${bet} — ${result.outcome.label} (${net>=0?'+':''}${net})`);
 }
