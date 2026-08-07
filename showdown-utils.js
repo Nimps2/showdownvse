@@ -1997,12 +1997,14 @@ async function placeBid(supabaseUrl, supabaseAnonKey, auctionId, bidderName, amo
 }
 
 // ---------- Lotaria ----------
-// Bilhete barato e de preço fixo (sempre acessível), o pote cresce com as
-// compras de todos, e o sorteio é ponderado pelo número de bilhetes de cada
-// um — matematicamente justo por construção, sem o problema de "aposta
-// mínima" que tínhamos com o jackpot progressivo da roleta.
+// Bilhete barato e de preço fixo (sempre acessível). Cada bilhete recebe um
+// número aleatório; no sorteio, um número vencedor é escolhido e só ganha
+// quem tiver algum bilhete com esse número exato — na maioria das vezes
+// ninguém acerta, e o pote acumula para a rodada seguinte (o sorteio em si
+// corre no gestor, ver LOTTERY_NUMBER_RANGE lá — tem de ser o MESMO valor).
 const LOTTERY_TICKET_PRICE = 10;
 const LOTTERY_HOUSE_CUT_PCT = 10; // fica de fora do pote, funciona como dreno da economia
+const LOTTERY_NUMBER_RANGE = 50;
 
 async function fetchActiveLotteryRound(supabaseUrl, supabaseAnonKey){
   try{

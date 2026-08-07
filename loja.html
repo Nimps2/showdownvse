@@ -270,7 +270,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 
     <div class="card" style="border-color:rgba(240,182,79,0.35);background:linear-gradient(135deg,rgba(240,182,79,0.06),rgba(165,107,240,0.04));">
       <h2>🎟️ Lotaria</h2>
-      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Compre bilhetes baratos (🪙<span id="lotteryTicketPriceLabel">?</span> cada) — o pote cresce com as compras de todos, e o sorteio é ponderado pelos bilhetes de cada um: quantos mais tiver, mais chances tem, mas todos participam de forma justa. Sorteio acontece sempre que um torneio novo é criado.</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Compre bilhetes baratos (🪙<span id="lotteryTicketPriceLabel">?</span> cada). Cada bilhete recebe um número de 1 a <span id="lotteryRangeLabel">?</span>, e no sorteio um número vencedor é escolhido — só ganha quem tiver um bilhete com esse número. Na maioria das vezes ninguém acerta, e o pote acumula para a próxima rodada! Sorteio acontece sempre que um torneio novo é criado.</div>
       <div id="lotteryContainer"><div class="empty-state">A carregar…</div></div>
     </div>
 
@@ -302,6 +302,7 @@ initTheme();
 ensureAnimatedBgStyles();
 document.getElementById('lootBoxPriceLabel').textContent = LOOT_BOX_PRICE;
 document.getElementById('lotteryTicketPriceLabel').textContent = LOTTERY_TICKET_PRICE;
+document.getElementById('lotteryRangeLabel').textContent = LOTTERY_NUMBER_RANGE;
 document.getElementById('surpriseGiftPriceLabel').textContent = SURPRISE_GIFT_PRICE;
 document.getElementById('sponsorshipPriceLabel').textContent = SPONSORSHIP_PRICE;
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -583,7 +584,8 @@ async function renderLottery(){
     return;
   }
   const myTickets = await fetchMyLotteryTickets(SUPABASE_URL, SUPABASE_ANON_KEY, currentLotteryRound.id, loggedInPlayerName);
-  const myOdds = currentLotteryRound.total_tickets > 0 ? Math.round((myTickets / currentLotteryRound.total_tickets) * 100) : 0;
+  // Chance de pelo menos um dos MEUS bilhetes acertar o número sorteado.
+  const myOdds = myTickets > 0 ? Math.round((1 - Math.pow((LOTTERY_NUMBER_RANGE-1)/LOTTERY_NUMBER_RANGE, myTickets)) * 100) : 0;
 
   el.innerHTML = `
     <div style="text-align:center;margin-bottom:14px;">
@@ -624,12 +626,13 @@ async function renderPastLotteryRounds(){
   const el = document.getElementById('pastLotteryList');
   const rows = await fetchPastLotteryRounds(SUPABASE_URL, SUPABASE_ANON_KEY, 10);
   if(!rows.length){ el.innerHTML = '<div class="empty-state">Ainda não houve nenhuma rodada concluída.</div>'; return; }
-  el.innerHTML = rows.map(r=>`
-    <div class="history-row">
-      <span>${r.total_tickets} bilhete(s) vendido(s)</span>
-      <b style="color:var(--tera-amber);">${r.winner_name ? `${escapeHtml(r.winner_name)} — 🪙${r.pot}` : 'Sem vencedor'}</b>
-    </div>
-  `).join('');
+  el.innerHTML = rows.map(r=>{
+    const numberLabel = r.winning_number ? ` (número sorteado: ${r.winning_number})` : '';
+    return `<div class="history-row">
+      <span>${r.total_tickets} bilhete(s)${numberLabel}</span>
+      <b style="color:${r.winner_name?'var(--tera-amber)':'var(--text-faint)'};">${r.winner_name ? `${escapeHtml(r.winner_name)} — 🪙${r.pot}` : '🔄 Ninguém acertou, pote acumulou'}</b>
+    </div>`;
+  }).join('');
 }
 
 function shopItemHtml(item, type, profile){
