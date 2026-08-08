@@ -1996,12 +1996,12 @@ async function placeBid(supabaseUrl, supabaseAnonKey, auctionId, bidderName, amo
   return {ok: insertRes.ok};
 }
 
-// ---------- Lotaria ----------
+// ---------- Loteria ----------
 // Bilhete barato e de preço fixo (sempre acessível). Cada bilhete recebe um
 // número aleatório; no sorteio, um número vencedor é escolhido e só ganha
-// quem tiver algum bilhete com esse número exato — na maioria das vezes
+// quem tiver algum bilhete com esse número exato. Na maioria das vezes
 // ninguém acerta, e o pote acumula para a rodada seguinte (o sorteio em si
-// corre no gestor, ver LOTTERY_NUMBER_RANGE lá — tem de ser o MESMO valor).
+// corre no gestor, ver LOTTERY_NUMBER_RANGE lá, que tem de ser o mesmo valor).
 const LOTTERY_TICKET_PRICE = 10;
 const LOTTERY_HOUSE_CUT_PCT = 10; // fica de fora do pote, funciona como dreno da economia
 const LOTTERY_NUMBER_RANGE = 50;
@@ -2045,7 +2045,7 @@ async function buyLotteryTickets(supabaseUrl, supabaseAnonKey, name, roundId, co
   if(!rows || !rows[0]) return {ok:false, reason:'error'};
   if((rows[0].coins||0) < cost) return {ok:false, reason:'insufficient'};
 
-  const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, -cost, `Comprou ${count} bilhete(s) da Lotaria`);
+  const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, -cost, `Comprou ${count} bilhete(s) da Loteria`);
   if(!ok) return {ok:false, reason:'error'};
 
   const insertRes = await fetch(`${supabaseUrl}/rest/v1/lottery_tickets`, {

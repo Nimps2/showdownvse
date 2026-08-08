@@ -269,13 +269,13 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
     </div>
 
     <div class="card" style="border-color:rgba(240,182,79,0.35);background:linear-gradient(135deg,rgba(240,182,79,0.06),rgba(165,107,240,0.04));">
-      <h2>🎟️ Lotaria</h2>
+      <h2>🎟️ Loteria</h2>
       <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Compre bilhetes baratos (🪙<span id="lotteryTicketPriceLabel">?</span> cada). Cada bilhete recebe um número de 1 a <span id="lotteryRangeLabel">?</span>, e no sorteio um número vencedor é escolhido — só ganha quem tiver um bilhete com esse número. Na maioria das vezes ninguém acerta, e o pote acumula para a próxima rodada! Sorteio acontece sempre que um torneio novo é criado.</div>
       <div id="lotteryContainer"><div class="empty-state">A carregar…</div></div>
     </div>
 
     <div class="card">
-      <h2>Últimos vencedores da Lotaria</h2>
+      <h2>Últimos vencedores da Loteria</h2>
       <div id="pastLotteryList"><div class="empty-state">A carregar…</div></div>
     </div>
   </div>
@@ -617,7 +617,7 @@ async function doBuyLotteryTickets(){
   }
   resultDiv.innerHTML = `<span style="color:var(--success);">✓ Comprou ${count} bilhete(s) por 🪙${cost}!</span>`;
   input.value = '';
-  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Comprou ${count} bilhete(s) da Lotaria (🪙${cost})`);
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Comprou ${count} bilhete(s) da Loteria (🪙${cost})`);
   await refreshAfterSpend();
   await renderLottery();
 }
