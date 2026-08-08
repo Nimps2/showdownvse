@@ -1133,7 +1133,7 @@ const ACHIEVEMENTS = [
 
 // stats vem de aggregatePlayers()[nome]; streak vem de computeAllCurrentStreaks()[nome].
 // Devolve um Set com os ids das conquistas já desbloqueadas.
-function computeAchievements(stats, streak){
+function computeAchievements(stats, bestWinStreakCount){
   const earned = new Set();
   if(!stats) return earned;
   if(stats.tournaments.length >= 1) earned.add('first_tournament');
@@ -1141,15 +1141,47 @@ function computeAchievements(stats, streak){
   if(stats.wins >= 10) earned.add('ten_wins');
   if(stats.wins >= 20) earned.add('immortal');
   if(stats.tournaments.length >= 5) earned.add('five_tournaments');
-  if(streak && streak.type === 'win' && streak.count >= 3) earned.add('win_streak_3');
-  if(streak && streak.type === 'win' && streak.count >= 5) earned.add('win_streak_5');
+  if((bestWinStreakCount||0) >= 3) earned.add('win_streak_3');
+  if((bestWinStreakCount||0) >= 5) earned.add('win_streak_5');
   if(stats.titles >= 1) earned.add('first_title');
   if(stats.titles >= 3) earned.add('three_titles');
   if(stats.titles >= 5) earned.add('legend');
   if(Object.keys(stats.titlesByTier || {}).length >= 2) earned.add('multi_tier_champion');
-  const totalGames = stats.wins + stats.losses;
-  if(totalGames >= 10 && (stats.wins/totalGames) >= 0.7) earned.add('precision');
+  // Nota: "Precisão" (winrate 70%+) NÃO fica aqui de propósito — winrate
+  // geral pode CAIR com o tempo (não é cumulativo como vitórias/torneios),
+  // por isso precisa de olhar para o histórico cronológico completo em vez
+  // do total atual. Ver computeMatchPathAchievements.
   return earned;
+}
+
+// Maior sequência de vitórias JÁ ALCANÇADA por cada jogador (não a sequência
+// atual) — usada para as conquistas "Em Chamas" e "Imparável", que uma vez
+// desbloqueadas devem continuar desbloqueadas para sempre, mesmo que o
+// jogador perca uma partida depois. Devolve { nome: maiorSequência }.
+function computeAllBestWinStreaks(allRows){
+  const sequences = {};
+  const sorted = allRows.slice().sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+  sorted.forEach(r=>{
+    const matches = (r.data||{}).matches || [];
+    matches.forEach(m=>{
+      if(!m.winner || !m.p1 || !m.p2) return;
+      const loser = m.winner === m.p1 ? m.p2 : m.p1;
+      if(!sequences[m.winner]) sequences[m.winner] = [];
+      if(!sequences[loser]) sequences[loser] = [];
+      sequences[m.winner].push('win');
+      sequences[loser].push('loss');
+    });
+  });
+  const bests = {};
+  Object.entries(sequences).forEach(([name, seq])=>{
+    let best = 0, run = 0;
+    seq.forEach(s=>{
+      run = s === 'win' ? run+1 : 0;
+      best = Math.max(best, run);
+    });
+    bests[name] = best;
+  });
+  return bests;
 }
 
 // Conquistas que dependem do PERCURSO de torneios específicos (não só do
@@ -1207,7 +1239,7 @@ function computeMatchPathAchievements(name, allRows, profile){
   );
   if(myNicknames.size >= 10) earned.add('creative_namer');
 
-  if(computeParticipationStreak(allRows, name) >= 5) earned.add('perfect_attendance');
+  if(computeBestParticipationStreak(allRows, name) >= 5) earned.add('perfect_attendance');
 
   if(computeUpsetWins(allRows, name, 100) >= 3) earned.add('serial_underdog');
   if(computeUpsetWins(allRows, name, 200) >= 1) earned.add('impossible_hunt');
@@ -1218,7 +1250,31 @@ function computeMatchPathAchievements(name, allRows, profile){
 
   if(computeCompletedCosmeticCategory(profile)) earned.add('full_collector');
 
+  if(computeEverReachedWinrateThreshold(allRows, name, 10, 0.7)) earned.add('precision');
+
   return earned;
+}
+
+// Verifica se, em ALGUM ponto da história cronológica do jogador (depois de
+// ter jogado pelo menos minGames partidas), o winrate-até-ali alguma vez
+// bateu minWinrate — ao contrário de olhar só para o total atual (que pode
+// cair com o tempo), isto torna a conquista permanente uma vez alcançada.
+function computeEverReachedWinrateThreshold(allRows, name, minGames, minWinrate){
+  const sequence = [];
+  const sorted = allRows.slice().sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+  sorted.forEach(r=>{
+    ((r.data||{}).matches || []).forEach(m=>{
+      if(!m.winner || (m.p1!==name && m.p2!==name)) return;
+      sequence.push(m.winner === name ? 1 : 0);
+    });
+  });
+  let wins = 0;
+  for(let i=0; i<sequence.length; i++){
+    wins += sequence[i];
+    const total = i+1;
+    if(total >= minGames && (wins/total) >= minWinrate) return true;
+  }
+  return false;
 }
 
 // Conta quantas vezes o jogador venceu como "underdog" — o adversário tinha
@@ -1288,7 +1344,8 @@ function computeCompletedCosmeticCategory(profile){
 }
 
 // Quantos torneios seguidos (do mais recente para trás) o jogador participou
-// sem falhar nenhum — independente de ganhar ou perder.
+// sem falhar nenhum — independente de ganhar ou perder. Usado só para exibir
+// "sequência atual", NÃO para a conquista (ver computeBestParticipationStreak).
 function computeParticipationStreak(allRows, name){
   const sorted = allRows.slice().sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
   let streak = 0;
@@ -1298,6 +1355,24 @@ function computeParticipationStreak(allRows, name){
     else break;
   }
   return streak;
+}
+
+// Maior sequência de participação JÁ ALCANÇADA em toda a história — ao
+// contrário da função acima, esta nunca "quebra" retroativamente, por isso é
+// segura para conquistas permanentes como "Presença Perfeita".
+function computeBestParticipationStreak(allRows, name){
+  const sorted = allRows.slice().sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+  let best = 0, run = 0;
+  sorted.forEach(r=>{
+    const players = (r.data && r.data.players) || [];
+    if(players.includes(name)){
+      run++;
+      best = Math.max(best, run);
+    } else {
+      run = 0;
+    }
+  });
+  return best;
 }
 
 // Conquistas que dependem de OUTRAS tabelas (palpites, transações de moedas)
@@ -1384,7 +1459,8 @@ async function computeAsyncAchievements(supabaseUrl, supabaseAnonKey, name, allR
 
 // Junta as três fontes (agregado, percurso, outras tabelas) numa só chamada.
 async function computeAllAchievements(supabaseUrl, supabaseAnonKey, name, stats, streak, allRows, profile){
-  const earned = computeAchievements(stats, streak);
+  const bestWinStreak = computeAllBestWinStreaks(allRows)[name] || 0;
+  const earned = computeAchievements(stats, bestWinStreak);
   computeMatchPathAchievements(name, allRows, profile).forEach(id=>earned.add(id));
   const asyncOnes = await computeAsyncAchievements(supabaseUrl, supabaseAnonKey, name, allRows);
   asyncOnes.forEach(id=>earned.add(id));
@@ -1394,12 +1470,12 @@ async function computeAllAchievements(supabaseUrl, supabaseAnonKey, name, stats,
 // Devolve, para cada conquista do catálogo, quantos e que % dos jogadores já a têm.
 // Ordenado da mais rara para a mais comum.
 function computeGlobalAchievementStats(playerStats, allRows, playerProfiles){
-  const streaks = computeAllCurrentStreaks(allRows);
+  const bestStreaks = computeAllBestWinStreaks(allRows);
   const names = Object.keys(playerStats);
   const counts = {};
   ACHIEVEMENTS.forEach(a=>{ counts[a.id] = 0; });
   names.forEach(name=>{
-    const earned = computeAchievements(playerStats[name], streaks[name]);
+    const earned = computeAchievements(playerStats[name], bestStreaks[name] || 0);
     computeMatchPathAchievements(name, allRows, playerProfiles ? playerProfiles[name] : null).forEach(id=>earned.add(id));
     // Nota: as conquistas baseadas noutras tabelas (Apostador Fino, Golpe de
     // Sorte) ficam de fora desta % global de propósito — evita multiplicar
