@@ -302,7 +302,8 @@ async function renderProfile(){
     checkNewAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, achievements).then(newOnes=>{
       newOnes.forEach((id, i)=>{
         const a = ACHIEVEMENTS.find(x=>x.id===id);
-        if(a) setTimeout(()=> showCelebrationToast(`🎖️ Conquista desbloqueada!<br>${a.emoji} ${escapeHtml(a.name)}<br><span style="font-size:11.5px;opacity:0.85;">+${ACHIEVEMENT_COIN_BONUS} 🪙</span>`, 6000), i*700);
+        const secretLabel = a && a.secret ? `<br><span style="font-size:11px;opacity:0.85;">🕵️ Esta era uma conquista secreta!</span>` : '';
+        if(a) setTimeout(()=> showCelebrationToast(`🎖️ Conquista desbloqueada!<br>${a.emoji} ${escapeHtml(a.name)}${secretLabel}<br><span style="font-size:11.5px;opacity:0.85;">+${ACHIEVEMENT_COIN_BONUS} 🪙</span>`, 6500), i*700);
       });
     });
   }
@@ -408,7 +409,7 @@ async function renderProfile(){
           return ACHIEVEMENTS.filter(a=>featuredIds.includes(a.id)).map(a=>`
             <div class="shop-item" title="${escapeHtml(a.desc)}">
               <div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:22px;">${a.emoji}</div>
-              <div class="shop-item-name">${escapeHtml(a.name)}</div>
+              <div class="shop-item-name">${escapeHtml(a.name)}${a.secret ? ' 🕵️' : ''}</div>
             </div>`).join('');
         })()}
       </div>

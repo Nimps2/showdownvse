@@ -1128,7 +1128,15 @@ const ACHIEVEMENTS = [
   { id:'philanthropist',         name:'Filantropo',          emoji:'💝', desc:'Deu mais de 500 moedas em presentes ao longo do tempo', tier:'gold', secret:true },
   { id:'no_fear',                name:'Sem Medo',            emoji:'🃏', desc:'Apostou todo o saldo que tinha de uma vez, na Roleta ou numa aposta de campeão', tier:'bronze', secret:true },
   { id:'full_collector',         name:'Colecionador Completo', emoji:'🏅', desc:'Comprou todos os cosméticos de uma categoria inteira', tier:'gold', secret:true },
-  { id:'night_owl',              name:'Coruja Noturna',      emoji:'🦉', desc:'Reclamou o bónus diário entre meia-noite e as 5 da manhã', tier:'bronze', secret:true }
+  { id:'night_owl',              name:'Coruja Noturna',      emoji:'🦉', desc:'Reclamou o bónus diário entre meia-noite e as 5 da manhã', tier:'bronze', secret:true },
+  { id:'active_voice',           name:'Voz Ativa',           emoji:'🗳️', desc:'Votou em pelo menos 5 votações de tier diferentes', tier:'bronze' },
+  { id:'popular',                name:'Popular',             emoji:'🎉', desc:'Foi presenteado por pelo menos 3 jogadores diferentes', tier:'silver' },
+  { id:'frequent_buyer',         name:'Comprador Assíduo',   emoji:'🛍️', desc:'Já acumulou pelo menos 10 cosméticos diferentes', tier:'bronze' },
+  { id:'pot_king',                name:'Rei do Pote',         emoji:'🫙', desc:'Ganhou uma rodada da Loteria com o pote acumulado em pelo menos 🪙150', tier:'gold' },
+  { id:'compulsive_rerolls',     name:'Trocador Compulsivo', emoji:'♻️', desc:'Pediu reroll pelo menos 5 vezes', tier:'bronze', secret:true },
+  { id:'auctioneer',              name:'Leiloeiro',           emoji:'🔨', desc:'Venceu um leilão de item raro pelo menos uma vez', tier:'silver', secret:true },
+  { id:'golden_ticket',           name:'Bilhete Dourado',     emoji:'🎫', desc:'Ganhou a Loteria com apenas 1 bilhete comprado nessa rodada', tier:'gold', secret:true },
+  { id:'crowned_underdog',        name:'Azarão Coroado',      emoji:'🎖️', desc:'Foi campeão de um torneio tendo o menor Elo entre todos os participantes', tier:'gold', secret:true }
 ];
 
 // stats vem de aggregatePlayers()[nome]; streak vem de computeAllCurrentStreaks()[nome].
@@ -1252,6 +1260,10 @@ function computeMatchPathAchievements(name, allRows, profile){
 
   if(computeEverReachedWinrateThreshold(allRows, name, 10, 0.7)) earned.add('precision');
 
+  if(profile && (profile.ownedCosmetics||[]).length >= 10) earned.add('frequent_buyer');
+
+  if(computeUnderdogChampionship(allRows, name)) earned.add('crowned_underdog');
+
   return earned;
 }
 
@@ -1299,6 +1311,39 @@ function computeUpsetWins(allRows, name, minGap){
     });
   });
   return count;
+}
+
+// Verifica se o jogador alguma vez foi campeão de um torneio tendo o Elo mais
+// baixo entre todos os participantes NAQUELE momento (antes do torneio
+// começar) — usa a mesma evolução cronológica de Elo que "Zebra em Série".
+function computeUnderdogChampionship(allRows, name){
+  const ratings = {};
+  const K = 32, BASE = 1000;
+  function getRating(n){ if(!(n in ratings)) ratings[n] = BASE; return ratings[n]; }
+  const sorted = allRows.slice().sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  let found = false;
+
+  sorted.forEach(r=>{
+    const data = r.data || {};
+    const players = (data.players || []).filter(Boolean);
+
+    if(data.champion === name && players.length > 1){
+      const myRating = getRating(name);
+      const isLowestOrTied = players.every(p => p === name || getRating(p) >= myRating);
+      if(isLowestOrTied) found = true;
+    }
+
+    const matches = data.matches || [];
+    matches.forEach(m=>{
+      if(!m.winner || !m.p1 || !m.p2) return;
+      const winner = m.winner, loser = winner === m.p1 ? m.p2 : m.p1;
+      const rWinner = getRating(winner), rLoser = getRating(loser);
+      const expectedWinner = 1 / (1 + Math.pow(10, (rLoser - rWinner) / 400));
+      ratings[winner] = rWinner + K * (1 - expectedWinner);
+      ratings[loser] = rLoser + K * (0 - (1 - expectedWinner));
+    });
+  });
+  return found;
 }
 
 // Fênix: teve uma sequência de 5 derrotas seguidas, mas continuou a jogar depois.
@@ -1451,6 +1496,60 @@ async function computeAsyncAchievements(supabaseUrl, supabaseAnonKey, name, allR
         if(importDates.has(tDate)) sameDayCount++;
       });
       if(sameDayCount >= 3) earned.add('early_bird');
+    }
+  } catch(e){ /* ignora silenciosamente */ }
+
+  try{
+    // Voz Ativa: os votos de tier são apagados a cada torneio novo, por isso
+    // conta-se a partir do registo de auditoria (permanente) em vez da
+    // tabela de votos em si.
+    const votePattern = encodeURIComponent('Votou*no tier*');
+    const voteRes = await fetch(`${supabaseUrl}/rest/v1/activity_log?actor_name=eq.${encodeURIComponent(name)}&category=eq.loja&action=like.${votePattern}&select=id`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const voteRows = await voteRes.json();
+    if(Array.isArray(voteRows) && voteRows.length >= 5) earned.add('active_voice');
+  } catch(e){ /* ignora silenciosamente */ }
+
+  try{
+    // Popular: recebeu presentes de pelo menos 3 jogadores diferentes.
+    const giftsRecRes = await fetch(`${supabaseUrl}/rest/v1/gifts?to_name=eq.${encodeURIComponent(name)}&select=from_name`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const giftsRecRows = await giftsRecRes.json();
+    if(Array.isArray(giftsRecRows)){
+      const distinctGivers = new Set(giftsRecRows.map(g=>g.from_name));
+      if(distinctGivers.size >= 3) earned.add('popular');
+    }
+  } catch(e){ /* ignora silenciosamente */ }
+
+  try{
+    // Trocador Compulsivo: pediu reroll pelo menos 5 vezes (qualquer status).
+    const rerollRes = await fetch(`${supabaseUrl}/rest/v1/reroll_requests?player_name=eq.${encodeURIComponent(name)}&select=id`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const rerollRows = await rerollRes.json();
+    if(Array.isArray(rerollRows) && rerollRows.length >= 5) earned.add('compulsive_rerolls');
+  } catch(e){ /* ignora silenciosamente */ }
+
+  try{
+    // Leiloeiro: venceu pelo menos um leilão concluído.
+    const auctionPattern = encodeURIComponent(`*${name}*`);
+    const auctionRes = await fetch(`${supabaseUrl}/rest/v1/auctions?status=eq.concluded&winner_name=ilike.${auctionPattern}&select=id&limit=1`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const auctionRows = await auctionRes.json();
+    if(Array.isArray(auctionRows) && auctionRows.length >= 1) earned.add('auctioneer');
+  } catch(e){ /* ignora silenciosamente */ }
+
+  try{
+    // Rei do Pote / Bilhete Dourado: precisa de olhar para as rodadas da
+    // Loteria que este jogador venceu, e para cada uma, quantos bilhetes
+    // tinha nessa rodada específica.
+    const wonPattern = encodeURIComponent(`*${name}*`);
+    const wonRoundsRes = await fetch(`${supabaseUrl}/rest/v1/lottery_rounds?status=eq.concluded&winner_name=ilike.${wonPattern}&select=id,pot`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const wonRounds = await wonRoundsRes.json();
+    if(Array.isArray(wonRounds) && wonRounds.length){
+      if(wonRounds.some(r => (r.pot||0) >= 150)) earned.add('pot_king');
+
+      for(const round of wonRounds){
+        const ticketsRes = await fetch(`${supabaseUrl}/rest/v1/lottery_tickets?round_id=eq.${round.id}&buyer_name=eq.${encodeURIComponent(name)}&select=ticket_count`, {headers: sbAuthHeaders(supabaseAnonKey)});
+        const ticketsRows = await ticketsRes.json();
+        const totalTickets = Array.isArray(ticketsRows) ? ticketsRows.reduce((s,t)=>s+(t.ticket_count||0), 0) : 0;
+        if(totalTickets === 1){ earned.add('golden_ticket'); break; }
+      }
     }
   } catch(e){ /* ignora silenciosamente */ }
 

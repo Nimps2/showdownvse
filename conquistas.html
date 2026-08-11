@@ -72,6 +72,15 @@ select:focus{outline:none;border-color:var(--tera-cyan);}
 .progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--tera-cyan),var(--tera-violet));border-radius:4px;transition:width .3s;}
 
 .achv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}
+.achv-grid-fixed{grid-template-rows:repeat(2,1fr);}
+.achv-tier-section{background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px;}
+.achv-tier-header{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.tier-pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;}
+.page-btn{background:var(--bg-panel);border:1px solid var(--line);color:var(--text-dim);padding:6px 14px;
+  border-radius:8px;cursor:pointer;font-family:'Chakra Petch',sans-serif;font-size:13px;}
+.page-btn:hover:not(:disabled){border-color:var(--tera-cyan);color:var(--tera-cyan);}
+.page-btn:disabled{opacity:0.35;cursor:not-allowed;}
+.page-info{font-size:12px;color:var(--text-faint);}
 .achv-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start;position:relative;}
 .achv-card.earned{border-color:rgba(240,182,79,0.35);background:linear-gradient(135deg,rgba(240,182,79,0.06),rgba(165,107,240,0.04));}
 .achv-emoji{font-size:30px;flex-shrink:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;
@@ -93,6 +102,7 @@ select:focus{outline:none;border-color:var(--tera-cyan);}
   background:linear-gradient(135deg,var(--tera-amber),#c98f2e);border-color:var(--tera-amber);
   box-shadow:0 0 10px rgba(240,182,79,0.5);
 }
+.secret-badge{font-size:11px;filter:drop-shadow(0 0 3px rgba(165,107,240,0.6));}
 
 .empty-state{color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;}
 .footer-note{color:var(--text-faint);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.5;}
@@ -256,6 +266,12 @@ function onPlayerChange(){
   renderAchievements();
 }
 
+let tierPages = { bronze:1, silver:1, gold:1 };
+const ACHIEVEMENTS_PER_PAGE = 6;
+let lastRenderedEarned = new Set();
+let lastRenderedIsOwn = false;
+let lastRenderedFeatured = [];
+
 async function renderAchievements(){
   const name = document.getElementById('playerSelect').value;
   if(!name) return;
@@ -267,32 +283,50 @@ async function renderAchievements(){
   const isOwn = name === loggedInPlayerName;
   const featured = (playerProfiles[name] && playerProfiles[name].featuredAchievements) || [];
 
+  lastRenderedEarned = earned;
+  lastRenderedIsOwn = isOwn;
+  lastRenderedFeatured = featured;
+  tierPages = { bronze:1, silver:1, gold:1 }; // volta à primeira página sempre que troca de jogador
+
   document.getElementById('progressLabel').textContent = `${earned.size} de ${ACHIEVEMENTS.length} conquistas desbloqueadas`;
   const pct = Math.round((earned.size / ACHIEVEMENTS.length) * 100);
   document.getElementById('progressBarFill').style.width = pct + '%';
 
-  const tierMeta = {
-    bronze: { label: '🥉 Bronze', color: '#cd7f32' },
-    silver: { label: '🥈 Prata', color: '#c0c0c0' },
-    gold:   { label: '🥇 Ouro', color: '#f0b64f' }
-  };
+  renderTierGrid();
+}
 
-  const achievementCardHtml = (a)=>{
-    const has = earned.has(a.id);
-    const isFeatured = featured.includes(a.id);
-    const pinBtn = (isOwn && has)
-      ? `<button class="pin-btn${isFeatured?' featured':''}" onclick="doToggleFeatured('${a.id}')" title="${isFeatured ? 'Em destaque — clique para remover' : `Destacar no perfil (até ${MAX_FEATURED_ACHIEVEMENTS})`}">📌</button>`
-      : '';
-    return `<div class="achv-card ${has?'earned':''}">
-      ${pinBtn}
-      <div class="achv-emoji">${has ? a.emoji : '🔒'}</div>
-      <div style="flex:1;">
-        <div class="achv-name">${escapeHtml(a.name)}</div>
-        <div class="achv-desc">${escapeHtml(a.desc)}</div>
-        <div class="achv-status ${has?'earned':'locked'}">${has ? '✓ Desbloqueada' : 'Por desbloquear'}${isFeatured ? ' · ⭐ Em destaque' : ''}</div>
-      </div>
-    </div>`;
-  };
+const tierMeta = {
+  bronze: { label: '🥉 Bronze', color: '#cd7f32' },
+  silver: { label: '🥈 Prata', color: '#c0c0c0' },
+  gold:   { label: '🥇 Ouro', color: '#f0b64f' }
+};
+
+function achievementCardHtml(a){
+  const earned = lastRenderedEarned, isOwn = lastRenderedIsOwn, featured = lastRenderedFeatured;
+  const has = earned.has(a.id);
+  const isFeatured = featured.includes(a.id);
+  const pinBtn = (isOwn && has)
+    ? `<button class="pin-btn${isFeatured?' featured':''}" onclick="doToggleFeatured('${a.id}')" title="${isFeatured ? 'Em destaque — clique para remover' : `Destacar no perfil (até ${MAX_FEATURED_ACHIEVEMENTS})`}">📌</button>`
+    : '';
+  return `<div class="achv-card ${has?'earned':''}">
+    ${pinBtn}
+    <div class="achv-emoji">${has ? a.emoji : '🔒'}</div>
+    <div style="flex:1;">
+      <div class="achv-name">${escapeHtml(a.name)}${has && a.secret ? ' <span class="secret-badge" title="Esta era uma conquista secreta">🕵️</span>' : ''}</div>
+      <div class="achv-desc">${escapeHtml(a.desc)}</div>
+      <div class="achv-status ${has?'earned':'locked'}">${has ? '✓ Desbloqueada' : 'Por desbloquear'}${isFeatured ? ' · ⭐ Em destaque' : ''}</div>
+    </div>
+  </div>`;
+}
+
+function changeTierPage(tierKey, delta){
+  tierPages[tierKey] += delta;
+  renderTierGrid();
+}
+
+function renderTierGrid(){
+  const grid = document.getElementById('achievementsGrid');
+  const earned = lastRenderedEarned;
 
   grid.innerHTML = ['bronze','silver','gold'].map(tierKey=>{
     const tierAchievements = ACHIEVEMENTS.filter(a=>a.tier===tierKey && (!a.secret || earned.has(a.id)));
@@ -300,11 +334,27 @@ async function renderAchievements(){
     const totalInTier = ACHIEVEMENTS.filter(a=>a.tier===tierKey).length;
     const tierEarnedCount = ACHIEVEMENTS.filter(a=>a.tier===tierKey).filter(a=>earned.has(a.id)).length;
     const meta = tierMeta[tierKey];
-    return `<div style="margin-bottom:20px;">
-      <div style="font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;color:${meta.color};margin-bottom:10px;display:flex;align-items:center;gap:8px;">
-        ${meta.label} <span style="font-size:11px;color:var(--text-faint);font-weight:400;">(${tierEarnedCount}/${totalInTier})</span>
+
+    const totalPages = Math.max(1, Math.ceil(tierAchievements.length / ACHIEVEMENTS_PER_PAGE));
+    if(tierPages[tierKey] > totalPages) tierPages[tierKey] = totalPages;
+    if(tierPages[tierKey] < 1) tierPages[tierKey] = 1;
+    const startIdx = (tierPages[tierKey]-1) * ACHIEVEMENTS_PER_PAGE;
+    const pageItems = tierAchievements.slice(startIdx, startIdx + ACHIEVEMENTS_PER_PAGE);
+
+    const arrows = totalPages > 1 ? `
+      <div class="tier-pagination">
+        <button class="page-btn" onclick="changeTierPage('${tierKey}',-1)" ${tierPages[tierKey]<=1?'disabled':''}>←</button>
+        <span class="page-info">${tierPages[tierKey]} / ${totalPages}</span>
+        <button class="page-btn" onclick="changeTierPage('${tierKey}',1)" ${tierPages[tierKey]>=totalPages?'disabled':''}>→</button>
+      </div>` : '';
+
+    return `<div class="achv-tier-section">
+      <div class="achv-tier-header">
+        <span style="color:${meta.color};">${meta.label}</span>
+        <span style="font-size:11px;color:var(--text-faint);font-weight:400;">(${tierEarnedCount}/${totalInTier})</span>
       </div>
-      <div class="achv-grid">${tierAchievements.map(achievementCardHtml).join('')}</div>
+      <div class="achv-grid achv-grid-fixed">${pageItems.map(achievementCardHtml).join('')}</div>
+      ${arrows}
     </div>`;
   }).join('');
 
