@@ -107,6 +107,10 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 
 .shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;}
 .shop-item{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center;}
+.fav-set-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;}
+.fav-set-head{display:flex;align-items:center;justify-content:space-between;font-size:13px;margin-bottom:4px;}
+.fav-set-text{background:var(--bg-panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;
+  font-family:monospace;font-size:11.5px;white-space:pre-wrap;color:var(--text-dim);max-height:140px;overflow-y:auto;}
 .shop-swatch{width:100%;height:36px;border-radius:8px;margin-bottom:8px;}
 .shop-item-name{font-size:11px;color:var(--text-dim);margin-bottom:8px;}
 .shop-btn{
@@ -297,6 +301,7 @@ async function renderProfile(){
   const winrateByTier = computeWinrateByTier(allRows, name);
   const iconicTeam = computeIconicTeam(allRows, name);
   const achievements = await computeAllAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, st, myStreak, allRows, playerProfiles[name] || {});
+  const favoriteSets = await fetchFavoriteSets(SUPABASE_URL, SUPABASE_ANON_KEY, name);
 
   if(isOwnProfile){
     checkNewAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, achievements).then(newOnes=>{
@@ -447,6 +452,22 @@ async function renderProfile(){
     </div>
 
     <div class="card">
+      <h2>📦 Vault de Sets Favoritos</h2>
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">${isOwnProfile ? 'Sets que já importou e marcou como favoritos — favorite mais no viewer, junto aos seus sorteios de qualquer torneio.' : `Sets favoritos de ${escapeHtml(displayName)}.`}</div>
+      ${favoriteSets.length ? favoriteSets.map(f=>`
+        <div class="fav-set-card">
+          <div class="fav-set-head">
+            <span><b>${f.nickname ? escapeHtml(f.nickname)+' ' : ''}</b><span style="color:var(--text-faint);">${f.nickname ? '('+escapeHtml(f.species)+')' : escapeHtml(f.species)}</span></span>
+            ${isOwnProfile ? `<button class="tiny-link" style="background:none;border:none;cursor:pointer;color:var(--danger);" onclick="doRemoveFavoriteSet('${f.id}')">Remover</button>` : ''}
+          </div>
+          ${f.tournament_name ? `<div style="font-size:10.5px;color:var(--text-faint);margin-bottom:6px;">De: ${escapeHtml(f.tournament_name)}</div>` : ''}
+          <div class="fav-set-text" id="fav-set-${f.id}">${escapeHtml(f.set_text)}</div>
+          <button class="shop-btn" style="margin-top:6px;" onclick="copyText('fav-set-${f.id}', this)">Copiar</button>
+        </div>
+      `).join('') : `<div class="empty-state">${isOwnProfile ? 'Ainda não favoritou nenhum set — encontre um nos seus sorteios (em qualquer torneio) e clique em "⭐ Favoritar este set".' : 'Ainda não tem sets favoritos.'}</div>`}
+    </div>
+
+    <div class="card">
       <h2>Winrate por Tier</h2>
       <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">Em qual tier joga melhor — só entram tiers com partidas registadas.</div>
       ${winrateByTier.length ? winrateByTier.map(t=>`
@@ -569,6 +590,13 @@ async function saveMyProfile(){
   } else {
     alert('Não foi possível guardar o perfil. Tente novamente.');
   }
+}
+
+async function doRemoveFavoriteSet(id){
+  if(!confirm('Remover este set do Vault de favoritos?')) return;
+  const result = await removeFavoriteSet(SUPABASE_URL, SUPABASE_ANON_KEY, id);
+  if(!result.ok){ alert('Não foi possível remover. Tente novamente.'); return; }
+  renderProfile();
 }
 
 function toggleCustomizePanel(){

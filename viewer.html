@@ -562,6 +562,7 @@ function renderMyDraw(){
         <span><button class="copy-btn" onclick="copyText('${boxId}', this)">Copiar</button><span class="copied-msg">Copiado!</span></span>
       </div>
       <div class="import-box" id="${boxId}">${escapeHtml(r.text || r.mon)}</div>
+      ${r.text ? `<button class="copy-btn" style="margin-top:6px;" onclick="doFavoriteSet('${boxId}','${r.mon.replace(/'/g,"\\'")}')">⭐ Favoritar este set</button>` : ''}
       ${importSection(pasteId, `<button class="copy-btn" onclick="importMyMon(${pIdx},${i},'random', this)">Importar e salvar</button><span class="save-msg"></span>`, `${r.mon} @ Leftovers&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2`)}
       ${!locked ? `<button class="copy-btn" style="margin-top:6px;" onclick="requestReroll(${pIdx},${i},'${r.mon.replace(/'/g,"\\'")}')">🎲 Pedir reroll (${computeRerollPrice(myRerollCount)} 🪙)</button>` : ''}
     </div>`;
@@ -584,11 +585,29 @@ function renderMyDraw(){
         <span><button class="copy-btn" onclick="copyText('${boxId}', this)">Copiar</button><span class="copied-msg">Copiado!</span></span>
       </div>
       <div class="import-box" id="${boxId}">${escapeHtml(f.text || f.name)}</div>
+      ${f.text ? `<button class="copy-btn" style="margin-top:6px;" onclick="doFavoriteSet('${boxId}','${f.name.replace(/'/g,"\\'")}')">⭐ Favoritar este set</button>` : ''}
       ${importSection(pasteId, `<button class="copy-btn" onclick="importMyMon(${pIdx},${i},'free', this)">Importar e salvar</button><span class="save-msg"></span>`, `${f.name} @ Leftovers&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2`)}
     </div>`;
   });
   html += `</div>`;
   card.innerHTML = html;
+}
+
+async function doFavoriteSet(boxId, species){
+  const box = document.getElementById(boxId);
+  if(!box){ alert('Não foi possível ler o set.'); return; }
+  const setText = box.textContent;
+  const parsed = parseShowdownImport(setText);
+  const nickname = parsed ? parsed.nickname : null;
+  const tournamentName = currentData ? currentData.name : null;
+
+  const result = await addFavoriteSet(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, species, nickname, setText, tournamentName);
+  if(!result.ok){
+    alert(result.reason === 'duplicate' ? 'Este set já está no seu Vault de favoritos.' : 'Não foi possível favoritar. Tente novamente.');
+    return;
+  }
+  alert(`✓ "${species}" adicionado ao seu Vault de favoritos! Veja no seu perfil.`);
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'perfil', `Favoritou um set: ${species}`);
 }
 
 function importMyMon(pIdx, idx, kind, btn){

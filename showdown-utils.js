@@ -2266,3 +2266,45 @@ async function fetchPastLotteryRounds(supabaseUrl, supabaseAnonKey, limit){
     return [];
   }
 }
+
+// ---------- Vault de Sets Favoritos ----------
+// Deixa cada jogador marcar sets já importados para encontrar rapidamente
+// depois, sem precisar de procurar no histórico de torneios antigos.
+async function fetchFavoriteSets(supabaseUrl, supabaseAnonKey, playerName){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/favorite_sets?player_name=eq.${encodeURIComponent(playerName)}&select=*&order=created_at.desc`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    if(!res.ok) return [];
+    return await res.json();
+  } catch(e){
+    return [];
+  }
+}
+
+// Devolve {ok, reason} — 'duplicate' | 'error' | true
+async function addFavoriteSet(supabaseUrl, supabaseAnonKey, playerName, species, nickname, setText, tournamentName){
+  try{
+    // Evita duplicar exatamente o mesmo set já favoritado.
+    const existing = await fetchFavoriteSets(supabaseUrl, supabaseAnonKey, playerName);
+    if(existing.some(f => f.set_text === setText)) return {ok:false, reason:'duplicate'};
+
+    const res = await fetch(`${supabaseUrl}/rest/v1/favorite_sets`, {
+      method:'POST',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify([{ player_name: playerName, species, nickname: nickname || null, set_text: setText, tournament_name: tournamentName || null }])
+    });
+    return {ok: res.ok};
+  } catch(e){
+    return {ok:false, reason:'error'};
+  }
+}
+
+async function removeFavoriteSet(supabaseUrl, supabaseAnonKey, id){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/favorite_sets?id=eq.${id}`, {
+      method:'DELETE', headers: sbAuthHeaders(supabaseAnonKey)
+    });
+    return {ok: res.ok};
+  } catch(e){
+    return {ok:false};
+  }
+}
