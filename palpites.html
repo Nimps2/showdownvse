@@ -30,7 +30,7 @@ body.light-theme{
 }
 .player-corner-badge:hover{border-color:var(--tera-cyan);}
 .daily-bonus-icon{
-  position:fixed;top:60px;left:16px;z-index:899;width:38px;height:38px;border-radius:10px;
+  position:fixed;top:82px;left:16px;z-index:899;width:38px;height:38px;border-radius:10px;
   background:var(--bg-panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
   font-size:16px;opacity:0.3;filter:grayscale(1);cursor:default;padding:0;
 }
@@ -249,7 +249,7 @@ async function handleDailyBonusClick(){
   const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
   const icon = document.getElementById('dailyBonusIcon');
   if(result.awarded){
-    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
   }
   if(icon) icon.classList.remove('available');
 }
@@ -399,13 +399,16 @@ function renderOpenMatches(){
     return;
   }
   const matches = activeTournament.data.matches || [];
-  // Uma partida só aceita NOVAS apostas se ainda não começou (nenhum jogo decidido).
-  // Mas se já tens uma aposta feita, ela continua visível até a partida CONCLUIR de vez
-  // (m.winner definido) — não desaparece só porque o primeiro jogo de uma Bo3 já saiu.
+  // Uma partida só aceita NOVAS apostas se ainda não começou — nem por jogos
+  // já registados (Bo3), nem por ter sido marcada manualmente como "iniciada"
+  // pelo organizador (usado principalmente em Bo1, onde não há jogos
+  // parciais para detetar automaticamente que a partida já começou).
+  // Mas se já tens uma aposta feita, ela continua visível até a partida
+  // CONCLUIR de vez (m.winner definido).
   const relevantMatches = matches.filter(m => {
     if(!m.p1 || !m.p2 || m.winner) return false;
     const hasBet = !!myPredictionsForActive[m.id];
-    const notStarted = !m.games || m.games.every(g=>!g);
+    const notStarted = (!m.games || m.games.every(g=>!g)) && !m.started;
     return hasBet || notStarted;
   });
 
@@ -416,7 +419,7 @@ function renderOpenMatches(){
 
   container.innerHTML = relevantMatches.map(m=>{
     const existing = myPredictionsForActive[m.id];
-    const started = m.games && m.games.some(g=>g);
+    const started = (m.games && m.games.some(g=>g)) || m.started;
     if(existing){
       return `<div class="match-bet-card">
         <div class="match-bet-head">
@@ -541,7 +544,10 @@ async function renderNicknameVoteCard(){
 
   if(standings.length){
     html += `<div style="margin-top:14px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">Votação atual</div>`;
-    html += standings.map(s=>`<div class="history-row"><span>${escapeHtml(s.nickname)} (${escapeHtml(s.species)}) — ${escapeHtml(s.ownerName)}</span><b style="color:var(--tera-amber);">${s.votes} voto(s)</b></div>`).join('');
+    html += standings.map(s=>{
+      const comboNote = s.ownerTotal > s.votes ? ` <span style="color:var(--text-faint);font-size:10px;">(${escapeHtml(s.ownerName)} soma ${s.ownerTotal} no total)</span>` : '';
+      return `<div class="history-row"><span>${escapeHtml(s.nickname)} (${escapeHtml(s.species)}) — ${escapeHtml(s.ownerName)}${comboNote}</span><b style="color:var(--tera-amber);">${s.votes} voto(s)</b></div>`;
+    }).join('');
   }
   el.innerHTML = html;
 }

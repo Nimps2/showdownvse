@@ -573,6 +573,7 @@ function buildHoverCardHtml(name, playerStats, playerProfiles, currentTrophies, 
   const avatar = avatarHtml(name, profile.photo_url, 40, bgCosmetic ? bgCosmetic.color : null, frameCosmetic ? frameCosmetic.effect : null, bgCosmetic ? !!bgCosmetic.multiColor : false);
   const trophy = trophyEmojiFor(name, currentTrophies);
   const elo = eloRatings ? (eloRatings[name] || 1000) : null;
+  const hasCustomBg = (profile.ownedCosmetics||[]).includes('feature_custom_pagebg') && !!profile.profileBackgroundUrl;
 
   let statsLine = 'Ainda sem torneios registrados.';
   if(st){
@@ -581,7 +582,7 @@ function buildHoverCardHtml(name, playerStats, playerProfiles, currentTrophies, 
     statsLine = `${st.wins}V - ${st.losses}D (${wr}%) · ${st.titles} título(s)`;
   }
 
-  return `
+  const html = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
       ${avatar}
       <div>
@@ -594,6 +595,23 @@ function buildHoverCardHtml(name, playerStats, playerProfiles, currentTrophies, 
     <div style="font-size:12px;color:var(--text-dim);">${statsLine}</div>
     ${profile.status_message ? `<div style="font-size:11.5px;color:var(--text-dim);font-style:italic;margin-top:6px;">"${escapeHtml(profile.status_message)}"</div>` : ''}
   `;
+
+  return { html, hasCustomBg, bgUrl: hasCustomBg ? profile.profileBackgroundUrl : null };
+}
+
+// Aplica (ou limpa) o fundo personalizado no próprio elemento do mini-perfil
+// — chamado depois de definir o innerHTML, já que o innerHTML não mexe no
+// estilo do contentor.
+function applyHoverCardBackground(cardEl, result){
+  if(result.hasCustomBg && result.bgUrl){
+    cardEl.style.backgroundImage = `linear-gradient(rgba(10,12,20,0.82),rgba(10,12,20,0.82)), url('${result.bgUrl.replace(/'/g,"\\'")}')`;
+    cardEl.style.backgroundSize = 'cover';
+    cardEl.style.backgroundPosition = 'center';
+  } else {
+    cardEl.style.backgroundImage = '';
+    cardEl.style.backgroundSize = '';
+    cardEl.style.backgroundPosition = '';
+  }
 }
 
 // ---------- Tema claro/escuro ----------
@@ -1207,7 +1225,14 @@ const ACHIEVEMENTS = [
   { id:'compulsive_rerolls',     name:'Trocador Compulsivo', emoji:'♻️', desc:'Pediu reroll pelo menos 5 vezes', tier:'bronze', secret:true },
   { id:'auctioneer',              name:'Leiloeiro',           emoji:'🔨', desc:'Venceu um leilão de item raro pelo menos uma vez', tier:'silver', secret:true },
   { id:'golden_ticket',           name:'Bilhete Dourado',     emoji:'🎫', desc:'Ganhou a Loteria com apenas 1 bilhete comprado nessa rodada', tier:'gold', secret:true },
-  { id:'crowned_underdog',        name:'Azarão Coroado',      emoji:'🎖️', desc:'Foi campeão de um torneio tendo o menor Elo entre todos os participantes', tier:'gold', secret:true }
+  { id:'crowned_underdog',        name:'Azarão Coroado',      emoji:'🎖️', desc:'Foi campeão de um torneio tendo o menor Elo entre todos os participantes', tier:'gold', secret:true },
+  { id:'daily_starter',           name:'Hábito em Formação',  emoji:'🔔', desc:'Reclamou o bónus diário 3 vezes', tier:'bronze' },
+  { id:'daily_week',              name:'Semana Completa',     emoji:'📆', desc:'Reclamou o bónus diário 7 vezes', tier:'bronze' },
+  { id:'daily_month_streak',      name:'Um Mês Sem Falhar',   emoji:'🗓️', desc:'Manteve uma sequência de 31 dias seguidos de bónus diário', tier:'gold', secret:true },
+  { id:'early_riser',             name:'Madrugador Nato',     emoji:'⏰', desc:'Reclamou o bónus diário 20 vezes no total', tier:'silver' },
+  { id:'group_loyal',             name:'Fiel ao Grupo',       emoji:'🤝', desc:'Participou em torneios durante 3 temporadas diferentes', tier:'silver' },
+  { id:'recurring_giver',         name:'Generosidade Recorrente', emoji:'🎁', desc:'Deu presentes a pelo menos 5 jogadores diferentes ao longo do tempo', tier:'silver' },
+  { id:'insomniac',               name:'Insone',              emoji:'🌙', desc:'Reclamou o bónus diário entre meia-noite e as 5h em pelo menos 3 dias diferentes', tier:'gold', secret:true }
 ];
 
 // stats vem de aggregatePlayers()[nome]; streak vem de computeAllCurrentStreaks()[nome].
@@ -1326,6 +1351,8 @@ function computeMatchPathAchievements(name, allRows, profile){
   if(computeMvpBatches(allRows).some(b => b.mvp && b.mvp.name === name)) earned.add('recognized_mvp');
 
   if(computeChampionSeasonsCount(allRows, name) >= 2) earned.add('back_to_back');
+
+  if(computeParticipationSeasonsCount(allRows, name) >= 3) earned.add('group_loyal');
 
   if(computeCompletedCosmeticCategory(profile)) earned.add('full_collector');
 
@@ -1449,6 +1476,22 @@ function computeChampionSeasonsCount(allRows, name){
   return count;
 }
 
+// Em quantas temporadas diferentes o jogador participou de pelo menos um
+// torneio (não precisa ser seguidas, ao contrário do Bicampeão que exige
+// título). Usado pela conquista "Fiel ao Grupo".
+function computeParticipationSeasonsCount(allRows, name){
+  const anchor = getSeasonAnchor(allRows);
+  if(!anchor) return 0;
+  const maxSeason = Math.max(1, ...allRows.map(r => computeSeasonNumber(r.created_at, anchor)));
+  let count = 0;
+  for(let s=1; s<=maxSeason; s++){
+    const seasonRows = filterRowsBySeason(allRows, s);
+    const stats = aggregatePlayers(seasonRows)[name];
+    if(stats && stats.tournaments && stats.tournaments.length > 0) count++;
+  }
+  return count;
+}
+
 // Colecionador Completo: já possui TODOS os itens compráveis de uma categoria inteira.
 function computeCompletedCosmeticCategory(profile){
   if(!profile) return false;
@@ -1528,31 +1571,59 @@ async function computeAsyncAchievements(supabaseUrl, supabaseAnonKey, name, allR
   } catch(e){ /* ignora silenciosamente */ }
 
   try{
-    const giftsRes = await fetch(`${supabaseUrl}/rest/v1/gifts?from_name=eq.${encodeURIComponent(name)}&select=amount`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const giftsRes = await fetch(`${supabaseUrl}/rest/v1/gifts?from_name=eq.${encodeURIComponent(name)}&select=amount,to_name`, {headers: sbAuthHeaders(supabaseAnonKey)});
     const giftsRows = await giftsRes.json();
+    const recipients = new Set();
+    let coinTotal = 0;
     if(Array.isArray(giftsRows)){
-      const total = giftsRows.reduce((s,g)=>s+(g.amount||0), 0);
-      if(total >= 500) earned.add('philanthropist');
+      giftsRows.forEach(g=>{
+        coinTotal += (g.amount||0);
+        if(g.to_name) recipients.add(g.to_name);
+      });
     }
+    if(coinTotal >= 500) earned.add('philanthropist');
+
+    // Generosidade Recorrente: junta destinatários de presentes de moedas
+    // E de Presente Surpresa, para contar quantos jogadores DIFERENTES já
+    // foram presenteados por este jogador, no total.
+    const surpriseRes = await fetch(`${supabaseUrl}/rest/v1/coin_transactions?player_name=eq.${encodeURIComponent(name)}&reason=like.Presente%20Surpresa%20para*&select=reason`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const surpriseRows = await surpriseRes.json();
+    if(Array.isArray(surpriseRows)){
+      surpriseRows.forEach(r=>{
+        const match = (r.reason||'').match(/Presente Surpresa para (.+?):/);
+        if(match) recipients.add(match[1]);
+      });
+    }
+    if(recipients.size >= 5) earned.add('recurring_giver');
   } catch(e){ /* ignora silenciosamente */ }
 
   try{
-    const playerRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=max_coins_reached,all_in_count`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const playerRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=max_coins_reached,all_in_count,total_daily_claims,best_daily_streak`, {headers: sbAuthHeaders(supabaseAnonKey)});
     const playerRows = await playerRes.json();
     if(Array.isArray(playerRows) && playerRows[0]){
       if((playerRows[0].max_coins_reached||0) >= 1000) earned.add('investor');
       if((playerRows[0].all_in_count||0) >= 1) earned.add('no_fear');
+      if((playerRows[0].total_daily_claims||0) >= 3) earned.add('daily_starter');
+      if((playerRows[0].total_daily_claims||0) >= 7) earned.add('daily_week');
+      if((playerRows[0].total_daily_claims||0) >= 20) earned.add('early_riser');
+      if((playerRows[0].best_daily_streak||0) >= 31) earned.add('daily_month_streak');
     }
   } catch(e){ /* ignora silenciosamente */ }
 
   try{
-    // Coruja Noturna: reclamou o bónus diário entre meia-noite e as 5h.
+    // Coruja Noturna: reclamou o bónus diário entre meia-noite e as 5h (só uma vez já basta).
+    // Insone: o mesmo, mas em pelo menos 3 dias DIFERENTES (upgrade da anterior).
     const nightRes = await fetch(`${supabaseUrl}/rest/v1/coin_transactions?player_name=eq.${encodeURIComponent(name)}&reason=like.Bônus%20diário*&select=created_at`, {headers: sbAuthHeaders(supabaseAnonKey)});
     const nightRows = await nightRes.json();
-    if(Array.isArray(nightRows) && nightRows.some(t=>{
-      const h = new Date(t.created_at).getHours();
-      return h >= 0 && h < 5;
-    })) earned.add('night_owl');
+    if(Array.isArray(nightRows)){
+      const nightDates = new Set();
+      nightRows.forEach(t=>{
+        const dt = new Date(t.created_at);
+        if(dt.getHours() >= 0 && dt.getHours() < 5) nightDates.add(dt.toISOString().slice(0,10));
+      });
+      if(nightDates.size >= 1) earned.add('night_owl');
+      if(nightDates.size >= 3) earned.add('insomniac');
+    }
   } catch(e){ /* ignora silenciosamente */ }
 
   try{
@@ -1819,7 +1890,7 @@ function renderDailyBonusIcon(available){
 async function claimDailyBonus(supabaseUrl, supabaseAnonKey, name){
   if(!name) return {awarded:false};
   try{
-    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=last_daily_bonus,daily_streak_count,total_daily_claims`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=last_daily_bonus,daily_streak_count,total_daily_claims,best_daily_streak`, {headers: sbAuthHeaders(supabaseAnonKey)});
     const rows = await res.json();
     if(!rows || !rows[0]) return {awarded:false};
     const today = new Date().toISOString().slice(0,10);
@@ -1829,13 +1900,14 @@ async function claimDailyBonus(supabaseUrl, supabaseAnonKey, name){
     const newStreak = (rows[0].last_daily_bonus === yesterday) ? ((rows[0].daily_streak_count || 0) + 1) : 1;
     const amount = DAILY_STREAK_AMOUNTS[Math.min(newStreak, DAILY_STREAK_AMOUNTS.length) - 1];
     const newTotalClaims = (rows[0].total_daily_claims || 0) + 1;
+    const newBestStreak = Math.max(rows[0].best_daily_streak || 0, newStreak);
 
     const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, amount, `Bônus diário de login (sequência: dia ${newStreak})`);
     if(!ok) return {awarded:false};
     await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
       method:'PATCH',
       headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-      body: JSON.stringify({ last_daily_bonus: today, daily_streak_count: newStreak, total_daily_claims: newTotalClaims })
+      body: JSON.stringify({ last_daily_bonus: today, daily_streak_count: newStreak, total_daily_claims: newTotalClaims, best_daily_streak: newBestStreak })
     });
     return {awarded:true, amount, streak:newStreak};
   } catch(e){

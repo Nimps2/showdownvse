@@ -39,7 +39,7 @@ body{
 }
 .player-corner-badge:hover{border-color:var(--tera-cyan);}
 .daily-bonus-icon{
-  position:fixed;top:60px;left:16px;z-index:899;width:38px;height:38px;border-radius:10px;
+  position:fixed;top:82px;left:16px;z-index:899;width:38px;height:38px;border-radius:10px;
   background:var(--bg-panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
   font-size:16px;opacity:0.3;filter:grayscale(1);cursor:default;padding:0;
 }
@@ -151,7 +151,7 @@ async function handleDailyBonusClick(){
   const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
   const icon = document.getElementById('dailyBonusIcon');
   if(result.awarded){
-    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙`);
+    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
   }
   if(icon) icon.classList.remove('available');
 }
