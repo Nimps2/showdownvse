@@ -167,6 +167,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 <script src="showdown-utils.js"></script>
 <script>
 initTheme();
+ensureAvatarFxStyles();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
 
@@ -342,7 +343,7 @@ async function renderProfile(){
   const nameEffectCosmetic = profile.equippedNameEffect ? getCosmeticById(profile.equippedNameEffect) : null;
   const titleCosmetic = profile.equippedTitle ? getCosmeticById(profile.equippedTitle) : null;
   const equippedBadges = (profile.equippedBadges || []).map(id=>getCosmeticById(id)).filter(Boolean);
-  const avatar = avatarHtml(name, profile.photo_url, 56, bgCosmetic ? bgCosmetic.css : null, frameCosmetic ? frameCosmetic.border : null, bgCosmetic ? bgCosmetic.animated : false);
+  const avatar = avatarHtml(name, profile.photo_url, 56, bgCosmetic ? bgCosmetic.color : null, frameCosmetic ? frameCosmetic.effect : null, bgCosmetic ? !!bgCosmetic.multiColor : false);
   const hasCustomPageBg = (profile.ownedCosmetics||[]).includes('feature_custom_pagebg') && profile.profileBackgroundUrl;
   const cardBgStyle = hasCustomPageBg
     ? `background-image:linear-gradient(rgba(10,12,20,0.72),rgba(10,12,20,0.72)),url('${profile.profileBackgroundUrl.replace(/'/g,"\\'")}');background-size:cover;background-position:center;`
@@ -478,7 +479,7 @@ async function renderProfile(){
     ${seasonComparison.length ? `
     <div class="card">
       <h2>Comparador de Temporadas</h2>
-      <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">Temporadas anuais, a contar a partir do primeiro torneio do grupo.</div>
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">Temporadas de 3 em 3 meses, a contar a partir do primeiro torneio do grupo.</div>
       <div style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
           <thead>
@@ -615,9 +616,9 @@ function customizeItemHtml(item, type, profile){
   const equipped = equippedId ? equippedId === item.id : item.price === 0;
 
   let swatchHtml;
-  if(type === 'background') swatchHtml = `<div class="shop-swatch" style="background:${item.css};${item.animated?'background-size:400% 400%;animation:vseAuroraShift 8s ease infinite;':''}"></div>`;
+  if(type === 'background') swatchHtml = `<div class="shop-swatch" style="background:${item.css};"></div>`;
   else if(type === 'accent') swatchHtml = `<div class="shop-swatch" style="background:${item.color};"></div>`;
-  else if(type === 'frame') swatchHtml = `<div class="shop-swatch" style="background:var(--bg-panel);border:${item.border==='none'?'2px dashed var(--line)':item.border};"></div>`;
+  else if(type === 'frame') swatchHtml = frameEffectPreviewHtml(item.effect);
   else if(type === 'nameEffect') swatchHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;font-weight:700;${item.css}">Abc</div>`;
   else if(type === 'title') swatchHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:11px;padding:4px;">${item.text ? escapeHtml(item.text) : '—'}</div>`;
 

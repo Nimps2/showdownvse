@@ -727,7 +727,8 @@ function renderPlayerList(){
     const profile = playerProfiles[name] || {};
     const displayName = profile.nickname ? profile.nickname : name;
     const bgCosmetic = profile.equippedBackground ? getCosmeticById(profile.equippedBackground) : null;
-    const avatar = avatarHtml(name, profile.photo_url, 34, bgCosmetic ? bgCosmetic.css : null);
+    const frameCosmetic = profile.equippedFrame ? getCosmeticById(profile.equippedFrame) : null;
+    const avatar = avatarHtml(name, profile.photo_url, 34, bgCosmetic ? bgCosmetic.color : null, frameCosmetic ? frameCosmetic.effect : null, bgCosmetic ? !!bgCosmetic.multiColor : false);
 
     return `<div class="player-card">
       <div class="player-card-head">

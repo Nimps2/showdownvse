@@ -299,7 +299,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 <script src="showdown-utils.js"></script>
 <script>
 initTheme();
-ensureAnimatedBgStyles();
+ensureAvatarFxStyles();
 document.getElementById('lootBoxPriceLabel').textContent = LOOT_BOX_PRICE;
 document.getElementById('lotteryTicketPriceLabel').textContent = LOTTERY_TICKET_PRICE;
 document.getElementById('lotteryRangeLabel').textContent = LOTTERY_NUMBER_RANGE;
@@ -645,9 +645,9 @@ function shopItemHtml(item, type, profile){
   const equipped = equippedId ? equippedId === item.id : item.price === 0;
 
   let swatchHtml;
-  if(type === 'background') swatchHtml = `<div class="shop-swatch" style="background:${item.css};${item.animated?'background-size:400% 400%;animation:vseAuroraShift 8s ease infinite;':''}"></div>`;
+  if(type === 'background') swatchHtml = `<div class="shop-swatch" style="background:${item.css};"></div>`;
   else if(type === 'accent') swatchHtml = `<div class="shop-swatch" style="background:${item.color};"></div>`;
-  else if(type === 'frame') swatchHtml = `<div class="shop-swatch" style="background:var(--bg-panel);border:${item.border==='none'?'2px dashed var(--line)':item.border};"></div>`;
+  else if(type === 'frame') swatchHtml = frameEffectPreviewHtml(item.effect);
   else if(type === 'nameEffect') swatchHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;font-weight:700;${item.css}">Abc</div>`;
   else if(type === 'title') swatchHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:11px;padding:4px;">${item.text ? escapeHtml(item.text) : '—'}</div>`;
 
@@ -704,9 +704,9 @@ function renderWeeklyFeatured(profile){
   const categoryLabels = { backgrounds:'Fundo', accents:'Cor de destaque', frames:'Moldura', nameEffects:'Efeito no nome', titles:'Título', badges:'Emblema' };
 
   let previewHtml;
-  if(item.category === 'backgrounds') previewHtml = `<div class="shop-swatch" style="background:${item.css};${item.animated?'background-size:400% 400%;animation:vseAuroraShift 8s ease infinite;':''}"></div>`;
+  if(item.category === 'backgrounds') previewHtml = `<div class="shop-swatch" style="background:${item.css};"></div>`;
   else if(item.category === 'accents') previewHtml = `<div class="shop-swatch" style="background:${item.color};"></div>`;
-  else if(item.category === 'frames') previewHtml = `<div class="shop-swatch" style="background:var(--bg-panel);border:${item.border==='none'?'2px dashed var(--line)':item.border};"></div>`;
+  else if(item.category === 'frames') previewHtml = frameEffectPreviewHtml(item.effect);
   else if(item.category === 'nameEffects') previewHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;font-weight:700;${item.css}">Abc</div>`;
   else if(item.category === 'titles') previewHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:11px;padding:4px;">${item.text ? escapeHtml(item.text) : '—'}</div>`;
   else previewHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:20px;">${item.emoji||''}</div>`;

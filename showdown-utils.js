@@ -222,14 +222,17 @@ async function updatePlayerProfile(supabaseUrl, supabaseAnonKey, name, nickname,
 
 // ---------- Loja de personalização ----------
 const COSMETIC_CATALOG = {
+  // "Fundo do Avatar" já não preenche o círculo — agora é a COR usada pelo
+  // efeito animado equipado na Moldura (ver frames abaixo). O campo "css"
+  // fica só para a pré-visualização na loja (mostra o gradiente do tema).
   backgrounds: [
-    { id:'bg_default',  name:'Padrão',       price:0,   css:'linear-gradient(135deg,#a56bf0,#4fd8d0)' },
-    { id:'bg_sunset',   name:'Pôr do Sol',   price:50,  css:'linear-gradient(135deg,#f0b64f,#e0607a)' },
-    { id:'bg_ocean',    name:'Oceano',       price:50,  css:'linear-gradient(135deg,#0e9488,#4fd8d0)' },
-    { id:'bg_galaxy',   name:'Galáxia',      price:80,  css:'linear-gradient(135deg,#7c4dc4,#1a1d29)' },
-    { id:'bg_fire',     name:'Fogo',         price:80,  css:'linear-gradient(135deg,#e0607a,#f0b64f)' },
-    { id:'bg_gold',     name:'Ouro Puro',    price:150, css:'linear-gradient(135deg,#f0b64f,#b8860b)' },
-    { id:'bg_aurora',   name:'Aurora Animada', price:220, css:'linear-gradient(270deg,#4fd8d0,#a56bf0,#f0b64f,#4fd8d0)', animated:true }
+    { id:'bg_default',  name:'Padrão',       price:0,   css:'linear-gradient(135deg,#a56bf0,#4fd8d0)', color:'#a56bf0' },
+    { id:'bg_sunset',   name:'Pôr do Sol',   price:50,  css:'linear-gradient(135deg,#f0b64f,#e0607a)', color:'#f0b64f' },
+    { id:'bg_ocean',    name:'Oceano',       price:50,  css:'linear-gradient(135deg,#0e9488,#4fd8d0)', color:'#4fd8d0' },
+    { id:'bg_galaxy',   name:'Galáxia',      price:80,  css:'linear-gradient(135deg,#7c4dc4,#1a1d29)', color:'#7c4dc4' },
+    { id:'bg_fire',     name:'Fogo',         price:80,  css:'linear-gradient(135deg,#e0607a,#f0b64f)', color:'#e0607a' },
+    { id:'bg_gold',     name:'Ouro Puro',    price:150, css:'linear-gradient(135deg,#f0b64f,#b8860b)', color:'#f0b64f' },
+    { id:'bg_aurora',   name:'Aurora Animada', price:220, css:'linear-gradient(270deg,#4fd8d0,#a56bf0,#f0b64f,#4fd8d0)', color:'#a56bf0', multiColor:['#4fd8d0','#a56bf0','#f0b64f'] }
   ],
   accents: [
     { id:'accent_default', name:'Ciano (padrão)', price:0,  color:'#4fd8d0' },
@@ -238,12 +241,16 @@ const COSMETIC_CATALOG = {
     { id:'accent_rose',    name:'Rosa',           price:30, color:'#e0607a' },
     { id:'accent_emerald', name:'Esmeralda',      price:50, color:'#5ed890' }
   ],
+  // "Moldura do Avatar" já não é uma borda estática — agora é um EFEITO
+  // ANIMADO à volta do avatar, colorido com a cor escolhida em "Fundo do
+  // Avatar" (ver backgrounds acima). Os IDs mantêm-se os mesmos de antes
+  // para quem já os tinha comprado não perder nada.
   frames: [
-    { id:'frame_none',  name:'Sem moldura',   price:0,   border:'none' },
-    { id:'frame_gold',  name:'Moldura Dourada', price:60,  border:'3px solid #f0b64f' },
-    { id:'frame_neon',  name:'Moldura Neon',    price:60,  border:'3px solid #4fd8d0' },
-    { id:'frame_royal', name:'Moldura Real',    price:100, border:'3px solid #a56bf0' },
-    { id:'frame_diamond', name:'Moldura de Diamante', price:0, border:'3px solid #b9e6ff', auctionOnly:true }
+    { id:'frame_none',  name:'Sem moldura',   price:0,   effect:'none' },
+    { id:'frame_gold',  name:'Faíscas',       price:60,  effect:'sparks' },
+    { id:'frame_neon',  name:'Estrelado',     price:60,  effect:'starry' },
+    { id:'frame_royal', name:'Florescer',     price:100, effect:'blossom' },
+    { id:'frame_diamond', name:'Moldura de Diamante', price:0, effect:'starry', auctionOnly:true }
   ],
   nameEffects: [
     { id:'effect_none',  name:'Nenhum',  price:0,  css:'' },
@@ -360,31 +367,95 @@ async function setProfileBackgroundUrl(supabaseUrl, supabaseAnonKey, name, url){
 
 // Devolve HTML de um avatar: <img> se houver photo_url, senão um círculo com
 // as iniciais, usando o fundo e a moldura personalizados equipados (se existirem).
-function ensureAnimatedBgStyles(){
-  if(document.getElementById('vseAnimatedBgStyles')) return;
+// ---------- Decorações Animadas do Avatar ----------
+// A "Moldura" é o tipo de efeito animado à volta do avatar; o "Fundo" deixou
+// de preencher o círculo e passou a ser só a COR usada por esse efeito —
+// assim as duas personalizações nunca competem visualmente uma com a outra.
+function ensureAvatarFxStyles(){
+  if(document.getElementById('vseAvatarFxStyles')) return;
   const style = document.createElement('style');
-  style.id = 'vseAnimatedBgStyles';
+  style.id = 'vseAvatarFxStyles';
   style.textContent = `
-    @keyframes vseAuroraShift{0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
-    .vse-animated-bg{background-size:400% 400%;animation:vseAuroraShift 8s ease infinite;}
+    .avatar-fx-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .avatar-fx-layer{position:absolute;inset:0;pointer-events:none;}
+    .avatar-fx-layer span{position:absolute;top:50%;left:50%;}
+
+    @keyframes vseSparkFlicker{0%,100%{opacity:0;transform:translate(-50%,-50%) scale(0.4);}50%{opacity:1;transform:translate(-50%,-50%) scale(1.3);}}
+    .avatar-fx-sparks span{width:3px;height:3px;border-radius:50%;background:var(--fx-color);
+      box-shadow:0 0 4px var(--fx-color);animation:vseSparkFlicker 1.6s ease-in-out infinite;}
+
+    @keyframes vseStarTwinkle{0%,100%{opacity:0.15;transform:translate(-50%,-50%) scale(0.5) rotate(0deg);}50%{opacity:1;transform:translate(-50%,-50%) scale(1.15) rotate(20deg);}}
+    .avatar-fx-starry span{width:6px;height:6px;background:var(--fx-color);
+      clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+      animation:vseStarTwinkle 2.2s ease-in-out infinite;filter:drop-shadow(0 0 2px var(--fx-color));}
+
+    @keyframes vseBlossomBloom{0%,100%{opacity:0;transform:translate(-50%,-50%) scale(0) rotate(0deg);}35%{opacity:0.9;transform:translate(-50%,-50%) scale(1) rotate(50deg);}70%{opacity:0.5;transform:translate(-50%,-50%) scale(0.85) rotate(90deg);}}
+    .avatar-fx-blossom span{width:7px;height:7px;background:var(--fx-color);
+      border-radius:0% 100% 0% 100%;animation:vseBlossomBloom 3s ease-in-out infinite;}
+
+    @keyframes vseFxHueRotate{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
+    .avatar-fx-layer.avatar-fx-multicolor{animation:vseFxHueRotate 5s linear infinite;}
   `;
   document.head.appendChild(style);
 }
 
-function avatarHtml(name, photoUrl, sizePx, backgroundCss, frameBorder, animated){
-  if(animated) ensureAnimatedBgStyles();
-  const size = sizePx || 44;
-  const border = frameBorder && frameBorder !== 'none' ? `border:${frameBorder};` : '';
-  const bg = backgroundCss || 'linear-gradient(135deg,var(--tera-violet),var(--tera-cyan))';
-  const animClass = animated ? ' vse-animated-bg' : '';
-  if(photoUrl){
-    const innerSize = Math.max(size - 4, 4); // deixa o fundo aparecer como um anel colorido à volta da foto
-    return `<div class="${animClass}" style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;flex-shrink:0;background:${bg};display:flex;align-items:center;justify-content:center;${border}">
-      <img src="${photoUrl.replace(/"/g,'&quot;')}" alt="${(name||'').replace(/"/g,'&quot;')}" style="width:${innerSize}px;height:${innerSize}px;border-radius:${Math.round(innerSize*0.28)}px;object-fit:cover;" onerror="this.parentElement.style.display='none';">
-    </div>`;
+// Pré-visualização em miniatura de um efeito de moldura, usada nos cartões
+// da loja/personalização — mostra a animação de verdade, não só um ícone
+// estático, para dar uma ideia real do que se está a comprar.
+function frameEffectPreviewHtml(effectType){
+  if(!effectType || effectType === 'none'){
+    return `<div class="shop-swatch" style="background:var(--bg-panel);border:2px dashed var(--line);"></div>`;
   }
-  const initials = (name||'?').slice(0,2).toUpperCase();
-  return `<div class="${animClass}" style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.28)}px;flex-shrink:0;background:${bg};display:flex;align-items:center;justify-content:center;font-family:'Chakra Petch',sans-serif;font-size:${Math.round(size*0.4)}px;font-weight:700;color:#0a0c14;${border}">${initials}</div>`;
+  ensureAvatarFxStyles();
+  const particles = avatarFxParticlesHtml(effectType, 40);
+  return `<div class="shop-swatch avatar-fx-wrap" style="--fx-color:#a56bf0;background:var(--bg-panel);position:relative;">
+    <div class="avatar-fx-layer avatar-fx-${effectType}">${particles}</div>
+  </div>`;
+}
+
+const AVATAR_FX_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
+const AVATAR_FX_COUNTS = { sparks:6, starry:6, blossom:5 };
+
+function avatarFxParticlesHtml(effectType, radiusPct){
+  const count = AVATAR_FX_COUNTS[effectType] || 6;
+  return AVATAR_FX_ANGLES.slice(0, count).map((deg, i)=>{
+    const rad = deg * Math.PI / 180;
+    const x = 50 + radiusPct * Math.cos(rad);
+    const y = 50 + radiusPct * Math.sin(rad);
+    const delay = (i * (2.4 / count)).toFixed(2);
+    return `<span style="top:${y.toFixed(1)}%;left:${x.toFixed(1)}%;animation-delay:${delay}s;"></span>`;
+  }).join('');
+}
+
+// effectColor: cor (hex) escolhida em "Fundo do Avatar". effectType: 'none' |
+// 'sparks' | 'starry' | 'blossom'. multiColor: true para a Aurora Animada,
+// faz o efeito ciclar de cor continuamente em vez de ficar fixo.
+function avatarHtml(name, photoUrl, sizePx, effectColor, effectType, multiColor){
+  const size = sizePx || 44;
+  const hasEffect = effectType && effectType !== 'none';
+  const contentRadius = Math.round(size*0.28);
+
+  let innerHtml;
+  if(photoUrl){
+    innerHtml = `<img src="${photoUrl.replace(/"/g,'&quot;')}" alt="${(name||'').replace(/"/g,'&quot;')}" style="width:${size}px;height:${size}px;border-radius:${contentRadius}px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none';">`;
+  } else {
+    const initials = (name||'?').slice(0,2).toUpperCase();
+    innerHtml = `<div style="width:${size}px;height:${size}px;border-radius:${contentRadius}px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-violet),var(--tera-cyan));display:flex;align-items:center;justify-content:center;font-family:'Chakra Petch',sans-serif;font-size:${Math.round(size*0.4)}px;font-weight:700;color:#0a0c14;">${initials}</div>`;
+  }
+
+  if(!hasEffect) return innerHtml;
+
+  ensureAvatarFxStyles();
+  const color = effectColor || '#4fd8d0';
+  const wrapPad = Math.max(Math.round(size*0.28), 10);
+  const wrapSize = size + wrapPad*2;
+  const particles = avatarFxParticlesHtml(effectType, 42);
+  const multiClass = multiColor ? ' avatar-fx-multicolor' : '';
+
+  return `<div class="avatar-fx-wrap" style="--fx-color:${color};width:${wrapSize}px;height:${wrapSize}px;">
+    <div class="avatar-fx-layer avatar-fx-${effectType}${multiClass}">${particles}</div>
+    ${innerHtml}
+  </div>`;
 }
 
 // ---------- Troféus do último torneio concluído (Ouro/Prata/Bronze) ----------
@@ -499,7 +570,7 @@ function buildHoverCardHtml(name, playerStats, playerProfiles, currentTrophies, 
   const titleCosmetic = profile.equippedTitle ? getCosmeticById(profile.equippedTitle) : null;
   const equippedBadgeEmojis = (profile.equippedBadges || []).map(id=>getCosmeticById(id)).filter(Boolean).map(b=>b.emoji).join(' ');
   const accentColor = accentCosmetic ? accentCosmetic.color : 'var(--text-main)';
-  const avatar = avatarHtml(name, profile.photo_url, 40, bgCosmetic ? bgCosmetic.css : null, frameCosmetic ? frameCosmetic.border : null, bgCosmetic ? bgCosmetic.animated : false);
+  const avatar = avatarHtml(name, profile.photo_url, 40, bgCosmetic ? bgCosmetic.color : null, frameCosmetic ? frameCosmetic.effect : null, bgCosmetic ? !!bgCosmetic.multiColor : false);
   const trophy = trophyEmojiFor(name, currentTrophies);
   const elo = eloRatings ? (eloRatings[name] || 1000) : null;
 
@@ -844,7 +915,7 @@ async function buyGuaranteedBye(supabaseUrl, supabaseAnonKey, name){
 }
 
 // ---------- Bloco 4: Voto no tier da próxima semana ----------
-const ALL_TIERS = ['OU','UU','RU','NU','PU','ZU'];
+const ALL_TIERS = ['OU','UU','RU','NU','PU','ZU','National Dex','National Dex AG','National Dex LC','National Dex UU','National Dex RU'];
 
 // Devolve a lista de tiers ainda por jogar no ciclo atual (reinicia quando
 // todos os 6 já saíram uma vez desde o último reinício).
@@ -1002,7 +1073,7 @@ function renderPlayerCornerBadge(name, profile){
   const bgCosmetic = profile.equippedBackground ? getCosmeticById(profile.equippedBackground) : null;
   const frameCosmetic = profile.equippedFrame ? getCosmeticById(profile.equippedFrame) : null;
   const accentCosmetic = profile.equippedAccent ? getCosmeticById(profile.equippedAccent) : null;
-  const avatar = avatarHtml(name, profile.photo_url, 28, bgCosmetic ? bgCosmetic.css : null, frameCosmetic ? frameCosmetic.border : null, bgCosmetic ? bgCosmetic.animated : false);
+  const avatar = avatarHtml(name, profile.photo_url, 28, bgCosmetic ? bgCosmetic.color : null, frameCosmetic ? frameCosmetic.effect : null, bgCosmetic ? !!bgCosmetic.multiColor : false);
   return `<a href="perfil.html" class="player-corner-badge" title="Ver o meu perfil">
     ${avatar}
     <span class="player-corner-name" style="${accentCosmetic ? `color:${accentCosmetic.color};` : ''}">${escapeHtml(displayName)}</span>
@@ -1106,7 +1177,7 @@ const ACHIEVEMENTS = [
   { id:'immortal',              name:'Imortal',             emoji:'🛡️', desc:'20 vitórias no total', tier:'gold' },
   { id:'legend',                name:'Lenda',               emoji:'🏵️', desc:'5 títulos conquistados', tier:'gold' },
   { id:'precision',             name:'Precisão',            emoji:'🎯', desc:'Winrate de 70%+ (mínimo 10 partidas)', tier:'silver' },
-  { id:'omnipresent',           name:'Onipresente',         emoji:'🌍', desc:'Já jogou pelo menos uma vez em todos os 6 tiers', tier:'silver' },
+  { id:'omnipresent',           name:'Onipresente',         emoji:'🌍', desc:'Já jogou pelo menos uma vez em 6 tiers diferentes', tier:'silver' },
   { id:'survivor',              name:'Sobrevivente',        emoji:'🌱', desc:'Foi campeão depois de ter passado pelo Play-in', tier:'gold' },
   { id:'perfectionist',         name:'Perfeição',           emoji:'💯', desc:'Foi campeão sem perder nenhuma partida — e sem perder nenhum jogo em nenhuma Bo3 (só vitórias 2-0)', tier:'gold' },
   { id:'comeback',              name:'Reviravolta',         emoji:'🔄', desc:'Venceu uma Bo3 depois de perder o primeiro jogo', tier:'silver' },
@@ -1893,12 +1964,14 @@ function getSeasonAnchor(allRows){
   return new Date(sorted[0].created_at);
 }
 
+const SEASON_LENGTH_MONTHS = 3;
+
 function computeSeasonNumber(dateStr, anchorDate){
   if(!anchorDate) return 1;
   const d = new Date(dateStr);
-  const anniversaryThisYear = new Date(d.getFullYear(), anchorDate.getMonth(), anchorDate.getDate());
-  let seasonIndex = d.getFullYear() - anchorDate.getFullYear();
-  if(d < anniversaryThisYear) seasonIndex -= 1;
+  let monthsDiff = (d.getFullYear() - anchorDate.getFullYear()) * 12 + (d.getMonth() - anchorDate.getMonth());
+  if(d.getDate() < anchorDate.getDate()) monthsDiff -= 1;
+  const seasonIndex = Math.floor(monthsDiff / SEASON_LENGTH_MONTHS);
   return seasonIndex + 1; // Temporada 1, 2, 3...
 }
 
@@ -2012,12 +2085,19 @@ async function fetchNicknameVoteStandings(supabaseUrl, supabaseAnonKey, tourname
   if(!res.ok) return [];
   const rows = await res.json();
   const tally = {};
+  const ownerTotals = {};
   rows.forEach(r=>{
     const key = `${r.owner_name}|${r.nickname}|${r.species}`;
     if(!tally[key]) tally[key] = { ownerName:r.owner_name, nickname:r.nickname, species:r.species, votes:0 };
     tally[key].votes++;
+    ownerTotals[r.owner_name] = (ownerTotals[r.owner_name]||0) + 1;
   });
-  return Object.values(tally).sort((a,b)=>b.votes-a.votes);
+  // ownerTotal: soma de TODOS os apelidos desse dono — é isto que decide o
+  // vencedor no apuramento (ver resolveNicknameVoteWinner no gestor), mesmo
+  // quando o "votes" individual de um apelido é menor que o de outro dono.
+  return Object.values(tally)
+    .map(entry => ({ ...entry, ownerTotal: ownerTotals[entry.ownerName] }))
+    .sort((a,b)=> (b.ownerTotal - a.ownerTotal) || (b.votes - a.votes));
 }
 
 // ---------- Comparador de Temporadas ----------
