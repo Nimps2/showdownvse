@@ -192,7 +192,7 @@ async function fetchRegisteredPlayerNames(supabaseUrl, supabaseAnonKey){
 // ---------- Perfil: apelido, foto (por link), mensagem de estado, moedas e personalização ----------
 // Devolve um mapa { nomeReal: {nickname, photo_url, status_message, coins, ownedCosmetics, equippedBackground, equippedAccent} }.
 async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
-  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent,equipped_frame,equipped_name_effect,equipped_title,equipped_badges,profile_background_url,guaranteed_bye,elo_chart_unlocked,featured_achievements,total_daily_claims`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent,equipped_frame,equipped_name_effect,equipped_title,equipped_badges,profile_background_url,guaranteed_bye,elo_chart_unlocked,featured_achievements,total_daily_claims,special_tags`, {headers: sbAuthHeaders(supabaseAnonKey)});
   if(!res.ok) return {};
   const rows = await res.json();
   const map = {};
@@ -205,7 +205,8 @@ async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
       equippedTitle: r.equipped_title || null, equippedBadges: r.equipped_badges || [],
       profileBackgroundUrl: r.profile_background_url || null, guaranteedBye: !!r.guaranteed_bye,
       eloChartUnlocked: !!r.elo_chart_unlocked, featuredAchievements: r.featured_achievements || [],
-      totalDailyClaims: r.total_daily_claims || 0, loyaltyDiscountPct: computeLoyaltyDiscountPct(r.total_daily_claims)
+      totalDailyClaims: r.total_daily_claims || 0, loyaltyDiscountPct: computeLoyaltyDiscountPct(r.total_daily_claims),
+      specialTags: r.special_tags || []
     };
   });
   return map;
@@ -2467,6 +2468,51 @@ async function removeFavoriteSet(supabaseUrl, supabaseAnonKey, id){
   try{
     const res = await fetch(`${supabaseUrl}/rest/v1/favorite_sets?id=eq.${id}`, {
       method:'DELETE', headers: sbAuthHeaders(supabaseAnonKey)
+    });
+    return {ok: res.ok};
+  } catch(e){
+    return {ok:false};
+  }
+}
+
+// ---------- Tags Especiais (atribuídas manualmente pelo organizador) ----------
+// Diferente dos títulos da loja (compráveis, um só de cada vez): estas tags
+// são atribuídas à mão pelo organizador no gestor, um jogador pode ter
+// várias ao mesmo tempo, e servem para reconhecimentos pontuais que os
+// números não captam (ex: encontrou um bug, ajudou a testar, é o criador).
+async function fetchPlayerSpecialTags(supabaseUrl, supabaseAnonKey, name){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=special_tags`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const rows = await res.json();
+    return (rows && rows[0] && rows[0].special_tags) || [];
+  } catch(e){
+    return [];
+  }
+}
+
+async function addSpecialTag(supabaseUrl, supabaseAnonKey, name, emoji, text){
+  try{
+    const current = await fetchPlayerSpecialTags(supabaseUrl, supabaseAnonKey, name);
+    const updated = current.concat([{ emoji: emoji || '🏷️', text }]);
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+      method:'PATCH',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify({ special_tags: updated })
+    });
+    return {ok: res.ok};
+  } catch(e){
+    return {ok:false};
+  }
+}
+
+async function removeSpecialTag(supabaseUrl, supabaseAnonKey, name, index){
+  try{
+    const current = await fetchPlayerSpecialTags(supabaseUrl, supabaseAnonKey, name);
+    const updated = current.filter((_, i) => i !== index);
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+      method:'PATCH',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify({ special_tags: updated })
     });
     return {ok: res.ok};
   } catch(e){

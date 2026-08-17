@@ -86,6 +86,10 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 }
 .profile-name{font-family:'Chakra Petch',sans-serif;font-size:22px;font-weight:700;}
 .profile-champion-line{font-size:12.5px;color:var(--tera-amber);margin-top:2px;}
+.special-tag-chip{
+  display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,rgba(165,107,240,0.18),rgba(79,216,208,0.18));
+  border:1px solid rgba(165,107,240,0.4);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--text-main);
+}
 
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:16px 0;}
 .stat-box{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-align:center;}
@@ -370,6 +374,7 @@ async function renderProfile(){
           <div class="profile-name" style="color:${accentColor};${nameEffectCosmetic ? nameEffectCosmetic.css : ''}">${trophyEmojiFor(name, currentTrophies)} ${escapeHtml(displayName)} ${equippedBadges.map(b=>b.emoji).join(' ')}</div>
           ${profile.nickname ? `<div style="font-size:11.5px;color:var(--text-faint);">${escapeHtml(name)}</div>` : ''}
           ${titleCosmetic && titleCosmetic.text ? `<div style="font-size:12px;color:var(--text-dim);margin-top:2px;">${escapeHtml(titleCosmetic.text)}</div>` : ''}
+          ${(profile.specialTags||[]).length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">${(profile.specialTags||[]).map(t=>`<span class="special-tag-chip">${t.emoji} ${escapeHtml(t.text)}</span>`).join('')}</div>` : ''}
           ${trophyEmojiFor(name, currentTrophies) ? `<div class="profile-champion-line">${trophyEmojiFor(name, currentTrophies)} ${currentTrophies.gold===name?'Campeão':currentTrophies.silver===name?'Vice-campeão':'3º lugar'} do último torneio (${escapeHtml(currentTrophies.tier)})</div>` : ''}
           ${st.titles > 0 ? `<div class="profile-champion-line">🏆 ${st.titles} título(s) conquistado(s) no total</div>` : ''}
         </div>
