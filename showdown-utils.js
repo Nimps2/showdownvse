@@ -1902,13 +1902,26 @@ async function claimDailyBonus(supabaseUrl, supabaseAnonKey, name){
     const newTotalClaims = (rows[0].total_daily_claims || 0) + 1;
     const newBestStreak = Math.max(rows[0].best_daily_streak || 0, newStreak);
 
-    const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, amount, `Bônus diário de login (sequência: dia ${newStreak})`);
-    if(!ok) return {awarded:false};
-    await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+    // Escrita CONDICIONAL: só atualiza se "last_daily_bonus" continuar a ser
+    // exatamente o valor que acabámos de ler. Se dois cliques (ou duas abas)
+    // dispararem ao mesmo tempo, só o primeiro consegue mudar a linha — o
+    // segundo não encontra nenhuma linha a corresponder e sabe que perdeu a
+    // corrida, sem conceder o bónus a dobrar. Isto fecha a janela de corrida
+    // que existia antes entre o "verificar" e o "gravar".
+    const lastBonusFilter = rows[0].last_daily_bonus
+      ? `&last_daily_bonus=eq.${rows[0].last_daily_bonus}`
+      : `&last_daily_bonus=is.null`;
+    const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}${lastBonusFilter}`, {
       method:'PATCH',
-      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=representation'}),
       body: JSON.stringify({ last_daily_bonus: today, daily_streak_count: newStreak, total_daily_claims: newTotalClaims, best_daily_streak: newBestStreak })
     });
+    if(!patchRes.ok) return {awarded:false};
+    const patchedRows = await patchRes.json();
+    if(!patchedRows || !patchedRows.length) return {awarded:false}; // outra chamada já reclamou primeiro
+
+    const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, amount, `Bônus diário de login (sequência: dia ${newStreak})`);
+    if(!ok) return {awarded:false};
     return {awarded:true, amount, streak:newStreak};
   } catch(e){
     return {awarded:false};

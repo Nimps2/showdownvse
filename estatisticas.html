@@ -346,13 +346,25 @@ function setStatus(ok, text){
   document.getElementById('statusText').textContent = text;
 }
 
+let dailyBonusClaimInFlight = false;
 async function handleDailyBonusClick(){
-  const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+  // Trava do lado do cliente: ignora cliques repetidos enquanto o pedido
+  // anterior ainda está a decorrer, para nem sequer disparar pedidos extra
+  // à base de dados (a proteção definitiva está em claimDailyBonus, que já
+  // é segura mesmo com vários pedidos em paralelo — isto é só para poupar
+  // chamadas desnecessárias e dar feedback visual imediato).
+  if(dailyBonusClaimInFlight) return;
+  dailyBonusClaimInFlight = true;
   const icon = document.getElementById('dailyBonusIcon');
-  if(result.awarded){
-    showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
-  }
   if(icon) icon.classList.remove('available');
+  try{
+    const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+    if(result.awarded){
+      showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
+    }
+  } finally {
+    dailyBonusClaimInFlight = false;
+  }
 }
 
 let pokeStats = {};
