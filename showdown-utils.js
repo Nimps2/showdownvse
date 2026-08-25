@@ -192,7 +192,7 @@ async function fetchRegisteredPlayerNames(supabaseUrl, supabaseAnonKey){
 // ---------- Perfil: apelido, foto (por link), mensagem de estado, moedas e personalização ----------
 // Devolve um mapa { nomeReal: {nickname, photo_url, status_message, coins, ownedCosmetics, equippedBackground, equippedAccent} }.
 async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
-  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent,equipped_frame,equipped_name_effect,equipped_title,equipped_badges,profile_background_url,guaranteed_bye,elo_chart_unlocked,featured_achievements,total_daily_claims,special_tags`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent,equipped_frame,equipped_name_effect,equipped_title,equipped_badges,profile_background_url,guaranteed_bye,elo_chart_unlocked,featured_achievements,total_daily_claims,special_tags,birthday_month,birthday_day`, {headers: sbAuthHeaders(supabaseAnonKey)});
   if(!res.ok) return {};
   const rows = await res.json();
   const map = {};
@@ -206,17 +206,17 @@ async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
       profileBackgroundUrl: r.profile_background_url || null, guaranteedBye: !!r.guaranteed_bye,
       eloChartUnlocked: !!r.elo_chart_unlocked, featuredAchievements: r.featured_achievements || [],
       totalDailyClaims: r.total_daily_claims || 0, loyaltyDiscountPct: computeLoyaltyDiscountPct(r.total_daily_claims),
-      specialTags: r.special_tags || []
+      specialTags: r.special_tags || [], birthdayMonth: r.birthday_month || null, birthdayDay: r.birthday_day || null
     };
   });
   return map;
 }
 
-async function updatePlayerProfile(supabaseUrl, supabaseAnonKey, name, nickname, photoUrl, statusMessage){
+async function updatePlayerProfile(supabaseUrl, supabaseAnonKey, name, nickname, photoUrl, statusMessage, birthdayMonth, birthdayDay){
   const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
     method:'PATCH',
     headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-    body: JSON.stringify({ nickname: nickname || null, photo_url: photoUrl || null, status_message: statusMessage || null })
+    body: JSON.stringify({ nickname: nickname || null, photo_url: photoUrl || null, status_message: statusMessage || null, birthday_month: birthdayMonth || null, birthday_day: birthdayDay || null })
   });
   return res.ok;
 }
@@ -2401,11 +2401,13 @@ async function buyLotteryTickets(supabaseUrl, supabaseAnonKey, name, roundId, co
     const roundRows = await roundRes.json();
     if(roundRows && roundRows[0]){
       const potIncrease = Math.round(cost * (1 - LOTTERY_HOUSE_CUT_PCT/100));
+      const houseCut = cost - potIncrease;
       await fetch(`${supabaseUrl}/rest/v1/lottery_rounds?id=eq.${roundId}`, {
         method:'PATCH',
         headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
         body: JSON.stringify({ pot: (roundRows[0].pot||0) + potIncrease, total_tickets: (roundRows[0].total_tickets||0) + count })
       });
+      if(houseCut > 0) await addToHouseFund(supabaseUrl, supabaseAnonKey, houseCut);
     }
   } catch(e){ /* nao critico */ }
 
@@ -2518,4 +2520,45 @@ async function removeSpecialTag(supabaseUrl, supabaseAnonKey, name, index){
   } catch(e){
     return {ok:false};
   }
+}
+
+// ---------- Fundo da Casa ----------
+// Guarda o lucro acumulado da taxa de 10% da Loteria — em vez de simplesmente
+// desaparecer, fica registado (para curiosidade) e disponível para ser
+// devolvido de várias formas (aniversários, marcos, MVP).
+const BIRTHDAY_FUND_SHARE_PCT = 20;   // fatia do fundo dada a cada aniversário de jogador
+const MVP_FUND_SHARE_PCT = 15;         // fatia dada ao MVP a cada bloco de 3 torneios
+const GROUP_ANNIVERSARY_BONUS = 20;    // moedas fixas por jogador no aniversário do grupo
+const HOUSE_FUND_MILESTONE_STEP = 500; // celebra a cada 500 moedas acumuladas no total
+
+async function fetchHouseFund(supabaseUrl, supabaseAnonKey){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/house_fund?id=eq.1&select=*`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const rows = await res.json();
+    return (rows && rows[0]) || { total_collected:0, current_balance:0, last_milestone:0 };
+  } catch(e){
+    return { total_collected:0, current_balance:0, last_milestone:0 };
+  }
+}
+
+async function addToHouseFund(supabaseUrl, supabaseAnonKey, amount){
+  try{
+    const fund = await fetchHouseFund(supabaseUrl, supabaseAnonKey);
+    await fetch(`${supabaseUrl}/rest/v1/house_fund?id=eq.1`, {
+      method:'PATCH',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify({
+        total_collected: (fund.total_collected||0) + amount,
+        current_balance: (fund.current_balance||0) + amount
+      })
+    });
+  } catch(e){ /* nao critico */ }
+}
+
+// Devolve o próximo marco (múltiplo de HOUSE_FUND_MILESTONE_STEP) que ainda
+// não foi celebrado, ou null se o total atual ainda não o atingiu.
+function computeNextUncelebratedMilestone(fund){
+  const reached = Math.floor((fund.total_collected||0) / HOUSE_FUND_MILESTONE_STEP) * HOUSE_FUND_MILESTONE_STEP;
+  if(reached > 0 && reached > (fund.last_milestone||0)) return reached;
+  return null;
 }

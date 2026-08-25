@@ -588,6 +588,17 @@ async function renderProfile(){
       <input type="text" id="editPhotoUrl" placeholder="Ex: link do teu avatar do Discord" value="${escapeHtml(profile.photo_url || '')}">
       <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Mensagem de perfil (opcional)</label>
       <input type="text" id="editMessage" placeholder="Ex: Main de Stall, não confiem em mim" value="${escapeHtml(profile.status_message || '')}">
+      <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">🎂 Aniversário (opcional — sem ano, só para o grupo celebrar contigo)</label>
+      <div style="display:flex;gap:8px;">
+        <select id="editBirthdayDay" style="flex:1;">
+          <option value="">Dia</option>
+          ${Array.from({length:31},(_,i)=>i+1).map(d=>`<option value="${d}" ${profile.birthdayDay===d?'selected':''}>${d}</option>`).join('')}
+        </select>
+        <select id="editBirthdayMonth" style="flex:1;">
+          <option value="">Mês</option>
+          ${['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'].map((m,i)=>`<option value="${i+1}" ${profile.birthdayMonth===i+1?'selected':''}>${m}</option>`).join('')}
+        </select>
+      </div>
       <button class="btn-primary" onclick="saveMyProfile()">Guardar</button>
     </div>
     ` : ''}
@@ -598,10 +609,13 @@ async function saveMyProfile(){
   const nickname = document.getElementById('editNickname').value.trim();
   const photoUrl = document.getElementById('editPhotoUrl').value.trim();
   const message = document.getElementById('editMessage').value.trim();
-  const ok = await updatePlayerProfile(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, nickname, photoUrl, message);
+  const birthdayDay = parseInt(document.getElementById('editBirthdayDay').value, 10) || null;
+  const birthdayMonth = parseInt(document.getElementById('editBirthdayMonth').value, 10) || null;
+  const ok = await updatePlayerProfile(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, nickname, photoUrl, message, birthdayMonth, birthdayDay);
   if(ok){
     playerProfiles[loggedInPlayerName] = Object.assign({}, playerProfiles[loggedInPlayerName], {
-      nickname: nickname || null, photo_url: photoUrl || null, status_message: message || null
+      nickname: nickname || null, photo_url: photoUrl || null, status_message: message || null,
+      birthdayMonth: birthdayMonth, birthdayDay: birthdayDay
     });
     renderProfile();
     logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'perfil', `Editou o perfil (apelido: "${nickname||'—'}", mensagem: "${message||'—'}")`);

@@ -278,6 +278,13 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
       <h2>Últimos vencedores da Loteria</h2>
       <div id="pastLotteryList"><div class="empty-state">A carregar…</div></div>
     </div>
+
+    <div class="card" style="text-align:center;">
+      <h2>🏛️ Fundo da Casa</h2>
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">Os 10% que a Loteria retém de cada bilhete vendido não desaparecem — ficam guardados aqui e são devolvidos de vez em quando: nos aniversários dos jogadores, no aniversário do grupo, e como prémio extra para o MVP.</div>
+      <div style="font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:22px;color:var(--tera-amber);" id="houseFundTotalDisplay">🪙 —</div>
+      <div style="font-size:10.5px;color:var(--text-faint);">arrecadado desde sempre</div>
+    </div>
   </div>
 
   <div id="panel-leilao" class="shop-panel">
@@ -429,6 +436,7 @@ async function init(){
     renderPastAuctions();
     renderLottery();
     renderPastLotteryRounds();
+    renderHouseFundDisplay();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
   }
@@ -645,6 +653,26 @@ async function renderPastLotteryRounds(){
       <b style="color:${r.winner_name?'var(--tera-amber)':'var(--text-faint)'};">${r.winner_name ? `${escapeHtml(r.winner_name)} — 🪙${r.pot}` : '🔄 Ninguém acertou, pote acumulou'}</b>
     </div>`;
   }).join('');
+}
+
+async function renderHouseFundDisplay(){
+  const fund = await fetchHouseFund(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const el = document.getElementById('houseFundTotalDisplay');
+  if(el) el.textContent = `🪙 ${fund.total_collected}`;
+
+  // Se algum marco redondo (500, 1000, ...) acabou de ser cruzado e ainda não
+  // foi celebrado, mostra uma pequena festa para quem estiver a ver a loja.
+  const milestone = computeNextUncelebratedMilestone(fund);
+  if(milestone){
+    showCelebrationToast(`🎉 Marco alcançado!<br>A Loteria já arrecadou 🪙${milestone} no total!`, 6000);
+    try{
+      await fetch(`${SUPABASE_URL}/rest/v1/house_fund?id=eq.1`, {
+        method:'PATCH',
+        headers: Object.assign(sbAuthHeaders(SUPABASE_ANON_KEY), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+        body: JSON.stringify({ last_milestone: milestone })
+      });
+    } catch(e){ /* nao critico */ }
+  }
 }
 
 function shopItemHtml(item, type, profile){
