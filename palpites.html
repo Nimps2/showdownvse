@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Palpiteiro — Torneio Showdown - VSE</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-void:#0a0c14; --bg-panel:#12151f; --bg-card:#171b28;
+  --line:#262c3e; --tera-cyan:#4fd8d0; --tera-violet:#a56bf0; --tera-amber:#f0b64f;
+  --text-main:#e9ecf5; --text-dim:#8b91a8; --text-faint:#565d78; --success:#5ed890; --danger:#e0607a;
+}
+body.light-theme{
+  --bg-void:#f5f6fa; --bg-panel:#ffffff; --bg-card:#eef0f6;
+  --line:#dcdfe8; --tera-cyan:#0e9488; --tera-violet:#7c4dc4; --tera-amber:#b8860b;
+  --text-main:#1a1d29; --text-dim:#4a5068; --text-faint:#8890a8; --success:#1a9d5c; --danger:#c23f5a;
+}
+.theme-toggle{
+  position:fixed;top:16px;right:16px;z-index:900;background:var(--bg-panel);border:1px solid var(--line);
+  color:var(--text-main);width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:16px;
+}
+.theme-toggle:hover{border-color:var(--tera-cyan);}
+.player-corner-badge{
+  position:fixed;top:16px;left:16px;z-index:900;display:flex;align-items:center;gap:8px;
+  background:var(--bg-panel);border:1px solid var(--line);border-radius:20px;padding:5px 12px 5px 5px;
+  text-decoration:none;color:var(--text-main);font-family:'Chakra Petch',sans-serif;font-size:12.5px;font-weight:600;
+}
+.player-corner-badge:hover{border-color:var(--tera-cyan);}
+.daily-bonus-icon{
+  position:fixed;top:82px;left:16px;z-index:899;width:38px;height:38px;border-radius:10px;
+  background:var(--bg-panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
+  font-size:16px;opacity:0.3;filter:grayscale(1);cursor:default;padding:0;
+}
+.daily-bonus-icon.available{
+  opacity:1;filter:none;cursor:pointer;border-color:var(--tera-amber);
+  box-shadow:0 0 12px rgba(240,182,79,0.4);animation:vseGiftPulse 1.6s ease-in-out infinite;
+}
+@keyframes vseGiftPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
+*{box-sizing:border-box;}
+body{
+  margin:0;background:var(--bg-void);
+  background-image:radial-gradient(circle at 15% 8%, rgba(165,107,240,0.10), transparent 40%),
+    radial-gradient(circle at 85% 92%, rgba(79,216,208,0.08), transparent 40%);
+  color:var(--text-main);font-family:'Inter',sans-serif;min-height:100vh;padding:0 0 60px 0;
+  transition:background-color .2s, color .2s;
+}
+.wrap{max-width:820px;margin:0 auto;padding:32px 20px;}
+.header{display:flex;align-items:center;gap:16px;margin-bottom:8px;}
+.crystal{width:38px;height:38px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));
+  clip-path:polygon(50% 0%, 100% 30%, 82% 100%, 18% 100%, 0% 30%);}
+h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0;letter-spacing:0.5px;}
+.subtitle{color:var(--text-dim);font-size:13px;margin:14px 0 6px 0;}
+.nav-link{color:var(--tera-cyan);font-size:12.5px;text-decoration:none;font-family:'Chakra Petch',sans-serif;}
+.nav-link:hover{text-decoration:underline;}
+.status-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);margin:14px 0 20px 0;}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
+.status-dot.on{background:var(--success);}
+.status-dot.off{background:var(--danger);}
+
+.card{background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px;}
+.card h2{font-family:'Chakra Petch',sans-serif;font-size:15px;margin:0 0 14px 0;color:var(--text-main);
+  display:flex;align-items:center;gap:8px;}
+.card h2::before{content:'';width:4px;height:15px;background:var(--tera-violet);border-radius:2px;}
+select,input[type=text],input[type=password],input[type=number]{width:100%;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);
+  border-radius:8px;color:var(--text-main);font-family:'Inter',sans-serif;font-size:14px;margin-bottom:6px;}
+select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
+.btn-primary{
+  width:100%;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));color:#0a0c14;
+  border:none;padding:11px 20px;border-radius:8px;font-family:'Chakra Petch',sans-serif;font-weight:700;
+  font-size:13.5px;cursor:pointer;margin-top:4px;
+}
+.btn-primary:disabled{opacity:0.4;cursor:not-allowed;}
+
+.coin-banner{
+  display:flex;align-items:center;justify-content:space-between;background:var(--bg-card);
+  border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:18px;
+}
+.coin-banner b{color:var(--tera-amber);font-family:'Chakra Petch',sans-serif;font-size:16px;}
+
+.match-bet-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;}
+.match-bet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.match-bet-title{font-family:'Chakra Petch',sans-serif;font-size:13.5px;color:var(--text-main);}
+.match-bet-title .tag{font-size:10px;color:var(--tera-cyan);border:1px solid var(--line);border-radius:20px;padding:2px 8px;margin-left:8px;}
+.pick-row{display:flex;gap:8px;margin-bottom:8px;}
+.pick-btn{
+  flex:1;background:var(--bg-panel);border:1px solid var(--line);color:var(--text-dim);
+  padding:10px;border-radius:8px;cursor:pointer;font-family:'Chakra Petch',sans-serif;font-size:13px;
+}
+.pick-btn.selected{background:var(--tera-cyan);color:#0a0c14;border-color:var(--tera-cyan);font-weight:700;}
+.bet-placed{font-size:12.5px;color:var(--text-dim);}
+.bet-placed b{color:var(--tera-amber);}
+
+.history-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--text-dim);
+  padding:8px 0;border-bottom:1px solid var(--line);}
+.history-row:last-child{border-bottom:none;}
+.history-row .res{font-family:'Chakra Petch',sans-serif;font-weight:700;}
+.history-row .res.win{color:var(--success);}
+.history-row .res.loss{color:var(--danger);}
+.history-row .res.pending{color:var(--text-faint);}
+
+.rank-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;}
+.rank-row:last-child{border-bottom:none;}
+.rank-row .pos{color:var(--text-faint);font-family:'Chakra Petch',sans-serif;width:24px;flex-shrink:0;}
+
+.empty-state{color:var(--text-faint);font-size:13px;text-align:center;padding:30px 0;}
+.footer-note{color:var(--text-faint);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.5;}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro">🌙</button>
+<div id="playerCornerContainer"></div>
+<div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
+    <h2>Entrar</h2>
+    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Nome</label>
+    <select id="gateNameSelect"><option value="">— a carregar jogadores —</option></select>
+    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Password</label>
+    <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()">
+    <button class="btn-primary" onclick="doGateLogin()">Entrar</button>
+    <div id="gateError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;"></div>
+  </div>
+</div>
+
+<div id="mainContent" class="wrap" style="display:none;">
+  <div class="header">
+    <div class="crystal"></div>
+    <div><h1>Palpiteiro</h1></div>
+  </div>
+  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="viewer.html">Ver bracket da semana</a> &nbsp;|&nbsp; <a class="nav-link" href="estatisticas.html">Estatísticas</a> &nbsp;|&nbsp; <a class="nav-link" href="hall-da-fama.html">Hall da Fama</a> &nbsp;|&nbsp; <a class="nav-link" href="conquistas.html">Conquistas</a> &nbsp;|&nbsp; <a class="nav-link" href="loja.html">Loja →</a></div>
+  <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
+  <div class="subtitle" style="margin-top:-14px;">Ligado como <b id="loggedInNameTop" style="color:var(--tera-cyan);"></b> — <a href="#" class="nav-link" onclick="doPlayerLogout(); return false;">Trocar jogador</a></div>
+
+  <div class="coin-banner">
+    <span>Seu saldo</span>
+    <b id="myCoinsDisplay">🪙 0</b>
+  </div>
+
+  <div class="card">
+    <h2>🏆 Campeão da Semana</h2>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Uma aposta única em quem vai ser campeão do torneio inteiro — antes de começar. Mais difícil de acertar, por isso os multiplicadores são bem maiores que o palpite partida a partida.</div>
+    <div id="championBetContainer"><div class="empty-state">A carregar…</div></div>
+  </div>
+
+  <div class="card">
+    <h2>😂 Apelido da Semana</h2>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Vote no apelido mais engraçado/criativo usado neste torneio. Quem vencer ganha 🪙<span id="nicknamePrizeLabel">?</span> quando o próximo torneio for criado.</div>
+    <div id="nicknameVoteContainer"><div class="empty-state">A carregar…</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Palpites abertos</h2>
+    <div id="openMatchesContainer"><div class="empty-state">A carregar partidas…</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Meus palpites</h2>
+    <div id="myPredictionsContainer"><div class="empty-state">Sem palpites ainda.</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Meu histórico de apostas no campeão</h2>
+    <div id="championBetHistoryContainer"><div class="empty-state">Sem apostas ainda.</div></div>
+  </div>
+
+  <div class="card">
+    <h2>🏅 Ranking de Palpiteiros</h2>
+    <div id="rankingContainer"><div class="empty-state">A calcular…</div></div>
+  </div>
+
+  <div class="footer-note">Aposta moedas em quem vai vencer cada partida — acerta e ganha o dobro, erra e perde a aposta. Jogos de sorte como a roleta agora ficam na <a class="nav-link" href="loja.html">loja</a>. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
+</div>
+
+<script src="showdown-utils.js"></script>
+<script>
+initTheme();
+document.getElementById('nicknamePrizeLabel').textContent = NICKNAME_VOTE_PRIZE;
+const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+
+let loggedInPlayerName = null;
+
+async function doGateLogin(){
+  const name = document.getElementById('gateNameSelect').value;
+  const password = document.getElementById('gatePassword').value;
+  const errEl = document.getElementById('gateError');
+  errEl.style.display = 'none';
+  if(!name){ errEl.textContent = 'Selecione o seu nome.'; errEl.style.display='block'; return; }
+  if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
+  const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
+  if(!result.ok){
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registrado pelo organizador.'
+      : result.reason==='wrongpass' ? 'Password incorreta.'
+      : 'Erro ao ligar à base de dados.';
+    errEl.style.display = 'block';
+    return;
+  }
+  localStorage.setItem('player_login_name', name);
+  loggedInPlayerName = name;
+  unlockContent();
+}
+
+function unlockContent(){
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('loggedInNameTop').textContent = loggedInPlayerName;
+  init();
+}
+
+function doPlayerLogout(){
+  localStorage.removeItem('player_login_name');
+  loggedInPlayerName = null;
+  document.getElementById('gatePassword').value = '';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('authGate').style.display = 'flex';
+}
+
+async function pageBoot(){
+  const sel = document.getElementById('gateNameSelect');
+  try{
+    const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
+    names.forEach(n=>{
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+    const saved = localStorage.getItem('player_login_name');
+    if(saved && names.includes(saved)){
+      loggedInPlayerName = saved;
+      unlockContent();
+    }
+  } catch(e){
+    sel.innerHTML = '<option value="">— erro ao carregar jogadores —</option>';
+  }
+}
+
+function sbHeaders(){
+  return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+}
+function setStatus(ok, text){
+  document.getElementById('statusDot').className = 'status-dot ' + (ok?'on':'off');
+  document.getElementById('statusText').textContent = text;
+}
+
+let dailyBonusClaimInFlight = false;
+async function handleDailyBonusClick(){
+  // Trava do lado do cliente: ignora cliques repetidos enquanto o pedido
+  // anterior ainda está a decorrer, para nem sequer disparar pedidos extra
+  // à base de dados (a proteção definitiva está em claimDailyBonus, que já
+  // é segura mesmo com vários pedidos em paralelo — isto é só para poupar
+  // chamadas desnecessárias e dar feedback visual imediato).
+  if(dailyBonusClaimInFlight) return;
+  dailyBonusClaimInFlight = true;
+  const icon = document.getElementById('dailyBonusIcon');
+  if(icon) icon.classList.remove('available');
+  try{
+    const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+    if(result.awarded){
+      showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
+    }
+  } finally {
+    dailyBonusClaimInFlight = false;
+  }
+}
+
+let activeTournament = null; // {id, tier, data}
+let myPredictionsForActive = {}; // match_id -> prediction row
+let playerCoins = 0;
+
+async function init(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=id,tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const rows = await res.json();
+    setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
+
+    await resolvePendingPredictions(rows);
+    await resolvePendingChampionBets(SUPABASE_URL, SUPABASE_ANON_KEY, rows);
+
+    const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
+    checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
+      document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
+    });
+    playerCoins = (profiles[loggedInPlayerName] && profiles[loggedInPlayerName].coins) || 0;
+    document.getElementById('myCoinsDisplay').textContent = `🪙 ${playerCoins}`;
+
+    const active = rows.find(r=>r.status==='em_curso') || rows[0] || null;
+    activeTournament = active ? { id: active.id, tier: active.tier, data: active.data || {} } : null;
+
+    await loadMyPredictions();
+    renderOpenMatches();
+    await renderMyPredictions();
+    await renderRanking();
+    await renderChampionBetCard();
+    await renderChampionBetHistory();
+    await renderNicknameVoteCard();
+  } catch(e){
+    setStatus(false, 'Não foi possível ligar à base de dados.');
+  }
+}
+
+async function renderChampionBetCard(){
+  const el = document.getElementById('championBetContainer');
+  if(!activeTournament){
+    el.innerHTML = '<div class="empty-state">Não há torneio em curso agora.</div>';
+    return;
+  }
+  const players = (activeTournament.data.players || []).filter(p=>p);
+  const matches = activeTournament.data.matches || [];
+  const tournamentStarted = matches.some(m=>m.winner);
+  const tournamentConcluded = !!activeTournament.data.champion;
+
+  if(tournamentConcluded){
+    el.innerHTML = `<div class="empty-state">Este torneio já foi concluído — o campeão foi <b style="color:var(--tera-amber);">${escapeHtml(activeTournament.data.champion)}</b>. Aguarde o próximo torneio para apostar de novo.</div>`;
+    return;
+  }
+
+  const myBet = await fetchMyChampionBet(SUPABASE_URL, SUPABASE_ANON_KEY, activeTournament.id, loggedInPlayerName);
+  if(myBet){
+    const payout = Math.round(myBet.wager * myBet.multiplier);
+    el.innerHTML = `<div class="bet-placed">Você apostou <b>🪙 ${myBet.wager}</b> em <b>${escapeHtml(myBet.predicted_champion)}</b> ser campeão (multiplicador ${myBet.multiplier}x — se acertar, recebe 🪙 ${payout}).</div>`;
+    return;
+  }
+
+  if(tournamentStarted){
+    el.innerHTML = '<div class="empty-state">As apostas fecharam — este torneio já começou. Aguarde o próximo para apostar no campeão.</div>';
+    return;
+  }
+
+  if(players.length < 2){
+    el.innerHTML = '<div class="empty-state">Aguardando o organizador preencher os jogadores do torneio.</div>';
+    return;
+  }
+
+  const multiplier = computeChampionBetMultiplier(players.length);
+  el.innerHTML = `
+    <select id="championPickSelect">
+      <option value="">— escolha quem vai ser campeão —</option>
+      ${players.map(p=>`<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
+    </select>
+    <input type="number" id="championBetAmount" placeholder="Quantas moedas apostar?" min="1">
+    <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:8px;">Multiplicador desta semana: <b style="color:var(--tera-amber);">${multiplier}x</b> (${players.length} jogadores no torneio)</div>
+    <button class="btn-primary" onclick="doPlaceChampionBet(${multiplier})">Apostar</button>
+  `;
+}
+
+async function doPlaceChampionBet(multiplier){
+  const picked = document.getElementById('championPickSelect').value;
+  const amount = parseInt(document.getElementById('championBetAmount').value, 10);
+  if(!picked){ alert('Escolha em quem vai apostar primeiro.'); return; }
+  if(!amount || amount <= 0){ alert('Digite uma quantidade de moedas válida.'); return; }
+  if(amount > playerCoins){ alert('Você não tem moedas suficientes para essa aposta.'); return; }
+
+  const result = await placeChampionBet(SUPABASE_URL, SUPABASE_ANON_KEY, activeTournament.id, loggedInPlayerName, picked, amount, multiplier);
+  if(!result.ok){
+    const msg = result.reason === 'insufficient' ? 'Você não tem moedas suficientes.' : 'Não foi possível processar. Tente novamente.';
+    alert(msg);
+    return;
+  }
+  playerCoins -= amount;
+  document.getElementById('myCoinsDisplay').textContent = `🪙 ${playerCoins}`;
+  await renderChampionBetCard();
+  await renderChampionBetHistory();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'palpite', `Apostou 🪙${amount} em ${picked} ser campeão da semana (${multiplier}x)`);
+}
+
+async function resolvePendingPredictions(allRows){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/predictions?resolved=eq.false&select=*`, {headers: sbHeaders()});
+  if(!res.ok) return;
+  const pending = await res.json();
+  if(!pending.length) return;
+
+  const tournamentsById = {};
+  allRows.forEach(r=>{ tournamentsById[r.id] = r.data || {}; });
+
+  for(const pred of pending){
+    const data = tournamentsById[pred.tournament_id];
+    if(!data) continue;
+    const match = (data.matches || []).find(m => m.id === pred.match_id);
+    if(!match || !match.winner) continue; // ainda não decidido, deixa pendente
+
+    const correct = match.winner === pred.predicted_winner;
+    if(correct){
+      await adjustPlayerCoins(SUPABASE_URL, SUPABASE_ANON_KEY, pred.predictor_name, pred.wager * 2, `Palpite correto: ${pred.predicted_winner}`);
+    }
+    await fetch(`${SUPABASE_URL}/rest/v1/predictions?id=eq.${pred.id}`, {
+      method:'PATCH',
+      headers: Object.assign(sbHeaders(), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify({ resolved:true, correct })
+    });
+  }
+}
+
+async function loadMyPredictions(){
+  myPredictionsForActive = {};
+  if(!activeTournament) return;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/predictions?tournament_id=eq.${activeTournament.id}&predictor_name=eq.${encodeURIComponent(loggedInPlayerName)}&select=*`, {headers: sbHeaders()});
+  if(!res.ok) return;
+  const rows = await res.json();
+  rows.forEach(r=>{ myPredictionsForActive[r.match_id] = r; });
+}
+
+function renderOpenMatches(){
+  const container = document.getElementById('openMatchesContainer');
+  if(!activeTournament){
+    container.innerHTML = '<div class="empty-state">Não há torneio em curso agora.</div>';
+    return;
+  }
+  const matches = activeTournament.data.matches || [];
+  // Uma partida só aceita NOVAS apostas se ainda não começou — nem por jogos
+  // já registados (Bo3), nem por ter sido marcada manualmente como "iniciada"
+  // pelo organizador (usado principalmente em Bo1, onde não há jogos
+  // parciais para detetar automaticamente que a partida já começou).
+  // Mas se já tens uma aposta feita, ela continua visível até a partida
+  // CONCLUIR de vez (m.winner definido).
+  const relevantMatches = matches.filter(m => {
+    if(!m.p1 || !m.p2 || m.winner) return false;
+    const hasBet = !!myPredictionsForActive[m.id];
+    const notStarted = (!m.games || m.games.every(g=>!g)) && !m.started;
+    return hasBet || notStarted;
+  });
+
+  if(!relevantMatches.length){
+    container.innerHTML = '<div class="empty-state">Não há partidas disponíveis para palpite agora — ou já foram todas decididas, ou já começaram.</div>';
+    return;
+  }
+
+  container.innerHTML = relevantMatches.map(m=>{
+    const existing = myPredictionsForActive[m.id];
+    const started = (m.games && m.games.some(g=>g)) || m.started;
+    if(existing){
+      return `<div class="match-bet-card">
+        <div class="match-bet-head">
+          <span class="match-bet-title">${escapeHtml(m.p1)} vs ${escapeHtml(m.p2)}<span class="tag">${escapeHtml(m.label)} · Bo${m.bo}</span></span>
+        </div>
+        <div class="bet-placed">Você apostou <b>🪙 ${existing.wager}</b> em <b>${escapeHtml(existing.predicted_winner)}</b>. ${started ? '⏳ Partida em curso...' : ''}</div>
+      </div>`;
+    }
+    return `<div class="match-bet-card">
+      <div class="match-bet-head">
+        <span class="match-bet-title">${escapeHtml(m.p1)} vs ${escapeHtml(m.p2)}<span class="tag">${escapeHtml(m.label)} · Bo${m.bo}</span></span>
+      </div>
+      <div class="pick-row">
+        <button class="pick-btn" id="pick-${m.id}-p1" onclick="selectPick('${m.id}','${m.p1.replace(/'/g,"\\'")}')">${escapeHtml(m.p1)}</button>
+        <button class="pick-btn" id="pick-${m.id}-p2" onclick="selectPick('${m.id}','${m.p2.replace(/'/g,"\\'")}')">${escapeHtml(m.p2)}</button>
+      </div>
+      <input type="number" id="wager-${m.id}" placeholder="Quantas moedas apostar?" min="1">
+      <button class="btn-primary" onclick="placeBet('${m.id}')">Apostar</button>
+    </div>`;
+  }).join('');
+}
+
+const currentPicks = {};
+
+function selectPick(matchId, playerName){
+  currentPicks[matchId] = playerName;
+  const m = (activeTournament.data.matches||[]).find(x=>x.id===matchId);
+  document.getElementById(`pick-${matchId}-p1`).classList.toggle('selected', m.p1 === playerName);
+  document.getElementById(`pick-${matchId}-p2`).classList.toggle('selected', m.p2 === playerName);
+}
+
+async function placeBet(matchId){
+  const picked = currentPicks[matchId];
+  if(!picked){ alert('Escolha em quem vai apostar primeiro.'); return; }
+  const wagerInput = document.getElementById(`wager-${matchId}`);
+  const wager = parseInt(wagerInput.value, 10);
+  if(!wager || wager <= 0){ alert('Digite uma quantidade de moedas válida.'); return; }
+  if(wager > playerCoins){ alert('Você não tem moedas suficientes para essa aposta.'); return; }
+
+  const ok = await adjustPlayerCoins(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, -wager, `Aposta em ${picked}`);
+  if(!ok){ alert('Não foi possível processar a aposta. Tente novamente.'); return; }
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/predictions`, {
+    method:'POST',
+    headers: Object.assign(sbHeaders(), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify([{
+      tournament_id: activeTournament.id, match_id: matchId,
+      predictor_name: loggedInPlayerName, predicted_winner: picked, wager
+    }])
+  });
+  if(!res.ok){
+    // devolve as moedas se a aposta não foi gravada
+    await adjustPlayerCoins(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, wager, 'Estorno de aposta (falhou)');
+    alert('Não foi possível gravar a aposta (talvez já tenha apostado nesta partida). Tente novamente.');
+    return;
+  }
+
+  playerCoins -= wager;
+  document.getElementById('myCoinsDisplay').textContent = `🪙 ${playerCoins}`;
+  await loadMyPredictions();
+  renderOpenMatches();
+  await renderMyPredictions();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'palpite', `Apostou 🪙${wager} em ${picked}`);
+}
+
+async function renderMyPredictions(){
+  const container = document.getElementById('myPredictionsContainer');
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/predictions?predictor_name=eq.${encodeURIComponent(loggedInPlayerName)}&select=*&order=created_at.desc&limit=30`, {headers: sbHeaders()});
+  if(!res.ok){ container.innerHTML = '<div class="empty-state">Erro ao carregar palpites.</div>'; return; }
+  const rows = await res.json();
+  if(!rows.length){ container.innerHTML = '<div class="empty-state">Sem palpites ainda.</div>'; return; }
+
+  container.innerHTML = rows.map(r=>{
+    let resClass = 'pending', resText = '⏳ Pendente';
+    if(r.resolved){
+      resClass = r.correct ? 'win' : 'loss';
+      resText = r.correct ? `✅ Acertou (+${r.wager*2})` : `❌ Errou (-${r.wager})`;
+    }
+    return `<div class="history-row"><span>Apostou <b>🪙 ${r.wager}</b> em ${escapeHtml(r.predicted_winner)}</span><span class="res ${resClass}">${resText}</span></div>`;
+  }).join('');
+}
+
+async function renderChampionBetHistory(){
+  const container = document.getElementById('championBetHistoryContainer');
+  const rows = await fetchChampionBetHistory(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 20);
+  if(!rows.length){ container.innerHTML = '<div class="empty-state">Sem apostas ainda.</div>'; return; }
+
+  container.innerHTML = rows.map(r=>{
+    let resClass = 'pending', resText = '⏳ Pendente';
+    if(r.resolved){
+      resClass = r.correct ? 'win' : 'loss';
+      resText = r.correct ? `✅ Acertou (+${Math.round(r.wager*r.multiplier)})` : `❌ Errou (-${r.wager})`;
+    }
+    return `<div class="history-row"><span>Apostou <b>🪙 ${r.wager}</b> em ${escapeHtml(r.predicted_champion)} (${r.multiplier}x)</span><span class="res ${resClass}">${resText}</span></div>`;
+  }).join('');
+}
+
+async function renderNicknameVoteCard(){
+  const el = document.getElementById('nicknameVoteContainer');
+  if(!activeTournament || !activeTournament.id){
+    el.innerHTML = '<div class="empty-state">Não há torneio em curso agora.</div>';
+    return;
+  }
+  const allNicknamesData = aggregateNicknames([{ id: activeTournament.id, tier: activeTournament.tier, data: activeTournament.data, created_at: new Date().toISOString() }]);
+  const votable = allNicknamesData.filter(n=>n.playerName !== loggedInPlayerName);
+  if(!votable.length){
+    el.innerHTML = '<div class="empty-state">Ainda não há apelidos de outros jogadores neste torneio para votar.</div>';
+    return;
+  }
+
+  const myVote = await fetchMyNicknameVote(SUPABASE_URL, SUPABASE_ANON_KEY, activeTournament.id, loggedInPlayerName);
+  const standings = await fetchNicknameVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY, activeTournament.id);
+
+  let html = '';
+  if(myVote){
+    html += `<div class="bet-placed">Você votou em <b>${escapeHtml(myVote.nickname)}</b> (${escapeHtml(myVote.species)}) de ${escapeHtml(myVote.owner_name)}. Pode trocar o voto abaixo, se mudar de ideias.</div>`;
+  }
+  html += `<select id="nicknameVoteSelect">`;
+  html += votable.map(n=>`<option value="${escapeHtml(n.playerName)}|${escapeHtml(n.nickname)}|${escapeHtml(n.species)}" ${myVote && myVote.nickname===n.nickname && myVote.owner_name===n.playerName ? 'selected' : ''}>${escapeHtml(n.nickname)} (${escapeHtml(n.species)}) — de ${escapeHtml(n.playerName)}</option>`).join('');
+  html += `</select>`;
+  html += `<button class="btn-primary" onclick="doCastNicknameVote()">${myVote ? 'Trocar voto' : 'Votar'}</button>`;
+
+  if(standings.length){
+    html += `<div style="margin-top:14px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">Votação atual</div>`;
+    html += standings.map(s=>{
+      const comboNote = s.ownerTotal > s.votes ? ` <span style="color:var(--text-faint);font-size:10px;">(${escapeHtml(s.ownerName)} soma ${s.ownerTotal} no total)</span>` : '';
+      return `<div class="history-row"><span>${escapeHtml(s.nickname)} (${escapeHtml(s.species)}) — ${escapeHtml(s.ownerName)}${comboNote}</span><b style="color:var(--tera-amber);">${s.votes} voto(s)</b></div>`;
+    }).join('');
+  }
+  el.innerHTML = html;
+}
+
+async function doCastNicknameVote(){
+  const [ownerName, nickname, species] = document.getElementById('nicknameVoteSelect').value.split('|');
+  const result = await castNicknameVote(SUPABASE_URL, SUPABASE_ANON_KEY, activeTournament.id, loggedInPlayerName, ownerName, nickname, species);
+  if(!result.ok){ alert('Não foi possível registar o voto. Tente novamente.'); return; }
+  await renderNicknameVoteCard();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'palpite', `Votou em "${nickname}" (${species}) de ${ownerName} para Apelido da Semana`);
+}
+
+async function renderRanking(){
+  const container = document.getElementById('rankingContainer');
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/predictions?resolved=eq.true&select=predictor_name,correct,wager`, {headers: sbHeaders()});
+  if(!res.ok){ container.innerHTML = '<div class="empty-state">Erro ao calcular ranking.</div>'; return; }
+  const rows = await res.json();
+  if(!rows.length){ container.innerHTML = '<div class="empty-state">Ainda não há palpites resolvidos.</div>'; return; }
+
+  const MIN_BETS = 3;
+  const stats = {};
+  rows.forEach(r=>{
+    if(!stats[r.predictor_name]) stats[r.predictor_name] = { correct:0, total:0, profit:0 };
+    stats[r.predictor_name].total++;
+    if(r.correct){ stats[r.predictor_name].correct++; stats[r.predictor_name].profit += r.wager; }
+    else{ stats[r.predictor_name].profit -= r.wager; }
+  });
+
+  const eligible = Object.entries(stats).filter(([,s])=>s.total >= MIN_BETS);
+  if(!eligible.length){
+    container.innerHTML = `<div class="empty-state">Ainda ninguém tem pelo menos ${MIN_BETS} palpites resolvidos para entrar no ranking.</div>`;
+    return;
+  }
+
+  const ranked = eligible.sort((a,b)=>{
+    const accA = a[1].correct / a[1].total, accB = b[1].correct / b[1].total;
+    return accB - accA || b[1].profit - a[1].profit;
+  });
+
+  let html = `<div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">Mínimo de ${MIN_BETS} palpites resolvidos para entrar no ranking.</div>`;
+  html += ranked.map(([name, s], i)=>{
+    const acc = Math.round((s.correct/s.total)*100);
+    return `<div class="rank-row">
+      <span class="pos">#${i+1}</span>
+      <span style="flex:1;">${escapeHtml(name)}</span>
+      <span style="color:var(--text-faint);margin-right:10px;">${s.correct}/${s.total} (${acc}%)</span>
+      <span style="color:${s.profit>=0?'var(--success)':'var(--danger)'};">${s.profit>=0?'+':''}${s.profit} 🪙</span>
+    </div>`;
+  }).join('');
+  container.innerHTML = html;
+}
+
+pageBoot();
+</script>
+</body>
+</html>

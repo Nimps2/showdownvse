@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Torneio Showdown - VSE</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-void:#0a0c14; --bg-panel:#12151f; --bg-card:#171b28;
+  --line:#262c3e; --tera-cyan:#4fd8d0; --tera-violet:#a56bf0; --tera-amber:#f0b64f;
+  --text-main:#e9ecf5; --text-dim:#8b91a8; --text-faint:#565d78;
+}
+body.light-theme{
+  --bg-void:#f5f6fa; --bg-panel:#ffffff; --bg-card:#eef0f6;
+  --line:#dcdfe8; --tera-cyan:#0e9488; --tera-violet:#7c4dc4; --tera-amber:#b8860b;
+  --text-main:#1a1d29; --text-dim:#4a5068; --text-faint:#8890a8;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;min-height:100vh;background:var(--bg-void);
+  background-image:radial-gradient(circle at 15% 8%, rgba(165,107,240,0.10), transparent 40%),
+    radial-gradient(circle at 85% 92%, rgba(79,216,208,0.08), transparent 40%);
+  color:var(--text-main);font-family:'Inter',sans-serif;
+  display:flex;align-items:center;justify-content:center;
+  transition:background-color .2s, color .2s;
+}
+.theme-toggle{
+  position:fixed;top:16px;right:16px;background:var(--bg-panel);border:1px solid var(--line);
+  color:var(--text-main);width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:16px;
+}
+.theme-toggle:hover{border-color:var(--tera-cyan);}
+.player-corner-badge{
+  position:fixed;top:16px;left:16px;z-index:900;display:flex;align-items:center;gap:8px;
+  background:var(--bg-panel);border:1px solid var(--line);border-radius:20px;padding:5px 12px 5px 5px;
+  text-decoration:none;color:var(--text-main);font-family:'Chakra Petch',sans-serif;font-size:12.5px;font-weight:600;
+}
+.player-corner-badge:hover{border-color:var(--tera-cyan);}
+.daily-bonus-icon{
+  position:fixed;top:82px;left:16px;z-index:899;width:38px;height:38px;border-radius:10px;
+  background:var(--bg-panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
+  font-size:16px;opacity:0.3;filter:grayscale(1);cursor:default;padding:0;
+}
+.daily-bonus-icon.available{
+  opacity:1;filter:none;cursor:pointer;border-color:var(--tera-amber);
+  box-shadow:0 0 12px rgba(240,182,79,0.4);animation:vseGiftPulse 1.6s ease-in-out infinite;
+}
+@keyframes vseGiftPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
+.wrap{max-width:480px;width:100%;padding:32px 20px;text-align:center;}
+.crystal{
+  width:56px;height:56px;margin:0 auto 20px auto;
+  background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));
+  clip-path:polygon(50% 0%, 100% 30%, 82% 100%, 18% 100%, 0% 30%);
+}
+h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0 0 8px 0;letter-spacing:0.5px;}
+.subtitle{color:var(--text-dim);font-size:14px;margin-bottom:32px;}
+.nav-card{
+  display:flex;align-items:center;gap:16px;background:var(--bg-panel);border:1px solid var(--line);
+  border-radius:12px;padding:20px 22px;margin-bottom:14px;text-decoration:none;color:var(--text-main);
+  transition:border-color .15s, transform .15s;text-align:left;
+}
+.nav-card:hover{border-color:var(--tera-cyan);transform:translateY(-2px);}
+.nav-icon{
+  width:40px;height:40px;flex-shrink:0;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-size:20px;background:var(--bg-card);border:1px solid var(--line);
+}
+.nav-text h2{font-family:'Chakra Petch',sans-serif;font-size:15px;margin:0 0 3px 0;}
+.nav-text p{font-size:12.5px;color:var(--text-dim);margin:0;}
+.footer-note{color:var(--text-faint);font-size:11px;margin-top:24px;line-height:1.5;}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro">🌙</button>
+<div id="playerCornerContainer"></div>
+<div class="wrap">
+  <div class="crystal"></div>
+  <h1>Torneio Showdown - VSE</h1>
+  <div class="subtitle">Escolha o que quer ver</div>
+
+  <a class="nav-card" href="viewer.html">
+    <div class="nav-icon">⬡</div>
+    <div class="nav-text">
+      <h2>Bracket & Sorteio</h2>
+      <p>Acompanha o torneio desta semana ao vivo e os seus Pokémon sorteados.</p>
+    </div>
+  </a>
+
+  <a class="nav-card" href="estatisticas.html">
+    <div class="nav-icon">📊</div>
+    <div class="nav-text">
+      <h2>Estatísticas</h2>
+      <p>Rankings e histórico de todos os torneios já disputados.</p>
+    </div>
+  </a>
+
+  <a class="nav-card" href="hall-da-fama.html">
+    <div class="nav-icon">🏆</div>
+    <div class="nav-text">
+      <h2>Hall da Fama</h2>
+      <p>A linha do tempo de todos os campeões, torneio a torneio.</p>
+    </div>
+  </a>
+
+  <a class="nav-card" href="palpites.html">
+    <div class="nav-icon">🔮</div>
+    <div class="nav-text">
+      <h2>Palpiteiro</h2>
+      <p>Aposte moedas em quem vai vencer cada partida e suba no ranking.</p>
+    </div>
+  </a>
+
+  <a class="nav-card" href="loja.html">
+    <div class="nav-icon">🛍️</div>
+    <div class="nav-text">
+      <h2>Loja</h2>
+      <p>Gaste as suas moedas em personalizações, vantagens e sorte.</p>
+    </div>
+  </a>
+
+  <div class="footer-note">O seu perfil fica acessível pelo ícone no canto superior esquerdo. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
+</div>
+<script src="showdown-utils.js"></script>
+<script>
+initTheme();
+const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+
+let loggedInPlayerName = null;
+
+async function loadCornerBadge(){
+  const savedName = localStorage.getItem('player_login_name');
+  if(!savedName){
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(null, null);
+    return;
+  }
+  loggedInPlayerName = savedName;
+  try{
+    const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(savedName, profiles[savedName]);
+    checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, savedName).then(available=>{
+      document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
+    });
+  } catch(e){
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(null, null);
+  }
+}
+
+let dailyBonusClaimInFlight = false;
+async function handleDailyBonusClick(){
+  // Trava do lado do cliente: ignora cliques repetidos enquanto o pedido
+  // anterior ainda está a decorrer, para nem sequer disparar pedidos extra
+  // à base de dados (a proteção definitiva está em claimDailyBonus, que já
+  // é segura mesmo com vários pedidos em paralelo — isto é só para poupar
+  // chamadas desnecessárias e dar feedback visual imediato).
+  if(dailyBonusClaimInFlight) return;
+  dailyBonusClaimInFlight = true;
+  const icon = document.getElementById('dailyBonusIcon');
+  if(icon) icon.classList.remove('available');
+  try{
+    const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+    if(result.awarded){
+      showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
+    }
+  } finally {
+    dailyBonusClaimInFlight = false;
+  }
+}
+
+loadCornerBadge();
+</script>
+</body>
+</html>

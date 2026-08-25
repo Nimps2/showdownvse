@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estatísticas — Torneio Showdown - VSE</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-void:#0a0c14; --bg-panel:#12151f; --bg-card:#171b28; --bg-code:#0d0f18;
+  --line:#262c3e; --tera-cyan:#4fd8d0; --tera-violet:#a56bf0; --tera-amber:#f0b64f;
+  --text-main:#e9ecf5; --text-dim:#8b91a8; --text-faint:#565d78; --success:#5ed890; --danger:#e0607a;
+}
+body.light-theme{
+  --bg-void:#f5f6fa; --bg-panel:#ffffff; --bg-card:#eef0f6; --bg-code:#e4e7f0;
+  --line:#dcdfe8; --tera-cyan:#0e9488; --tera-violet:#7c4dc4; --tera-amber:#b8860b;
+  --text-main:#1a1d29; --text-dim:#4a5068; --text-faint:#8890a8; --success:#1a9d5c; --danger:#c23f5a;
+}
+.theme-toggle{
+  position:fixed;top:16px;right:16px;z-index:900;background:var(--bg-panel);border:1px solid var(--line);
+  color:var(--text-main);width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:16px;
+}
+.theme-toggle:hover{border-color:var(--tera-cyan);}
+.player-corner-badge{
+  position:fixed;top:16px;left:16px;z-index:900;display:flex;align-items:center;gap:8px;
+  background:var(--bg-panel);border:1px solid var(--line);border-radius:20px;padding:5px 12px 5px 5px;
+  text-decoration:none;color:var(--text-main);font-family:'Chakra Petch',sans-serif;font-size:12.5px;font-weight:600;
+}
+.player-corner-badge:hover{border-color:var(--tera-cyan);}
+.daily-bonus-icon{
+  position:fixed;top:82px;left:16px;z-index:899;width:38px;height:38px;border-radius:10px;
+  background:var(--bg-panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
+  font-size:16px;opacity:0.3;filter:grayscale(1);cursor:default;padding:0;
+}
+.daily-bonus-icon.available{
+  opacity:1;filter:none;cursor:pointer;border-color:var(--tera-amber);
+  box-shadow:0 0 12px rgba(240,182,79,0.4);animation:vseGiftPulse 1.6s ease-in-out infinite;
+}
+@keyframes vseGiftPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
+*{box-sizing:border-box;}
+body{
+  margin:0;background:var(--bg-void);
+  background-image:radial-gradient(circle at 15% 8%, rgba(165,107,240,0.10), transparent 40%),
+    radial-gradient(circle at 85% 92%, rgba(79,216,208,0.08), transparent 40%);
+  color:var(--text-main);font-family:'Inter',sans-serif;min-height:100vh;padding:0 0 60px 0;
+}
+.wrap{max-width:900px;margin:0 auto;padding:32px 20px;}
+.header{display:flex;align-items:center;gap:16px;margin-bottom:8px;}
+.crystal{width:38px;height:38px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));
+  clip-path:polygon(50% 0%, 100% 30%, 82% 100%, 18% 100%, 0% 30%);}
+h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0;letter-spacing:0.5px;}
+.subtitle{color:var(--text-dim);font-size:13px;margin:14px 0 6px 0;}
+.nav-link{color:var(--tera-cyan);font-size:12.5px;text-decoration:none;font-family:'Chakra Petch',sans-serif;}
+.nav-link:hover{text-decoration:underline;}
+.status-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);margin:14px 0 20px 0;}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
+.status-dot.on{background:var(--success);}
+.status-dot.off{background:var(--danger);}
+
+.card{background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px;}
+.card h2{font-family:'Chakra Petch',sans-serif;font-size:15px;margin:0 0 14px 0;color:var(--text-main);
+  display:flex;align-items:center;gap:8px;}
+.card h2::before{content:'';width:4px;height:15px;background:var(--tera-violet);border-radius:2px;}
+select,input[type=text],input[type=password]{width:100%;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);
+  border-radius:8px;color:var(--text-main);font-family:'Inter',sans-serif;font-size:14px;margin-bottom:6px;}
+select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
+.btn-primary{
+  width:100%;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));color:#0a0c14;
+  border:none;padding:11px 20px;border-radius:8px;font-family:'Chakra Petch',sans-serif;font-weight:700;
+  font-size:13.5px;cursor:pointer;margin-top:4px;
+}
+
+.highlight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
+.highlight-box{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+.highlight-box .label{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+.highlight-box .value{font-family:'Chakra Petch',sans-serif;font-size:18px;font-weight:700;color:var(--tera-cyan);}
+.highlight-box .sub{font-size:11.5px;color:var(--text-dim);margin-top:2px;}
+
+.controls{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.controls input[type=text]{
+  flex:1;min-width:180px;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);
+  border-radius:8px;color:var(--text-main);font-family:'Inter',sans-serif;font-size:14px;
+}
+.controls select{
+  padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);border-radius:8px;
+  color:var(--text-main);font-family:'Inter',sans-serif;font-size:13px;
+}
+.controls input:focus,.controls select:focus{outline:none;border-color:var(--tera-cyan);}
+
+.poke-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+.pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:18px;}
+.page-btn{
+  background:var(--bg-card);border:1px solid var(--line);color:var(--text-dim);
+  padding:8px 14px;border-radius:8px;cursor:pointer;font-family:'Chakra Petch',sans-serif;font-size:13px;
+}
+.page-btn:hover:not(:disabled){border-color:var(--tera-cyan);color:var(--tera-cyan);}
+.page-btn:disabled{opacity:0.35;cursor:not-allowed;}
+.page-info{font-size:12.5px;color:var(--text-dim);font-family:'Chakra Petch',sans-serif;}
+.poke-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+.poke-name{font-family:'Chakra Petch',sans-serif;font-size:15px;font-weight:700;margin-bottom:8px;}
+.poke-stat-row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-dim);margin-bottom:4px;}
+.poke-stat-row b{color:var(--text-main);}
+.poke-moves{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);}
+.poke-moves .label{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;}
+.move-chip{
+  display:inline-block;font-size:11px;background:var(--bg-panel);border:1px solid var(--line);
+  border-radius:20px;padding:3px 9px;margin:0 5px 5px 0;color:var(--text-dim);
+}
+.move-chip b{color:var(--tera-cyan);font-weight:600;}
+.free-bar{
+  height:5px;border-radius:3px;background:var(--bg-panel);overflow:hidden;margin-top:6px;
+}
+.free-bar-fill{height:100%;background:linear-gradient(90deg,var(--tera-amber),var(--tera-violet));}
+
+.empty-state{color:var(--text-faint);font-size:13px;text-align:center;padding:30px 0;}
+.footer-note{color:var(--text-faint);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.5;}
+
+.tabs{display:flex;gap:2px;margin-bottom:20px;border-bottom:1px solid var(--line);}
+.tab-btn{
+  flex:1;padding:12px 10px;background:none;border:none;color:var(--text-faint);
+  font-family:'Chakra Petch',sans-serif;font-size:14px;font-weight:600;
+  cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;letter-spacing:0.3px;
+}
+.tab-btn:hover{color:var(--text-dim);}
+.tab-btn.active{color:var(--tera-cyan);border-bottom-color:var(--tera-cyan);}
+.stats-panel{display:none;}
+.stats-panel.active{display:block;}
+
+.player-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;}
+.player-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+.player-card-name{font-family:'Chakra Petch',sans-serif;font-size:16px;font-weight:700;}
+.player-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:10px;}
+.player-stat-box{background:var(--bg-panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;text-align:center;}
+.player-stat-box .n{font-family:'Chakra Petch',sans-serif;font-size:15px;font-weight:700;color:var(--tera-cyan);}
+.player-stat-box .l{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.4px;margin-top:2px;}
+.title-chip{
+  display:inline-block;font-size:11px;background:rgba(240,182,79,0.1);border:1px solid rgba(240,182,79,0.3);
+  border-radius:20px;padding:3px 10px;margin:0 5px 5px 0;color:var(--tera-amber);font-family:'Chakra Petch',sans-serif;
+}
+.history-toggle{cursor:pointer;font-family:'Chakra Petch',sans-serif;font-size:11.5px;color:var(--tera-cyan);
+  list-style:none;user-select:none;padding:2px 0;}
+.history-toggle::-webkit-details-marker{display:none;}
+.history-list{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);}
+.history-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-dim);padding:5px 0;gap:8px;}
+
+.hover-card{
+  position:fixed;z-index:1000;background:var(--bg-panel);border:1px solid var(--line);
+  border-radius:10px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.5);
+  min-width:220px;max-width:280px;pointer-events:none;display:none;
+}
+.hover-card.show{display:block;}
+.history-row .res{font-family:'Chakra Petch',sans-serif;font-weight:700;flex-shrink:0;}
+.history-row .res.champ{color:var(--tera-amber);}
+.history-row .res.elim{color:var(--text-faint);}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro">🌙</button>
+<div id="playerCornerContainer"></div>
+<div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
+    <h2>Entrar</h2>
+    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Nome</label>
+    <select id="gateNameSelect"><option value="">— carregando jogadores —</option></select>
+    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Password</label>
+    <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()">
+    <button class="btn-primary" onclick="doGateLogin()">Entrar</button>
+    <div id="gateError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;"></div>
+  </div>
+</div>
+
+<div id="mainContent" class="wrap" style="display:none;">
+  <div class="header">
+    <div class="crystal"></div>
+    <div><h1>Estatísticas</h1></div>
+  </div>
+  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="viewer.html">Ver bracket da semana</a> &nbsp;|&nbsp; <a class="nav-link" href="hall-da-fama.html">Hall da Fama</a> &nbsp;|&nbsp; <a class="nav-link" href="loja.html">Loja</a> &nbsp;|&nbsp; <a class="nav-link" href="conquistas.html">Conquistas</a> &nbsp;|&nbsp; <a class="nav-link" href="palpites.html">Palpiteiro →</a></div>
+  <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
+  <div class="subtitle" style="margin-top:-14px;">Ligado como <b id="loggedInNameTop" style="color:var(--tera-cyan);"></b> — <a href="#" class="nav-link" onclick="doPlayerLogout(); return false;">Trocar jogador</a></div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchStatsTab('pokemon')">Pokémon</button>
+    <button class="tab-btn" onclick="switchStatsTab('players')">Jogadores</button>
+    <button class="tab-btn" onclick="switchStatsTab('achievements')">Conquistas</button>
+  </div>
+
+  <div id="panel-pokemon" class="stats-panel active">
+    <div class="card" id="highlightsCard">
+      <h2>Resumo geral</h2>
+      <div class="empty-state">Carregando dados de todos os torneios…</div>
+    </div>
+
+    <div class="card">
+      <h2>Pokémon</h2>
+      <div class="controls">
+        <select id="tierFilterSelect" onchange="onPokemonTierFilterChange()">
+          <option value="">Todos os tiers</option>
+        </select>
+        <input type="text" id="searchBox" placeholder="Procurar Pokémon..." oninput="onPokemonFilterChange()">
+        <select id="sortSelect" onchange="onPokemonFilterChange()">
+          <option value="total_desc">Mais usados</option>
+          <option value="total_asc">Menos usados</option>
+          <option value="free_desc">Mais como escolha livre</option>
+          <option value="winrate_desc">Melhor winrate</option>
+          <option value="winrate_asc">Pior winrate</option>
+          <option value="az">Ordem alfabética</option>
+        </select>
+      </div>
+      <div id="pokeGrid" class="poke-grid"></div>
+      <div id="pokePagination" class="pagination"></div>
+      <div style="font-size:10.5px;color:var(--text-faint);margin-top:10px;">* Winrate do time: como não sabemos qual Pokémon específico jogou em cada partida, este número reflete o resultado do jogador no torneio inteiro, atribuído a toda a equipa dele — é uma aproximação, não um dado batalha a batalha.</div>
+    </div>
+  </div>
+
+  <div id="panel-players" class="stats-panel">
+    <div class="card" id="playerHighlightsCard">
+      <h2>Resumo geral</h2>
+      <div class="empty-state">Carregando dados de todos os torneios…</div>
+    </div>
+
+    <div class="card">
+      <h2>Jogadores</h2>
+      <div class="controls">
+        <select id="seasonFilterSelect" onchange="onSeasonChange()"></select>
+        <input type="text" id="playerSearchBox" placeholder="Procurar jogador..." oninput="onPlayerFilterChange()">
+        <select id="playerSortSelect" onchange="onPlayerFilterChange()">
+          <option value="elo_desc">Ranking (Elo)</option>
+          <option value="wins_desc">Mais vitórias</option>
+          <option value="winrate_desc">Melhor winrate</option>
+          <option value="titles_desc">Mais títulos</option>
+          <option value="matches_desc">Mais partidas jogadas</option>
+          <option value="az">Ordem alfabética</option>
+        </select>
+      </div>
+      <div id="playerGrid"></div>
+      <div id="playerPagination" class="pagination"></div>
+    </div>
+  </div>
+
+  <div id="panel-achievements" class="stats-panel">
+    <div class="card">
+      <h2>🎖️ Conquistas da comunidade</h2>
+      <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:14px;">Quantos por cento dos jogadores já desbloquearam cada conquista — ordenado da mais rara para a mais comum. Veja e escolha as suas em <a class="nav-link" href="conquistas.html">Conquistas</a>.</div>
+      <div id="achievementStatsList"><div class="empty-state">A carregar…</div></div>
+    </div>
+  </div>
+
+  <div class="footer-note">Estatísticas calculadas a partir de todos os torneios guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
+</div>
+
+<div class="hover-card" id="hoverCard"></div>
+
+<script src="showdown-utils.js"></script>
+<script>
+initTheme();
+const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+
+let loggedInPlayerName = null;
+
+async function doGateLogin(){
+  const name = document.getElementById('gateNameSelect').value;
+  const password = document.getElementById('gatePassword').value;
+  const errEl = document.getElementById('gateError');
+  errEl.style.display = 'none';
+  if(!name){ errEl.textContent = 'Selecione o seu nome.'; errEl.style.display='block'; return; }
+  if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
+  const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
+  if(!result.ok){
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registrado pelo organizador.'
+      : result.reason==='wrongpass' ? 'Password incorreta.'
+      : 'Erro ao ligar à base de dados.';
+    errEl.style.display = 'block';
+    return;
+  }
+  localStorage.setItem('player_login_name', name);
+  loggedInPlayerName = name;
+  unlockContent();
+}
+
+function unlockContent(){
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('loggedInNameTop').textContent = loggedInPlayerName;
+  init();
+}
+
+function doPlayerLogout(){
+  localStorage.removeItem('player_login_name');
+  loggedInPlayerName = null;
+  document.getElementById('gatePassword').value = '';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('authGate').style.display = 'flex';
+}
+
+async function pageBoot(){
+  const sel = document.getElementById('gateNameSelect');
+  try{
+    const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
+    names.forEach(n=>{
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+    const saved = localStorage.getItem('player_login_name');
+    if(saved && names.includes(saved)){
+      loggedInPlayerName = saved;
+      unlockContent();
+    }
+  } catch(e){
+    sel.innerHTML = '<option value="">— erro ao carregar jogadores —</option>';
+  }
+}
+
+function showHoverCard(evt, name){
+  const card = document.getElementById('hoverCard');
+  const result = buildHoverCardHtml(name, playerStats, playerProfiles, currentTrophies, eloRatings);
+  card.innerHTML = result.html;
+  applyHoverCardBackground(card, result);
+  card.classList.add('show');
+  positionHoverCard(evt);
+}
+function positionHoverCard(evt){
+  const card = document.getElementById('hoverCard');
+  const pad = 14;
+  let x = evt.clientX + pad;
+  let y = evt.clientY + pad;
+  const rect = card.getBoundingClientRect();
+  if(x + rect.width > window.innerWidth) x = evt.clientX - rect.width - pad;
+  if(y + rect.height > window.innerHeight) y = evt.clientY - rect.height - pad;
+  card.style.left = x + 'px';
+  card.style.top = y + 'px';
+}
+function hideHoverCard(){
+  document.getElementById('hoverCard').classList.remove('show');
+}
+
+function sbHeaders(){
+  return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+}
+function setStatus(ok, text){
+  document.getElementById('statusDot').className = 'status-dot ' + (ok?'on':'off');
+  document.getElementById('statusText').textContent = text;
+}
+
+let dailyBonusClaimInFlight = false;
+async function handleDailyBonusClick(){
+  // Trava do lado do cliente: ignora cliques repetidos enquanto o pedido
+  // anterior ainda está a decorrer, para nem sequer disparar pedidos extra
+  // à base de dados (a proteção definitiva está em claimDailyBonus, que já
+  // é segura mesmo com vários pedidos em paralelo — isto é só para poupar
+  // chamadas desnecessárias e dar feedback visual imediato).
+  if(dailyBonusClaimInFlight) return;
+  dailyBonusClaimInFlight = true;
+  const icon = document.getElementById('dailyBonusIcon');
+  if(icon) icon.classList.remove('available');
+  try{
+    const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+    if(result.awarded){
+      showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
+    }
+  } finally {
+    dailyBonusClaimInFlight = false;
+  }
+}
+
+let pokeStats = {};
+let globalMoves = {};
+let totalTournaments = 0;
+let totalSlots = 0;
+
+let allTournamentRows = [];
+let allNicknames = [];
+
+async function init(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const rows = await res.json();
+    allTournamentRows = rows;
+    setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
+    populateTierFilter(rows);
+    aggregate(rows);
+    allNicknames = aggregateNicknames(rows);
+    populateSeasonFilter(rows);
+    recomputePlayerData(rows);
+    playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, playerProfiles[loggedInPlayerName]);
+    checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
+      document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
+    });
+    currentTrophies = computeCurrentTrophies(rows);
+    renderHighlights();
+    renderPokemonList();
+    renderPlayerHighlights();
+    renderPlayerList();
+    renderAchievementStats(rows);
+  } catch(e){
+    setStatus(false, 'Não foi possível ligar à base de dados.');
+    document.getElementById('highlightsCard').innerHTML = '<h2>Resumo geral</h2><div class="empty-state">Erro ao carregar dados.</div>';
+    document.getElementById('playerHighlightsCard').innerHTML = '<h2>Resumo geral</h2><div class="empty-state">Erro ao carregar dados.</div>';
+  }
+}
+
+function populateSeasonFilter(rows){
+  const sel = document.getElementById('seasonFilterSelect');
+  const current = getCurrentSeasonNumber(rows);
+  let options = '<option value="all">Geral (todas as temporadas)</option>';
+  for(let s=current; s>=1; s--){
+    options += `<option value="${s}">Temporada ${s}${s===current?' (atual)':''}</option>`;
+  }
+  sel.innerHTML = options;
+  sel.value = 'all';
+}
+
+function recomputePlayerData(rows){
+  const seasonValue = document.getElementById('seasonFilterSelect').value || 'all';
+  const filteredRows = seasonValue === 'all' ? rows : filterRowsBySeason(rows, parseInt(seasonValue, 10));
+  playerStats = aggregatePlayers(filteredRows);
+  eloRatings = computeEloRatings(filteredRows);
+  currentStreaks = computeAllCurrentStreaks(filteredRows);
+}
+
+function onSeasonChange(){
+  recomputePlayerData(allTournamentRows);
+  renderPlayerHighlights();
+  renderPlayerList();
+}
+
+function populateTierFilter(rows){
+  const sel = document.getElementById('tierFilterSelect');
+  if(!sel) return;
+  const tiers = Array.from(new Set(rows.map(r=>r.tier).filter(t=>t))).sort();
+  sel.innerHTML = '<option value="">Todos os tiers</option>' + tiers.map(t=>`<option value="${t}">${t}</option>`).join('');
+}
+
+function onPokemonTierFilterChange(){
+  const tier = document.getElementById('tierFilterSelect').value;
+  const filtered = tier ? allTournamentRows.filter(r=>r.tier===tier) : allTournamentRows;
+  aggregate(filtered);
+  pokemonPage = 1;
+  renderHighlights();
+  renderPokemonList();
+}
+
+function renderAchievementStats(rows){
+  const el = document.getElementById('achievementStatsList');
+  const stats = computeGlobalAchievementStats(playerStats, rows, playerProfiles);
+  if(!Object.keys(playerStats).length){
+    el.innerHTML = '<div class="empty-state">Ainda não há jogadores com histórico.</div>';
+    return;
+  }
+  el.innerHTML = stats.map(a=>`
+    <div class="history-row">
+      <span style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:18px;">${a.emoji}</span>
+        <span><b>${escapeHtml(a.name)}</b><br><span style="font-size:11px;color:var(--text-faint);">${escapeHtml(a.desc)}</span></span>
+      </span>
+      <b style="color:var(--tera-amber);white-space:nowrap;">${a.pct}% <span style="font-weight:400;color:var(--text-faint);font-size:11px;">(${a.count})</span></b>
+    </div>
+  `).join('');
+}
+
+function switchStatsTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.stats-panel').forEach(p=>p.classList.remove('active'));
+  const map = {pokemon:0, players:1, achievements:2};
+  document.querySelectorAll('.tab-btn')[map[tab]].classList.add('active');
+  document.getElementById('panel-'+tab).classList.add('active');
+}
+
+function getOrCreate(name){
+  if(!pokeStats[name]) pokeStats[name] = { total:0, free:0, abilities:{}, moves:{}, wins:0, losses:0 };
+  return pokeStats[name];
+}
+
+function processItem(name, item, record){
+  const st = getOrCreate(name);
+  st.total++;
+  if(item.__isFree) st.free++;
+  if(record){ st.wins += record.wins; st.losses += record.losses; }
+  let ability = item.ability;
+  let moves = item.moves;
+  if((!ability || !moves || !moves.length) && item.text){
+    const parsed = parseShowdownImport(item.text);
+    if(parsed){
+      if(!ability) ability = parsed.ability;
+      if(!moves || !moves.length) moves = parsed.moves;
+    }
+  }
+  if(ability){ st.abilities[ability] = (st.abilities[ability]||0)+1; }
+  (moves||[]).forEach(mv=>{
+    st.moves[mv] = (st.moves[mv]||0)+1;
+    globalMoves[mv] = (globalMoves[mv]||0)+1;
+  });
+}
+
+function aggregate(rows){
+  pokeStats = {};
+  globalMoves = {};
+  totalTournaments = rows.length;
+  totalSlots = 0;
+  rows.forEach(r=>{
+    const data = r.data || {};
+    const players = data.players || [];
+    const numPlayers = players.length;
+    totalSlots += numPlayers * 6;
+    const matches = data.matches || [];
+
+    // Vitórias/derrotas de cada jogador NESTE torneio específico — usado como
+    // proxy para "winrate do Pokémon" (atribuído ao time inteiro do jogador,
+    // já que não sabemos qual Pokémon específico jogou em cada partida).
+    const recordByName = {};
+    matches.forEach(m=>{
+      if(!m.winner || !m.p1 || !m.p2) return;
+      const loser = m.winner === m.p1 ? m.p2 : m.p1;
+      if(!recordByName[m.winner]) recordByName[m.winner] = {wins:0, losses:0};
+      if(!recordByName[loser]) recordByName[loser] = {wins:0, losses:0};
+      recordByName[m.winner].wins++;
+      recordByName[loser].losses++;
+    });
+
+    Object.entries(data.draws||{}).forEach(([pIdxStr, entry])=>{
+      const pIdx = parseInt(pIdxStr, 10);
+      const playerName = players[pIdx];
+      const record = (playerName && recordByName[playerName]) || {wins:0, losses:0};
+      (entry.random||[]).forEach(item=>{
+        if(!item.mon) return;
+        processItem(item.mon, Object.assign({}, item, {__isFree:false}), record);
+      });
+      (entry.free||[]).forEach(item=>{
+        if(!item.name) return;
+        processItem(item.name, Object.assign({}, item, {__isFree:true}), record);
+      });
+    });
+  });
+}
+
+function renderHighlights(){
+  const card = document.getElementById('highlightsCard');
+  const distinctCount = Object.keys(pokeStats).length;
+  const topMoveEntry = Object.entries(globalMoves).sort((a,b)=>b[1]-a[1])[0];
+  const topPokeEntry = Object.entries(pokeStats).sort((a,b)=>b[1].total-a[1].total)[0];
+
+  let html = `<h2>Resumo geral</h2><div class="highlight-grid">`;
+  html += `<div class="highlight-box"><div class="label">Torneios</div><div class="value">${totalTournaments}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Pokémon distintos</div><div class="value">${distinctCount}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Pokémon mais usado</div><div class="value">${topPokeEntry?topPokeEntry[0]:'—'}</div><div class="sub">${topPokeEntry?topPokeEntry[1].total+' vezes':''}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Golpe mais visto</div><div class="value">${topMoveEntry?topMoveEntry[0]:'—'}</div><div class="sub">${topMoveEntry?topMoveEntry[1]+' vezes':''}</div></div>`;
+  html += `</div>`;
+  if(!totalTournaments){
+    html += '<div class="empty-state" style="margin-top:16px;">Ainda não há torneios guardados.</div>';
+  }
+  card.innerHTML = html;
+}
+
+const POKEMON_PAGE_SIZE = 12;
+let pokemonPage = 1;
+
+function onPokemonFilterChange(){
+  pokemonPage = 1;
+  renderPokemonList();
+}
+
+function changePokemonPage(delta){
+  pokemonPage += delta;
+  renderPokemonList();
+}
+
+function renderPokemonList(){
+  const grid = document.getElementById('pokeGrid');
+  const pagination = document.getElementById('pokePagination');
+  const search = document.getElementById('searchBox').value.trim().toLowerCase();
+  const sortBy = document.getElementById('sortSelect').value;
+
+  let entries = Object.entries(pokeStats);
+  if(search){
+    const speciesWithMatchingNickname = new Set(
+      allNicknames.filter(n=>n.nickname.toLowerCase().includes(search)).map(n=>n.species)
+    );
+    entries = entries.filter(([name])=>name.toLowerCase().includes(search) || speciesWithMatchingNickname.has(name));
+  }
+
+  if(sortBy === 'total_desc') entries.sort((a,b)=>b[1].total - a[1].total);
+  else if(sortBy === 'total_asc') entries.sort((a,b)=>a[1].total - b[1].total);
+  else if(sortBy === 'free_desc') entries.sort((a,b)=>(b[1].free/b[1].total) - (a[1].free/a[1].total));
+  else if(sortBy === 'winrate_desc' || sortBy === 'winrate_asc'){
+    const winrateOf = (st)=>{
+      const total = st.wins + st.losses;
+      return total ? st.wins/total : null;
+    };
+    entries.sort((a,b)=>{
+      const wrA = winrateOf(a[1]), wrB = winrateOf(b[1]);
+      if(wrA === null && wrB === null) return 0;
+      if(wrA === null) return 1; // sem partidas registadas fica sempre no fim
+      if(wrB === null) return -1;
+      return sortBy === 'winrate_desc' ? wrB - wrA : wrA - wrB;
+    });
+  }
+  else if(sortBy === 'az') entries.sort((a,b)=>a[0].localeCompare(b[0]));
+
+  if(!entries.length){
+    grid.innerHTML = '<div class="empty-state">Nenhum Pokémon encontrado.</div>';
+    pagination.innerHTML = '';
+    return;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(entries.length / POKEMON_PAGE_SIZE));
+  if(pokemonPage > totalPages) pokemonPage = totalPages;
+  if(pokemonPage < 1) pokemonPage = 1;
+  const pageEntries = entries.slice((pokemonPage-1)*POKEMON_PAGE_SIZE, pokemonPage*POKEMON_PAGE_SIZE);
+
+  grid.innerHTML = pageEntries.map(([name, st])=>{
+    const freePct = Math.round((st.free/st.total)*100);
+    const overallPct = totalSlots ? ((st.total/totalSlots)*100).toFixed(1) : '0';
+    const topAbility = Object.entries(st.abilities).sort((a,b)=>b[1]-a[1])[0];
+    const topMoves = Object.entries(st.moves).sort((a,b)=>b[1]-a[1]).slice(0,4);
+    const movesHtml = topMoves.length
+      ? topMoves.map(([mv,c])=>`<span class="move-chip">${escapeHtml(mv)} <b>${c}x</b></span>`).join('')
+      : '<span style="font-size:11.5px;color:var(--text-faint);">Sem golpes registrados</span>';
+    const totalGames = st.wins + st.losses;
+    const winrate = totalGames ? Math.round((st.wins/totalGames)*100) : null;
+    const nicksForThis = Array.from(new Set(allNicknames.filter(n=>n.species===name).map(n=>n.nickname))).slice(0,5);
+
+    return `<div class="poke-card">
+      <div class="poke-name">${escapeHtml(name)}</div>
+      <div class="poke-stat-row"><span>Apareceu</span><b>${st.total}x (${overallPct}% dos sorteios)</b></div>
+      <div class="poke-stat-row"><span>Como escolha livre</span><b>${freePct}%</b></div>
+      <div class="free-bar"><div class="free-bar-fill" style="width:${freePct}%"></div></div>
+      <div class="poke-stat-row" style="margin-top:8px;"><span>Winrate do time*</span><b style="color:var(--tera-amber);">${winrate!==null ? winrate+'% ('+st.wins+'V-'+st.losses+'D)' : '—'}</b></div>
+      <div class="poke-stat-row"><span>Ability mais comum</span><b>${topAbility ? escapeHtml(topAbility[0]) : '—'}</b></div>
+      <div class="poke-moves">
+        <div class="label">Golpes mais usados</div>
+        ${movesHtml}
+      </div>
+      ${nicksForThis.length ? `<div class="poke-moves"><div class="label">Apelidos vistos</div><span style="font-size:11.5px;color:var(--text-dim);">${nicksForThis.map(n=>escapeHtml(n)).join(', ')}</span></div>` : ''}
+    </div>`;
+  }).join('');
+
+  pagination.innerHTML = `
+    <button class="page-btn" onclick="changePokemonPage(-1)" ${pokemonPage<=1 ? 'disabled' : ''}>← Anterior</button>
+    <span class="page-info">Página ${pokemonPage} de ${totalPages} (${entries.length} Pokémon)</span>
+    <button class="page-btn" onclick="changePokemonPage(1)" ${pokemonPage>=totalPages ? 'disabled' : ''}>Próxima →</button>
+  `;
+}
+
+let playerStats = {};
+let playerProfiles = {};
+let currentTrophies = null;
+let eloRatings = {};
+let currentStreaks = {};
+// aggregatePlayers(rows) agora vive em showdown-utils.js (partilhado com perfil.html)
+
+function renderPlayerHighlights(){
+  const card = document.getElementById('playerHighlightsCard');
+  const entries = Object.entries(playerStats);
+  const distinctCount = entries.length;
+  const topWins = entries.slice().sort((a,b)=>b[1].wins-a[1].wins)[0];
+  const topTitles = entries.slice().sort((a,b)=>b[1].titles-a[1].titles)[0];
+  const eligibleForWinrate = entries.filter(([,s])=>(s.wins+s.losses)>=3);
+  const topWinrate = eligibleForWinrate.sort((a,b)=>(b[1].wins/(b[1].wins+b[1].losses)) - (a[1].wins/(a[1].wins+a[1].losses)))[0];
+  const topEloEntry = Object.entries(eloRatings).sort((a,b)=>b[1]-a[1])[0];
+  const winStreaks = Object.entries(currentStreaks).filter(([,s])=>s.type==='win' && s.count>=2).sort((a,b)=>b[1].count-a[1].count);
+  const topStreak = winStreaks[0];
+
+  let html = `<h2>Resumo geral</h2><div class="highlight-grid">`;
+  html += `<div class="highlight-box"><div class="label">Torneios</div><div class="value">${totalTournaments}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Jogadores distintos</div><div class="value">${distinctCount}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Nº1 do ranking (Elo)</div><div class="value">${topEloEntry?topEloEntry[0]:'—'}</div><div class="sub">${topEloEntry?topEloEntry[1]+' pontos':''}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Mais vitórias</div><div class="value">${topWins?topWins[0]:'—'}</div><div class="sub">${topWins?topWins[1].wins+' vitórias':''}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Mais títulos</div><div class="value">${topTitles&&topTitles[1].titles>0?topTitles[0]:'—'}</div><div class="sub">${topTitles&&topTitles[1].titles>0?topTitles[1].titles+' título(s)':''}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">🔥 Em sequência</div><div class="value">${topStreak?topStreak[0]:'—'}</div><div class="sub">${topStreak?topStreak[1].count+' vitórias seguidas':''}</div></div>`;
+  html += `</div>`;
+  if(topWinrate){
+    const wr = ((topWinrate[1].wins/(topWinrate[1].wins+topWinrate[1].losses))*100).toFixed(0);
+    html += `<div style="margin-top:10px;font-size:12px;color:var(--text-dim);">Melhor winrate (mín. 3 partidas): <b style="color:var(--tera-cyan);">${topWinrate[0]}</b> — ${wr}%</div>`;
+  }
+  if(!totalTournaments){
+    html += '<div class="empty-state" style="margin-top:16px;">Ainda não há torneios guardados.</div>';
+  }
+  card.innerHTML = html;
+}
+
+const PLAYER_PAGE_SIZE = 12;
+let playerPage = 1;
+
+function onPlayerFilterChange(){
+  playerPage = 1;
+  renderPlayerList();
+}
+
+function changePlayerPage(delta){
+  playerPage += delta;
+  renderPlayerList();
+}
+
+function renderPlayerList(){
+  const grid = document.getElementById('playerGrid');
+  const pagination = document.getElementById('playerPagination');
+  const search = document.getElementById('playerSearchBox').value.trim().toLowerCase();
+  const sortBy = document.getElementById('playerSortSelect').value;
+
+  let entries = Object.entries(playerStats);
+  if(search) entries = entries.filter(([name])=>name.toLowerCase().includes(search));
+
+  if(sortBy === 'elo_desc') entries.sort((a,b)=>(eloRatings[b[0]]||1000) - (eloRatings[a[0]]||1000));
+  else if(sortBy === 'wins_desc') entries.sort((a,b)=>b[1].wins - a[1].wins);
+  else if(sortBy === 'winrate_desc') entries.sort((a,b)=>{
+    const wa = a[1].wins+a[1].losses ? a[1].wins/(a[1].wins+a[1].losses) : 0;
+    const wb = b[1].wins+b[1].losses ? b[1].wins/(b[1].wins+b[1].losses) : 0;
+    return wb - wa;
+  });
+  else if(sortBy === 'titles_desc') entries.sort((a,b)=>b[1].titles - a[1].titles);
+  else if(sortBy === 'matches_desc') entries.sort((a,b)=>(b[1].wins+b[1].losses) - (a[1].wins+a[1].losses));
+  else if(sortBy === 'az') entries.sort((a,b)=>a[0].localeCompare(b[0]));
+
+  if(!entries.length){
+    grid.innerHTML = '<div class="empty-state">Nenhum jogador encontrado.</div>';
+    pagination.innerHTML = '';
+    return;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(entries.length / PLAYER_PAGE_SIZE));
+  if(playerPage > totalPages) playerPage = totalPages;
+  if(playerPage < 1) playerPage = 1;
+  const pageEntries = entries.slice((playerPage-1)*PLAYER_PAGE_SIZE, playerPage*PLAYER_PAGE_SIZE);
+
+  grid.innerHTML = pageEntries.map(([name, st])=>{
+    const matchesPlayed = st.wins + st.losses;
+    const winrate = matchesPlayed ? Math.round((st.wins/matchesPlayed)*100) : 0;
+    const titleChips = Object.entries(st.titlesByTier).map(([tier,c])=>`<span class="title-chip">🏆 ${escapeHtml(tier)} x${c}</span>`).join('');
+    const historyRows = st.tournaments.slice().sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)).map(t=>{
+      const label = t.name || (t.createdAt ? new Date(t.createdAt).toLocaleDateString('pt-BR') : 'Torneio');
+      const cls = t.isChamp ? 'champ' : (t.result.startsWith('Eliminado') ? 'elim' : '');
+      return `<div class="history-row"><span>${escapeHtml(label)} <span style="color:var(--text-faint);">(${escapeHtml(t.tier)})</span></span><span class="res ${cls}">${t.isChamp?'🏆 ':''}${escapeHtml(t.result)}</span></div>`;
+    }).join('');
+
+    const profile = playerProfiles[name] || {};
+    const displayName = profile.nickname ? profile.nickname : name;
+    const bgCosmetic = profile.equippedBackground ? getCosmeticById(profile.equippedBackground) : null;
+    const frameCosmetic = profile.equippedFrame ? getCosmeticById(profile.equippedFrame) : null;
+    const avatar = avatarHtml(name, profile.photo_url, 34, bgCosmetic ? bgCosmetic.color : null, frameCosmetic ? frameCosmetic.effect : null, bgCosmetic ? !!bgCosmetic.multiColor : false);
+
+    return `<div class="player-card">
+      <div class="player-card-head">
+        <a href="perfil.html?jogador=${encodeURIComponent(name)}" style="display:flex;align-items:center;gap:10px;text-decoration:none;" onmouseover="showHoverCard(event,'${name.replace(/'/g,"\\'")}')" onmousemove="positionHoverCard(event)" onmouseout="hideHoverCard()">
+          ${avatar}
+          <span>
+            <span class="player-card-name" style="color:${profile.equippedAccent && getCosmeticById(profile.equippedAccent) ? getCosmeticById(profile.equippedAccent).color : 'var(--text-main)'};">${trophyEmojiFor(name, currentTrophies)} ${escapeHtml(displayName)}</span>
+            ${profile.nickname ? `<div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(name)}</div>` : ''}
+          </span>
+        </a>
+        ${titleChips || ''}
+      </div>
+      <div class="player-stat-grid">
+        <div class="player-stat-box"><div class="n" style="color:var(--tera-amber);">${eloRatings[name] || 1000}</div><div class="l">Elo</div></div>
+        <div class="player-stat-box"><div class="n">${st.tournaments.length}</div><div class="l">Torneios</div></div>
+        <div class="player-stat-box"><div class="n">${st.wins}</div><div class="l">Vitórias</div></div>
+        <div class="player-stat-box"><div class="n">${st.losses}</div><div class="l">Derrotas</div></div>
+        <div class="player-stat-box"><div class="n">${winrate}%</div><div class="l">Winrate</div></div>
+      </div>
+      <details>
+        <summary class="history-toggle">Ver histórico de participação</summary>
+        <div class="history-list">${historyRows || '<div class="empty-state">Sem histórico.</div>'}</div>
+      </details>
+    </div>`;
+  }).join('');
+
+  pagination.innerHTML = `
+    <button class="page-btn" onclick="changePlayerPage(-1)" ${playerPage<=1 ? 'disabled' : ''}>← Anterior</button>
+    <span class="page-info">Página ${playerPage} de ${totalPages} (${entries.length} jogador(es))</span>
+    <button class="page-btn" onclick="changePlayerPage(1)" ${playerPage>=totalPages ? 'disabled' : ''}>Próxima →</button>
+  `;
+}
+
+pageBoot();
+</script>
+</body>
+</html>

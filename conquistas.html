@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conquistas — Torneio Showdown - VSE</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-void:#0a0c14; --bg-panel:#12151f; --bg-card:#171b28;
+  --line:#262c3e; --tera-cyan:#4fd8d0; --tera-violet:#a56bf0; --tera-amber:#f0b64f;
+  --text-main:#e9ecf5; --text-dim:#8b91a8; --text-faint:#565d78; --success:#5ed890; --danger:#e0607a;
+}
+body.light-theme{
+  --bg-void:#f5f6fa; --bg-panel:#ffffff; --bg-card:#eef0f6;
+  --line:#dcdfe8; --tera-cyan:#0e9488; --tera-violet:#7c4dc4; --tera-amber:#b8860b;
+  --text-main:#1a1d29; --text-dim:#4a5068; --text-faint:#8890a8; --success:#1a9d5c; --danger:#c23f5a;
+}
+.theme-toggle{
+  position:fixed;top:16px;right:16px;z-index:900;background:var(--bg-panel);border:1px solid var(--line);
+  color:var(--text-main);width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:16px;
+}
+.theme-toggle:hover{border-color:var(--tera-cyan);}
+.player-corner-badge{
+  position:fixed;top:16px;left:16px;z-index:900;display:flex;align-items:center;gap:8px;
+  background:var(--bg-panel);border:1px solid var(--line);border-radius:20px;padding:5px 12px 5px 5px;
+  text-decoration:none;color:var(--text-main);font-family:'Chakra Petch',sans-serif;font-size:12.5px;font-weight:600;
+}
+.player-corner-badge:hover{border-color:var(--tera-cyan);}
+.daily-bonus-icon{
+  position:fixed;top:82px;left:16px;z-index:899;width:38px;height:38px;border-radius:10px;
+  background:var(--bg-panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
+  font-size:16px;opacity:0.3;filter:grayscale(1);cursor:default;padding:0;
+}
+.daily-bonus-icon.available{
+  opacity:1;filter:none;cursor:pointer;border-color:var(--tera-amber);
+  box-shadow:0 0 12px rgba(240,182,79,0.4);animation:vseGiftPulse 1.6s ease-in-out infinite;
+}
+@keyframes vseGiftPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
+*{box-sizing:border-box;}
+body{
+  margin:0;background:var(--bg-void);
+  background-image:radial-gradient(circle at 15% 8%, rgba(165,107,240,0.10), transparent 40%),
+    radial-gradient(circle at 85% 92%, rgba(79,216,208,0.08), transparent 40%);
+  color:var(--text-main);font-family:'Inter',sans-serif;min-height:100vh;padding:0 0 60px 0;
+  transition:background-color .2s, color .2s;
+}
+.wrap{max-width:820px;margin:0 auto;padding:32px 20px;}
+.header{display:flex;align-items:center;gap:16px;margin-bottom:8px;}
+.crystal{width:38px;height:38px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));
+  clip-path:polygon(50% 0%, 100% 30%, 82% 100%, 18% 100%, 0% 30%);}
+h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0;letter-spacing:0.5px;}
+.subtitle{color:var(--text-dim);font-size:13px;margin:14px 0 6px 0;}
+.nav-link{color:var(--tera-cyan);font-size:12.5px;text-decoration:none;font-family:'Chakra Petch',sans-serif;}
+.nav-link:hover{text-decoration:underline;}
+.status-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);margin:14px 0 20px 0;}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
+.status-dot.on{background:var(--success);}
+.status-dot.off{background:var(--danger);}
+
+.card{background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px;}
+.card h2{font-family:'Chakra Petch',sans-serif;font-size:15px;margin:0 0 14px 0;color:var(--text-main);
+  display:flex;align-items:center;gap:8px;}
+.card h2::before{content:'';width:4px;height:15px;background:var(--tera-violet);border-radius:2px;}
+select{width:100%;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);
+  border-radius:8px;color:var(--text-main);font-family:'Inter',sans-serif;font-size:14px;margin-bottom:6px;}
+select:focus{outline:none;border-color:var(--tera-cyan);}
+
+.progress-bar{width:100%;height:8px;background:var(--bg-card);border-radius:4px;overflow:hidden;margin:10px 0;}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--tera-cyan),var(--tera-violet));border-radius:4px;transition:width .3s;}
+
+.achv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}
+.achv-grid-fixed{grid-template-rows:repeat(2,1fr);}
+.achv-tier-section{background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px;}
+.achv-tier-header{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.tier-pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;}
+.page-btn{background:var(--bg-panel);border:1px solid var(--line);color:var(--text-dim);padding:6px 14px;
+  border-radius:8px;cursor:pointer;font-family:'Chakra Petch',sans-serif;font-size:13px;}
+.page-btn:hover:not(:disabled){border-color:var(--tera-cyan);color:var(--tera-cyan);}
+.page-btn:disabled{opacity:0.35;cursor:not-allowed;}
+.page-info{font-size:12px;color:var(--text-faint);}
+.achv-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start;position:relative;}
+.achv-card.earned{border-color:rgba(240,182,79,0.35);background:linear-gradient(135deg,rgba(240,182,79,0.06),rgba(165,107,240,0.04));}
+.achv-emoji{font-size:30px;flex-shrink:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+  background:var(--bg-panel);border-radius:10px;}
+.achv-card.earned .achv-emoji{background:rgba(240,182,79,0.12);}
+.achv-name{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;margin-bottom:4px;padding-right:28px;}
+.achv-card.earned .achv-name{color:var(--tera-amber);}
+.achv-desc{font-size:12px;color:var(--text-dim);line-height:1.4;}
+.achv-status{font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;margin-top:6px;font-weight:700;}
+.achv-status.earned{color:var(--success);}
+.achv-status.locked{color:var(--text-faint);}
+.pin-btn{
+  position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:50%;
+  background:var(--bg-panel);border:1px solid var(--line);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .15s;padding:0;
+}
+.pin-btn:hover{border-color:var(--tera-amber);transform:scale(1.12);}
+.pin-btn.featured{
+  background:linear-gradient(135deg,var(--tera-amber),#c98f2e);border-color:var(--tera-amber);
+  box-shadow:0 0 10px rgba(240,182,79,0.5);
+}
+.secret-badge{font-size:11px;filter:drop-shadow(0 0 3px rgba(165,107,240,0.6));}
+
+.empty-state{color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;}
+.footer-note{color:var(--text-faint);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.5;}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro">🌙</button>
+<div id="playerCornerContainer"></div>
+
+<div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
+    <h2>Entrar</h2>
+    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Nome</label>
+    <select id="gateNameSelect"><option value="">— carregando jogadores —</option></select>
+    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Password</label>
+    <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()" style="width:100%;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);border-radius:8px;color:var(--text-main);font-size:14px;margin-bottom:6px;">
+    <button class="theme-toggle" style="position:static;width:100%;height:auto;padding:11px 20px;border-radius:8px;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));color:#0a0c14;border:none;font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:13.5px;cursor:pointer;margin-top:4px;" onclick="doGateLogin()">Entrar</button>
+    <div id="gateError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;"></div>
+  </div>
+</div>
+
+<div id="mainContent" class="wrap" style="display:none;">
+  <div class="header">
+    <div class="crystal"></div>
+    <div><h1>Conquistas</h1></div>
+  </div>
+  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="perfil.html">Meu perfil</a> &nbsp;|&nbsp; <a class="nav-link" href="estatisticas.html">Estatísticas</a> &nbsp;|&nbsp; <a class="nav-link" href="hall-da-fama.html">Hall da Fama</a></div>
+  <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
+
+  <div class="card">
+    <h2>A ver as conquistas de</h2>
+    <select id="playerSelect" onchange="onPlayerChange()"></select>
+    <div id="progressLabel" style="font-size:12.5px;color:var(--text-dim);margin-top:4px;"></div>
+    <div class="progress-bar"><div class="progress-bar-fill" id="progressBarFill" style="width:0%;"></div></div>
+  </div>
+
+  <div class="card">
+    <h2>🎖️ Todas as conquistas</h2>
+    <div style="font-size:11px;color:var(--text-faint);margin-bottom:14px;">Clique no 📌 de uma conquista já desbloqueada para a destacar no seu perfil (até <span id="maxFeaturedLabel">?</span> ao mesmo tempo).</div>
+    <div id="achievementsGrid" class="achv-grid"><div class="empty-state">A carregar…</div></div>
+  </div>
+
+  <div class="footer-note">As conquistas desbloqueiam-se sozinhas por mérito, sem custar moedas — diferente dos emblemas da loja. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
+</div>
+
+<script src="showdown-utils.js"></script>
+<script>
+initTheme();
+document.getElementById('maxFeaturedLabel').textContent = MAX_FEATURED_ACHIEVEMENTS;
+const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+
+let loggedInPlayerName = null;
+let allRows = [];
+let playerStats = {};
+let playerProfiles = {};
+
+async function doGateLogin(){
+  const name = document.getElementById('gateNameSelect').value;
+  const password = document.getElementById('gatePassword').value;
+  const errEl = document.getElementById('gateError');
+  errEl.style.display = 'none';
+  if(!name){ errEl.textContent = 'Selecione o seu nome.'; errEl.style.display='block'; return; }
+  if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
+  const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
+  if(!result.ok){
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registrado pelo organizador.'
+      : result.reason==='wrongpass' ? 'Password incorreta.'
+      : 'Erro ao ligar à base de dados.';
+    errEl.style.display = 'block';
+    return;
+  }
+  localStorage.setItem('player_login_name', name);
+  loggedInPlayerName = name;
+  unlockContent();
+}
+
+function unlockContent(){
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  init();
+}
+
+function doPlayerLogout(){
+  localStorage.removeItem('player_login_name');
+  loggedInPlayerName = null;
+  document.getElementById('gatePassword').value = '';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('authGate').style.display = 'flex';
+}
+
+async function pageBoot(){
+  const sel = document.getElementById('gateNameSelect');
+  try{
+    const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
+    names.forEach(n=>{
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+    const saved = localStorage.getItem('player_login_name');
+    if(saved && names.includes(saved)){
+      loggedInPlayerName = saved;
+      unlockContent();
+    }
+  } catch(e){
+    sel.innerHTML = '<option value="">— erro ao carregar jogadores —</option>';
+  }
+}
+
+function sbHeaders(){
+  return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+}
+function setStatus(ok, text){
+  document.getElementById('statusDot').className = 'status-dot ' + (ok?'on':'off');
+  document.getElementById('statusText').textContent = text;
+}
+
+let dailyBonusClaimInFlight = false;
+async function handleDailyBonusClick(){
+  // Trava do lado do cliente: ignora cliques repetidos enquanto o pedido
+  // anterior ainda está a decorrer, para nem sequer disparar pedidos extra
+  // à base de dados (a proteção definitiva está em claimDailyBonus, que já
+  // é segura mesmo com vários pedidos em paralelo — isto é só para poupar
+  // chamadas desnecessárias e dar feedback visual imediato).
+  if(dailyBonusClaimInFlight) return;
+  dailyBonusClaimInFlight = true;
+  const icon = document.getElementById('dailyBonusIcon');
+  if(icon) icon.classList.remove('available');
+  try{
+    const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+    if(result.awarded){
+      showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
+    }
+  } finally {
+    dailyBonusClaimInFlight = false;
+  }
+}
+
+function getRequestedPlayerName(){
+  const params = new URLSearchParams(window.location.search);
+  return params.get('jogador') || loggedInPlayerName;
+}
+
+async function init(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    allRows = await res.json();
+    setStatus(true, `Ligado — ${allRows.length} torneio(s) encontrados.`);
+    playerStats = aggregatePlayers(allRows);
+    const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    playerProfiles = profiles;
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
+    checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
+      document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
+    });
+
+    const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sel = document.getElementById('playerSelect');
+    sel.innerHTML = names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+    const requested = getRequestedPlayerName();
+    if(requested && names.includes(requested)) sel.value = requested;
+
+    renderAchievements();
+  } catch(e){
+    setStatus(false, 'Não foi possível ligar à base de dados.');
+  }
+}
+
+function onPlayerChange(){
+  renderAchievements();
+}
+
+let tierPages = { bronze:1, silver:1, gold:1 };
+const ACHIEVEMENTS_PER_PAGE = 6;
+let lastRenderedEarned = new Set();
+let lastRenderedIsOwn = false;
+let lastRenderedFeatured = [];
+
+async function renderAchievements(){
+  const name = document.getElementById('playerSelect').value;
+  if(!name) return;
+  const stats = playerStats[name] || { wins:0, losses:0, titles:0, titlesByTier:{}, tournaments:[] };
+  const streak = computeAllCurrentStreaks(allRows)[name] || null;
+  const grid = document.getElementById('achievementsGrid');
+  grid.innerHTML = '<div class="empty-state">A calcular…</div>';
+  const earned = await computeAllAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, stats, streak, allRows, playerProfiles[name] || {});
+  const isOwn = name === loggedInPlayerName;
+  const featured = (playerProfiles[name] && playerProfiles[name].featuredAchievements) || [];
+
+  lastRenderedEarned = earned;
+  lastRenderedIsOwn = isOwn;
+  lastRenderedFeatured = featured;
+  tierPages = { bronze:1, silver:1, gold:1 }; // volta à primeira página sempre que troca de jogador
+
+  document.getElementById('progressLabel').textContent = `${earned.size} de ${ACHIEVEMENTS.length} conquistas desbloqueadas`;
+  const pct = Math.round((earned.size / ACHIEVEMENTS.length) * 100);
+  document.getElementById('progressBarFill').style.width = pct + '%';
+
+  renderTierGrid();
+}
+
+const tierMeta = {
+  bronze: { label: '🥉 Bronze', color: '#cd7f32' },
+  silver: { label: '🥈 Prata', color: '#c0c0c0' },
+  gold:   { label: '🥇 Ouro', color: '#f0b64f' }
+};
+
+function achievementCardHtml(a){
+  const earned = lastRenderedEarned, isOwn = lastRenderedIsOwn, featured = lastRenderedFeatured;
+  const has = earned.has(a.id);
+  const isFeatured = featured.includes(a.id);
+  const pinBtn = (isOwn && has)
+    ? `<button class="pin-btn${isFeatured?' featured':''}" onclick="doToggleFeatured('${a.id}')" title="${isFeatured ? 'Em destaque — clique para remover' : `Destacar no perfil (até ${MAX_FEATURED_ACHIEVEMENTS})`}">📌</button>`
+    : '';
+  return `<div class="achv-card ${has?'earned':''}">
+    ${pinBtn}
+    <div class="achv-emoji">${has ? a.emoji : '🔒'}</div>
+    <div style="flex:1;">
+      <div class="achv-name">${escapeHtml(a.name)}${has && a.secret ? ' <span class="secret-badge" title="Esta era uma conquista secreta">🕵️</span>' : ''}</div>
+      <div class="achv-desc">${escapeHtml(a.desc)}</div>
+      <div class="achv-status ${has?'earned':'locked'}">${has ? '✓ Desbloqueada' : 'Por desbloquear'}${isFeatured ? ' · ⭐ Em destaque' : ''}</div>
+    </div>
+  </div>`;
+}
+
+function changeTierPage(tierKey, delta){
+  tierPages[tierKey] += delta;
+  renderTierGrid();
+}
+
+function renderTierGrid(){
+  const grid = document.getElementById('achievementsGrid');
+  const earned = lastRenderedEarned;
+
+  grid.innerHTML = ['bronze','silver','gold'].map(tierKey=>{
+    const tierAchievements = ACHIEVEMENTS.filter(a=>a.tier===tierKey && (!a.secret || earned.has(a.id)));
+    if(!tierAchievements.length) return '';
+    const totalInTier = ACHIEVEMENTS.filter(a=>a.tier===tierKey).length;
+    const tierEarnedCount = ACHIEVEMENTS.filter(a=>a.tier===tierKey).filter(a=>earned.has(a.id)).length;
+    const meta = tierMeta[tierKey];
+
+    const totalPages = Math.max(1, Math.ceil(tierAchievements.length / ACHIEVEMENTS_PER_PAGE));
+    if(tierPages[tierKey] > totalPages) tierPages[tierKey] = totalPages;
+    if(tierPages[tierKey] < 1) tierPages[tierKey] = 1;
+    const startIdx = (tierPages[tierKey]-1) * ACHIEVEMENTS_PER_PAGE;
+    const pageItems = tierAchievements.slice(startIdx, startIdx + ACHIEVEMENTS_PER_PAGE);
+
+    const arrows = totalPages > 1 ? `
+      <div class="tier-pagination">
+        <button class="page-btn" onclick="changeTierPage('${tierKey}',-1)" ${tierPages[tierKey]<=1?'disabled':''}>←</button>
+        <span class="page-info">${tierPages[tierKey]} / ${totalPages}</span>
+        <button class="page-btn" onclick="changeTierPage('${tierKey}',1)" ${tierPages[tierKey]>=totalPages?'disabled':''}>→</button>
+      </div>` : '';
+
+    return `<div class="achv-tier-section">
+      <div class="achv-tier-header">
+        <span style="color:${meta.color};">${meta.label}</span>
+        <span style="font-size:11px;color:var(--text-faint);font-weight:400;">(${tierEarnedCount}/${totalInTier})</span>
+      </div>
+      <div class="achv-grid achv-grid-fixed">${pageItems.map(achievementCardHtml).join('')}</div>
+      ${arrows}
+    </div>`;
+  }).join('');
+
+  const undiscoveredSecrets = ACHIEVEMENTS.filter(a=>a.secret && !earned.has(a.id)).length;
+  if(undiscoveredSecrets > 0){
+    grid.innerHTML += `<div class="empty-state" style="margin-top:8px;">🔒 ${undiscoveredSecrets} conquista(s) secreta(s) ainda por descobrir — não aparecem aqui até serem desbloqueadas.</div>`;
+  }
+}
+
+async function doToggleFeatured(achievementId){
+  const featured = (playerProfiles[loggedInPlayerName] && playerProfiles[loggedInPlayerName].featuredAchievements) || [];
+  const result = await toggleFeaturedAchievement(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, achievementId, featured);
+  if(!result.ok){
+    if(result.reason === 'limit') alert(`Só pode destacar até ${MAX_FEATURED_ACHIEVEMENTS} conquistas ao mesmo tempo. Remova uma antes de adicionar outra.`);
+    else alert('Não foi possível atualizar. Tente novamente.');
+    return;
+  }
+  playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+  renderAchievements();
+}
+
+pageBoot();
+</script>
+</body>
+</html>
