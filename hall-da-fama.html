@@ -110,6 +110,32 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
 .runner-up a{color:var(--text-dim);text-decoration:none;}
 .runner-up a:hover{text-decoration:underline;}
 
+.spotlight-card{
+  background:linear-gradient(160deg,var(--bg-card),var(--bg-panel));
+  border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:14px;
+  position:relative;overflow:hidden;
+}
+.spotlight-card::before{
+  content:'';position:absolute;top:0;left:0;width:4px;height:100%;
+  background:linear-gradient(180deg,var(--tera-cyan),var(--tera-violet));
+}
+.spotlight-title{
+  font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:19px;
+  color:var(--text-main);margin-bottom:8px;
+}
+.spotlight-meta{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;
+  color:var(--text-dim);margin-bottom:10px;
+}
+.spotlight-card .champ-row{margin-bottom:14px;}
+.spotlight-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));color:#0a0c14;
+  border:none;padding:9px 18px;border-radius:8px;font-family:'Chakra Petch',sans-serif;font-weight:700;
+  font-size:13px;text-decoration:none;
+}
+.spotlight-btn:hover{filter:brightness(1.08);}
+
 .empty-state{color:var(--text-faint);font-size:13px;text-align:center;padding:30px 0;}
 .footer-note{color:var(--text-faint);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.5;}
 </style>
@@ -141,6 +167,7 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
   <div class="tabs">
     <button class="tab-btn active" onclick="switchHofTab('torneios')">Torneios</button>
     <button class="tab-btn" onclick="switchHofTab('apelidos')">Apelidos</button>
+    <button class="tab-btn" onclick="switchHofTab('melhorpartida')">Melhor Partida</button>
   </div>
 
   <div id="panel-torneios" class="hof-panel active">
@@ -169,6 +196,14 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
       <input type="text" id="nicknameSearchBox" placeholder="Procurar por apelido, Pokémon ou jogador..." style="margin-bottom:12px;" oninput="onNicknameFilterChange()">
       <div id="nicknameHallContainer"><div class="empty-state">A carregar…</div></div>
       <div id="nicknamePagination" class="pagination"></div>
+    </div>
+  </div>
+
+  <div id="panel-melhorpartida" class="hof-panel">
+    <div class="card">
+      <h2>🎬 Melhor Partida de Cada Torneio</h2>
+      <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:14px;">Escolhida à mão pelo organizador — a partida mais marcante de cada torneio, com o replay para reviver.</div>
+      <div id="featuredMatchContainer"><div class="empty-state">A carregar…</div></div>
     </div>
   </div>
 
@@ -276,14 +311,14 @@ const NICKNAMES_PER_PAGE = 12;
 function switchHofTab(tab){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.hof-panel').forEach(p=>p.classList.remove('active'));
-  const map = {torneios:0, apelidos:1};
+  const map = {torneios:0, apelidos:1, melhorpartida:2};
   document.querySelectorAll('.tab-btn')[map[tab]].classList.add('active');
   document.getElementById('panel-'+tab).classList.add('active');
 }
 
 async function init(){
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data,featured_match_title,featured_match_replay_path&order=created_at.desc`, {headers: sbHeaders()});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows = await res.json();
     allTournamentRows = rows;
@@ -296,11 +331,13 @@ async function init(){
     populateHofTierFilter(rows);
     renderTimeline(rows);
     renderMvpList(rows);
+    renderFeaturedMatches(rows);
     allNicknames = aggregateNicknames(rows);
     renderNicknameHall();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
     document.getElementById('timelineContainer').innerHTML = '<div class="empty-state">Erro ao carregar dados.</div>';
+    document.getElementById('featuredMatchContainer').innerHTML = '<div class="empty-state">Erro ao carregar dados.</div>';
   }
 }
 
@@ -440,6 +477,30 @@ function renderTimeline(rows){
       </div>
     </div>`;
   }).join('') + `</div>`;
+}
+
+function renderFeaturedMatches(rows){
+  const container = document.getElementById('featuredMatchContainer');
+  const featured = rows.filter(r => r.featured_match_title && r.featured_match_replay_path);
+  if(!featured.length){
+    container.innerHTML = '<div class="empty-state">Ainda não há nenhuma partida em destaque escolhida.</div>';
+    return;
+  }
+  container.innerHTML = featured.map(r=>{
+    const data = r.data || {};
+    const date = r.created_at ? new Date(r.created_at).toLocaleDateString('pt-BR') : '';
+    const tournamentName = data.name || `Torneio (${r.tier || '?'})`;
+    return `<div class="spotlight-card">
+      <div class="spotlight-title">${escapeHtml(r.featured_match_title)}</div>
+      <div class="spotlight-meta">
+        <span class="tier-pill">${escapeHtml(r.tier||'?')}</span>
+        <span>${escapeHtml(tournamentName)}</span>
+        <span style="color:var(--text-faint);">${date}</span>
+      </div>
+      ${data.champion ? `<div class="champ-row">🏆 <a href="perfil.html?jogador=${encodeURIComponent(data.champion)}">${displayName(data.champion)}</a></div>` : ''}
+      <a class="spotlight-btn" href="${escapeHtml(r.featured_match_replay_path)}" target="_blank" rel="noopener">▶ Assistir Replay</a>
+    </div>`;
+  }).join('');
 }
 
 pageBoot();
