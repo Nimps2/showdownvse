@@ -544,6 +544,8 @@ function renderHighlights(){
   const distinctCount = Object.keys(pokeStats).length;
   const topMoveEntry = Object.entries(globalMoves).sort((a,b)=>b[1]-a[1])[0];
   const topPokeEntry = Object.entries(pokeStats).sort((a,b)=>b[1].total-a[1].total)[0];
+  const eligibleForLucky = Object.entries(pokeStats).filter(([,s])=>(s.wins+s.losses)>=3);
+  const topLucky = eligibleForLucky.sort((a,b)=>(b[1].wins/(b[1].wins+b[1].losses)) - (a[1].wins/(a[1].wins+a[1].losses)))[0];
 
   let html = `<h2>Resumo geral</h2><div class="highlight-grid">`;
   html += `<div class="highlight-box"><div class="label">Torneios</div><div class="value">${totalTournaments}</div></div>`;
@@ -551,6 +553,10 @@ function renderHighlights(){
   html += `<div class="highlight-box"><div class="label">Pokémon mais usado</div><div class="value">${topPokeEntry?topPokeEntry[0]:'—'}</div><div class="sub">${topPokeEntry?topPokeEntry[1].total+' vezes':''}</div></div>`;
   html += `<div class="highlight-box"><div class="label">Golpe mais visto</div><div class="value">${topMoveEntry?topMoveEntry[0]:'—'}</div><div class="sub">${topMoveEntry?topMoveEntry[1]+' vezes':''}</div></div>`;
   html += `</div>`;
+  if(topLucky){
+    const wr = ((topLucky[1].wins/(topLucky[1].wins+topLucky[1].losses))*100).toFixed(0);
+    html += `<div style="margin-top:10px;font-size:12px;color:var(--text-dim);">🍀 Pokémon da sorte (mín. 3 partidas do time em que saiu): <b style="color:var(--tera-cyan);">${topLucky[0]}</b> — ${wr}% de vitórias em ${topLucky[1].wins+topLucky[1].losses} partida(s)</div>`;
+  }
   if(!totalTournaments){
     html += '<div class="empty-state" style="margin-top:16px;">Ainda não há torneios guardados.</div>';
   }

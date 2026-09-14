@@ -245,6 +245,32 @@ select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
       <h2>💝 Ranking de Generosidade</h2>
       <div id="generosityList"><div class="empty-state">A carregar…</div></div>
     </div>
+
+    <div class="card">
+      <h2>🔄 Trocar Cosmético</h2>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">Ofereça um cosmético seu a outro jogador, pedindo moedas ou um item específico dele em troca. Só se concretiza se a outra pessoa aceitar.</div>
+      <label>O que você oferece</label>
+      <select id="tradeOfferItemSelect"></select>
+      <label>Para quem</label>
+      <select id="tradeTargetSelect" onchange="renderTradeRequestItemOptions()"></select>
+      <label>O que você pede em troca</label>
+      <select id="tradeRequestType" onchange="onTradeRequestTypeChange()">
+        <option value="coins">Moedas</option>
+        <option value="item">Um item específico dele(a)</option>
+      </select>
+      <input type="number" id="tradeRequestCoins" placeholder="Quantas moedas?" min="1">
+      <select id="tradeRequestItemSelect" style="display:none;"></select>
+      <button class="btn-primary" onclick="doCreateTradeOffer()">Enviar proposta</button>
+      <div id="tradeOfferResult" style="margin-top:10px;font-size:12.5px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>📥 Propostas de Troca</h2>
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Recebidas</div>
+      <div id="tradeIncomingList"><div class="empty-state">A carregar…</div></div>
+      <div style="font-size:11px;color:var(--text-faint);margin:14px 0 10px 0;text-transform:uppercase;letter-spacing:0.5px;">Enviadas por você</div>
+      <div id="tradeOutgoingList"><div class="empty-state">A carregar…</div></div>
+    </div>
   </div>
 
   <!-- ==================== SORTE ==================== -->
@@ -437,6 +463,7 @@ async function init(){
     renderLottery();
     renderPastLotteryRounds();
     renderHouseFundDisplay();
+    refreshTradeOffers();
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
   }
@@ -494,6 +521,14 @@ function renderAll(){
   document.getElementById('generosityList').innerHTML = generosityRanking.length
     ? generosityRanking.map(([gname, total], i)=>`<div class="history-row"><span><span style="color:var(--text-faint);font-family:'Chakra Petch',sans-serif;margin-right:8px;">#${i+1}</span>${escapeHtml(gname)}</span><b style="color:var(--tera-amber);">🪙 ${total} doado(s)</b></div>`).join('')
     : '<div class="empty-state">Ainda ninguém presenteou moedas a outro jogador.</div>';
+
+  const myTradeableItems = getTradeableOwnedItems(myProfile);
+  document.getElementById('tradeOfferItemSelect').innerHTML = myTradeableItems.length
+    ? myTradeableItems.map(it=>`<option value="${it.id}">${escapeHtml(it.name)}</option>`).join('')
+    : '<option value="">— você não tem itens elegíveis para trocar —</option>';
+  const tradeTargetSel = document.getElementById('tradeTargetSelect');
+  tradeTargetSel.innerHTML = '<option value="">— selecione um jogador —</option>' + otherNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  renderTradeRequestItemOptions();
 
   // Sorte — histórico e ranking da roleta
   document.getElementById('rouletteHistoryList').innerHTML = rouletteHistory.length
@@ -904,6 +939,83 @@ async function doGiftSurpriseCosmetic(){
   resultDiv.innerHTML = `<span style="color:var(--success);font-family:'Chakra Petch',sans-serif;font-weight:700;">🎀 Enviaste "${escapeHtml(result.item.name)}" para ${escapeHtml(targetName)}!</span>`;
   await refreshAfterSpend();
   logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Deu um Presente Surpresa a ${targetName}: "${result.item.name}" (🪙${SURPRISE_GIFT_PRICE})`);
+}
+
+function onTradeRequestTypeChange(){
+  const type = document.getElementById('tradeRequestType').value;
+  document.getElementById('tradeRequestCoins').style.display = type==='coins' ? 'block' : 'none';
+  document.getElementById('tradeRequestItemSelect').style.display = type==='item' ? 'block' : 'none';
+}
+
+function renderTradeRequestItemOptions(){
+  const target = document.getElementById('tradeTargetSelect').value;
+  const sel = document.getElementById('tradeRequestItemSelect');
+  const items = getTradeableOwnedItems(playerProfiles[target]);
+  sel.innerHTML = items.length
+    ? items.map(it=>`<option value="${it.id}">${escapeHtml(it.name)}</option>`).join('')
+    : '<option value="">— esse jogador não tem itens elegíveis —</option>';
+}
+
+async function doCreateTradeOffer(){
+  const offeredItemId = document.getElementById('tradeOfferItemSelect').value;
+  const targetName = document.getElementById('tradeTargetSelect').value;
+  const type = document.getElementById('tradeRequestType').value;
+  const resultDiv = document.getElementById('tradeOfferResult');
+  if(!offeredItemId){ alert('Escolha um item seu para oferecer.'); return; }
+  if(!targetName){ alert('Escolha um jogador.'); return; }
+  let requestedCoins = null, requestedItemId = null;
+  if(type === 'coins'){
+    requestedCoins = parseInt(document.getElementById('tradeRequestCoins').value, 10);
+    if(!requestedCoins || requestedCoins <= 0){ alert('Digite uma quantidade de moedas válida.'); return; }
+  } else {
+    requestedItemId = document.getElementById('tradeRequestItemSelect').value;
+    if(!requestedItemId){ alert('Escolha um item para pedir em troca.'); return; }
+  }
+  const result = await createTradeOffer(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, targetName, offeredItemId, requestedCoins, requestedItemId);
+  if(!result.ok){ resultDiv.innerHTML = '<span style="color:var(--danger);">Não foi possível enviar a proposta. Tente novamente.</span>'; return; }
+  resultDiv.innerHTML = '<span style="color:var(--success);">Proposta enviada!</span>';
+  await refreshTradeOffers();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Propôs troca com ${targetName}`);
+}
+
+let pendingTradeOffers = [];
+function tradeOfferAskLabel(offer){
+  return offer.requested_coins ? `🪙${offer.requested_coins}` : escapeHtml((getCosmeticById(offer.requested_item_id)||{}).name || '—');
+}
+
+async function refreshTradeOffers(){
+  const { incoming, outgoing } = await fetchTradeOffers(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+  pendingTradeOffers = incoming.concat(outgoing);
+
+  document.getElementById('tradeIncomingList').innerHTML = incoming.length ? incoming.map(o=>{
+    const itemName = escapeHtml((getCosmeticById(o.offered_item_id)||{}).name || o.offered_item_id);
+    return `<div class="history-row"><span>${escapeHtml(o.from_name)} oferece <b>${itemName}</b> por ${tradeOfferAskLabel(o)}</span>
+      <span><button class="tiny" onclick="doRespondTrade('${o.id}','accept')">Aceitar</button> <button class="tiny danger" onclick="doRespondTrade('${o.id}','reject')">Recusar</button></span></div>`;
+  }).join('') : '<div class="empty-state">Nenhuma proposta recebida no momento.</div>';
+
+  document.getElementById('tradeOutgoingList').innerHTML = outgoing.length ? outgoing.map(o=>{
+    const itemName = escapeHtml((getCosmeticById(o.offered_item_id)||{}).name || o.offered_item_id);
+    return `<div class="history-row"><span>Você ofereceu <b>${itemName}</b> a ${escapeHtml(o.to_name)} por ${tradeOfferAskLabel(o)}</span>
+      <button class="tiny danger" onclick="doRespondTrade('${o.id}','cancel')">Cancelar</button></div>`;
+  }).join('') : '<div class="empty-state">Nenhuma proposta enviada pendente.</div>';
+}
+
+async function doRespondTrade(offerId, action){
+  const offer = pendingTradeOffers.find(o=>o.id===offerId);
+  if(!offer) return;
+  if(action === 'accept'){
+    const result = await acceptTradeOffer(SUPABASE_URL, SUPABASE_ANON_KEY, offer);
+    if(!result.ok){
+      alert(result.reason==='invalid' ? 'Essa troca já não é possível (o item ou as moedas deixaram de estar disponíveis) — a proposta foi cancelada automaticamente.' : 'Não foi possível concluir a troca. Tente novamente.');
+    } else {
+      alert('Troca concluída!');
+      logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'loja', `Aceitou troca de ${offer.from_name}`);
+    }
+  } else {
+    await setTradeOfferStatus(SUPABASE_URL, SUPABASE_ANON_KEY, offerId, action==='reject'?'rejected':'cancelled');
+  }
+  await refreshAfterSpend();
+  await refreshTradeOffers();
 }
 
 let playerCoinsLocal = 0;

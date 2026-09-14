@@ -806,6 +806,136 @@ async function giftSurpriseCosmetic(supabaseUrl, supabaseAnonKey, fromName, toNa
   return {ok:true, item: won};
 }
 
+// ---------- Troca de Cosméticos entre Jogadores ----------
+// Troca dirigida (from_name propõe a to_name), por moedas ou por outro item
+// específico. Só se concretiza quando to_name aceita (tabela trade_offers,
+// coluna status: pending/accepted/rejected/cancelled).
+
+// Itens realmente "possuídos" por um jogador, elegíveis para trocar — exclui
+// os itens gratuitos-para-todos (price 0 e não vindos de leilão), que não são
+// posses reais (mesmo padrão de "owned" usado em shopItemHtml, loja.html).
+function getTradeableOwnedItems(profile){
+  const owned = (profile && profile.ownedCosmetics) || [];
+  return owned.map(id=>getCosmeticById(id)).filter(item=>item && !(item.price===0 && !item.auctionOnly));
+}
+
+function findCosmeticCategory(itemId){
+  for(const [cat, list] of Object.entries(COSMETIC_CATALOG)){
+    if(list.some(c=>c.id===itemId)) return cat;
+  }
+  return null;
+}
+
+const TRADE_CATEGORY_TO_EQUIPPED_FIELD = {
+  backgrounds:'equipped_background', accents:'equipped_accent', frames:'equipped_frame',
+  nameEffects:'equipped_name_effect', titles:'equipped_title'
+};
+
+// Devolve só os campos que precisam de ser limpos no PATCH, se o item trocado
+// estiver equipado (evita ficar com um cosmético equipado que já não possui).
+function buildUnequipPatchIfNeeded(rawPlayerRow, itemId){
+  const patch = {};
+  const cat = findCosmeticCategory(itemId);
+  const field = cat && TRADE_CATEGORY_TO_EQUIPPED_FIELD[cat];
+  if(field && rawPlayerRow[field] === itemId) patch[field] = null;
+  if((rawPlayerRow.equipped_badges||[]).includes(itemId)){
+    patch.equipped_badges = (rawPlayerRow.equipped_badges||[]).filter(b=>b!==itemId);
+  }
+  return patch;
+}
+
+// Devolve {ok, reason} — 'invalid' | 'error' | true
+async function createTradeOffer(supabaseUrl, supabaseAnonKey, fromName, toName, offeredItemId, requestedCoins, requestedItemId){
+  if(fromName === toName) return {ok:false, reason:'invalid'};
+  if(!offeredItemId) return {ok:false, reason:'invalid'};
+  if(!requestedCoins && !requestedItemId) return {ok:false, reason:'invalid'};
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/trade_offers`, {
+      method:'POST',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify([{ from_name:fromName, to_name:toName, offered_item_id:offeredItemId, requested_coins: requestedCoins||null, requested_item_id: requestedItemId||null, status:'pending' }])
+    });
+    return { ok: res.ok };
+  } catch(e){ return {ok:false, reason:'error'}; }
+}
+
+async function fetchTradeOffers(supabaseUrl, supabaseAnonKey, playerName){
+  try{
+    const [incomingRes, outgoingRes] = await Promise.all([
+      fetch(`${supabaseUrl}/rest/v1/trade_offers?to_name=eq.${encodeURIComponent(playerName)}&status=eq.pending&order=created_at.desc`, {headers: sbAuthHeaders(supabaseAnonKey)}),
+      fetch(`${supabaseUrl}/rest/v1/trade_offers?from_name=eq.${encodeURIComponent(playerName)}&status=eq.pending&order=created_at.desc`, {headers: sbAuthHeaders(supabaseAnonKey)})
+    ]);
+    return { incoming: await incomingRes.json(), outgoing: await outgoingRes.json() };
+  } catch(e){ return {incoming:[], outgoing:[]}; }
+}
+
+// status: 'rejected' | 'cancelled' — só muda o status, não mexe em moedas/itens
+async function setTradeOfferStatus(supabaseUrl, supabaseAnonKey, offerId, status){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/trade_offers?id=eq.${offerId}`, {
+      method:'PATCH',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify({status})
+    });
+    return res.ok;
+  } catch(e){ return false; }
+}
+
+// Devolve {ok, reason} — 'invalid' (deixou de ser possível cumprir, proposta
+// rejeitada automaticamente) | 'error' | true. Busca dados frescos dos dois
+// jogadores (nunca confia em cache — a proposta pode ter dias).
+async function acceptTradeOffer(supabaseUrl, supabaseAnonKey, offer){
+  try{
+    const fields = 'coins,owned_cosmetics,equipped_background,equipped_accent,equipped_frame,equipped_name_effect,equipped_title,equipped_badges';
+    const [fromRes, toRes] = await Promise.all([
+      fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(offer.from_name)}&select=${fields}`, {headers: sbAuthHeaders(supabaseAnonKey)}),
+      fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(offer.to_name)}&select=${fields}`, {headers: sbAuthHeaders(supabaseAnonKey)})
+    ]);
+    const fromRow = (await fromRes.json())[0];
+    const toRow = (await toRes.json())[0];
+    if(!fromRow || !toRow) return {ok:false, reason:'error'};
+
+    const fromOwned = fromRow.owned_cosmetics || [];
+    const toOwned = toRow.owned_cosmetics || [];
+    const stillHasOffered = fromOwned.includes(offer.offered_item_id);
+    const stillHasRequestedItem = !offer.requested_item_id || toOwned.includes(offer.requested_item_id);
+    const hasEnoughCoins = !offer.requested_coins || (toRow.coins||0) >= offer.requested_coins;
+
+    if(!stillHasOffered || !stillHasRequestedItem || !hasEnoughCoins){
+      await setTradeOfferStatus(supabaseUrl, supabaseAnonKey, offer.id, 'rejected');
+      return {ok:false, reason:'invalid'};
+    }
+
+    let newFromOwned = fromOwned.filter(id=>id!==offer.offered_item_id);
+    let newToOwned = toOwned.concat([offer.offered_item_id]);
+    if(offer.requested_item_id){
+      newToOwned = newToOwned.filter(id=>id!==offer.requested_item_id);
+      newFromOwned = newFromOwned.concat([offer.requested_item_id]);
+    }
+
+    const fromPatch = Object.assign({ owned_cosmetics:newFromOwned }, buildUnequipPatchIfNeeded(fromRow, offer.offered_item_id));
+    const toPatch = Object.assign({ owned_cosmetics:newToOwned }, offer.requested_item_id ? buildUnequipPatchIfNeeded(toRow, offer.requested_item_id) : {});
+
+    const [fromPatchRes, toPatchRes] = await Promise.all([
+      fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(offer.from_name)}`, {
+        method:'PATCH', headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}), body: JSON.stringify(fromPatch)
+      }),
+      fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(offer.to_name)}`, {
+        method:'PATCH', headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}), body: JSON.stringify(toPatch)
+      })
+    ]);
+    if(!fromPatchRes.ok || !toPatchRes.ok) return {ok:false, reason:'error'};
+
+    if(offer.requested_coins){
+      await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, offer.to_name, -offer.requested_coins, `Troca de cosmético com ${offer.from_name}`);
+      await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, offer.from_name, offer.requested_coins, `Troca de cosmético com ${offer.to_name}`);
+    }
+
+    await setTradeOfferStatus(supabaseUrl, supabaseAnonKey, offer.id, 'accepted');
+    return {ok:true};
+  } catch(e){ return {ok:false, reason:'error'}; }
+}
+
 async function fetchGenerosityRanking(supabaseUrl, supabaseAnonKey){
   const res = await fetch(`${supabaseUrl}/rest/v1/gifts?select=from_name,amount`, {headers: sbAuthHeaders(supabaseAnonKey)});
   if(!res.ok) return [];
