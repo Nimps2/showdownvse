@@ -103,7 +103,10 @@ function aggregatePlayers(rows){
         playerStats[p].titles++;
         playerStats[p].titlesByTier[tier] = (playerStats[p].titlesByTier[tier]||0)+1;
       } else {
-        const lostMatch = matches.find(m=>m.winner && (m.p1===p || m.p2===p) && m.winner!==p);
+        // Numa derrota com repescagem (m.loserNext definido), o jogador cai
+        // para a chave de perdedores em vez de ficar eliminado — só conta
+        // como eliminação uma derrota sem "próxima paragem" (loserNext).
+        const lostMatch = matches.find(m=>m.winner && (m.p1===p || m.p2===p) && m.winner!==p && !m.loserNext);
         if(lostMatch) resultLabel = `Eliminado — ${lostMatch.label}`;
         else {
           const anyMatch = matches.find(m=>m.p1===p||m.p2===p);
@@ -157,6 +160,13 @@ async function sha256Hex(text){
   const enc = new TextEncoder().encode(text);
   const buf = await crypto.subtle.digest('SHA-256', enc);
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// Repete `fn` a cada `ms` milissegundos, para as páginas atualizarem
+// sozinhas sem precisar de F5. Pausa enquanto a aba não está visível
+// (em segundo plano), para não gastar pedidos à toa.
+function startPolling(fn, ms){
+  setInterval(() => { if(!document.hidden) fn(); }, ms);
 }
 
 function sbAuthHeaders(supabaseAnonKey){
@@ -1859,7 +1869,9 @@ function computeGlobalAchievementStats(playerStats, allRows, playerProfiles){
     ...a,
     count: counts[a.id] || 0,
     pct: names.length ? Math.round(((counts[a.id]||0) / names.length) * 100) : 0
-  })).sort((a,b)=> a.pct - b.pct);
+  }))
+    .filter(a => !a.secret || a.count > 0) // esconde secretas que ninguém desbloqueou ainda — mesma regra do resto do site
+    .sort((a,b)=> a.pct - b.pct);
 }
 
 const MAX_FEATURED_ACHIEVEMENTS = 6;

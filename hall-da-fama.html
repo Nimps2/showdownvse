@@ -244,6 +244,7 @@ function unlockContent(){
   document.getElementById('mainContent').style.display = 'block';
   document.getElementById('loggedInNameTop').textContent = loggedInPlayerName;
   init();
+  startPolling(init, 20000); // atualiza sozinho a cada 20s, sem precisar de F5
 }
 
 function doPlayerLogout(){
@@ -329,7 +330,7 @@ async function init(){
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
     populateHofTierFilter(rows);
-    renderTimeline(rows);
+    onHofFilterChange(); // respeita a pesquisa/filtro de tier já escolhidos (importa quando isto corre de novo sozinho, via polling)
     renderMvpList(rows);
     renderFeaturedMatches(rows);
     allNicknames = aggregateNicknames(rows);
@@ -348,8 +349,10 @@ function displayName(name){
 
 function populateHofTierFilter(rows){
   const sel = document.getElementById('hofTierFilter');
+  const previous = sel.value; // preserva a escolha do jogador quando isto corre de novo sozinho (polling)
   const tiers = Array.from(new Set(rows.map(r=>r.tier).filter(t=>t))).sort();
   sel.innerHTML = '<option value="">Todos os tiers</option>' + tiers.map(t=>`<option value="${t}">${t}</option>`).join('');
+  if(tiers.includes(previous)) sel.value = previous;
 }
 
 function onHofFilterChange(){
@@ -459,8 +462,12 @@ function renderTimeline(rows){
     const matches = data.matches || [];
     const finalMatch = matches.find(m => m.next === null);
     const runnerUp = finalMatch ? (finalMatch.winner === finalMatch.p1 ? finalMatch.p2 : finalMatch.p1) : null;
-    const bronzeMatches = finalMatch ? matches.filter(m => m.next === finalMatch.id && m.winner) : [];
-    const bronzePlayers = bronzeMatches.map(m => m.winner === m.p1 ? m.p2 : m.p1);
+    // Com repescagem, o 3º lugar é sempre uma pessoa só — quem perde a final
+    // da repescagem (isLbFinal). Sem repescagem, mantém-se como sempre.
+    const lbFinal = matches.find(m => m.isLbFinal && m.winner);
+    const bronzePlayers = lbFinal
+      ? [lbFinal.winner === lbFinal.p1 ? lbFinal.p2 : lbFinal.p1]
+      : (finalMatch ? matches.filter(m => m.next === finalMatch.id && m.winner).map(m => m.winner === m.p1 ? m.p2 : m.p1) : []);
     const date = r.created_at ? new Date(r.created_at).toLocaleDateString('pt-BR') : '';
     const title = data.name || `Torneio (${r.tier || '?'})`;
 
