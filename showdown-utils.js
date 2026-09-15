@@ -1851,6 +1851,22 @@ async function computeAllAchievements(supabaseUrl, supabaseAnonKey, name, stats,
 
 // Devolve, para cada conquista do catálogo, quantos e que % dos jogadores já a têm.
 // Ordenado da mais rara para a mais comum.
+// IDs só calculados dentro de computeAsyncAchievements() (precisam de
+// consultas extra a outras tabelas — predictions, gifts, activity_log,
+// reroll_requests, auctions, lottery_rounds, coin_transactions, etc). A
+// função abaixo NUNCA as chama (custaria N jogadores × várias consultas só
+// para um resumo), por isso a contagem destas seria sempre 0, mesmo que
+// alguém as tenha mesmo — têm de ficar de fora da lista, não só escondidas
+// se forem secretas. Se adicionar uma conquista nova a computeAsyncAchievements,
+// junte o id aqui também.
+const GLOBAL_STATS_UNCOUNTABLE_IDS = new Set([
+  'sharp_bettor', 'lucky_streak_bettor', 'lucky_strike', 'voice_of_the_people',
+  'philanthropist', 'recurring_giver', 'investor', 'no_fear', 'daily_starter',
+  'daily_week', 'early_riser', 'daily_month_streak', 'night_owl', 'insomniac',
+  'early_bird', 'active_voice', 'popular', 'compulsive_rerolls', 'auctioneer',
+  'pot_king', 'golden_ticket'
+]);
+
 function computeGlobalAchievementStats(playerStats, allRows, playerProfiles){
   const bestStreaks = computeAllBestWinStreaks(allRows);
   const names = Object.keys(playerStats);
@@ -1859,17 +1875,15 @@ function computeGlobalAchievementStats(playerStats, allRows, playerProfiles){
   names.forEach(name=>{
     const earned = computeAchievements(playerStats[name], bestStreaks[name] || 0);
     computeMatchPathAchievements(name, allRows, playerProfiles ? playerProfiles[name] : null).forEach(id=>earned.add(id));
-    // Nota: as conquistas baseadas noutras tabelas (Apostador Fino, Golpe de
-    // Sorte) ficam de fora desta % global de propósito — evita multiplicar
-    // por N jogadores o número de consultas à base de dados só para uma
-    // estatística de resumo.
     earned.forEach(id=>{ counts[id] = (counts[id]||0) + 1; });
   });
-  return ACHIEVEMENTS.map(a=>({
-    ...a,
-    count: counts[a.id] || 0,
-    pct: names.length ? Math.round(((counts[a.id]||0) / names.length) * 100) : 0
-  }))
+  return ACHIEVEMENTS
+    .filter(a => !GLOBAL_STATS_UNCOUNTABLE_IDS.has(a.id)) // fora as que nunca dá para contar certo aqui
+    .map(a=>({
+      ...a,
+      count: counts[a.id] || 0,
+      pct: names.length ? Math.round(((counts[a.id]||0) / names.length) * 100) : 0
+    }))
     .filter(a => !a.secret || a.count > 0) // esconde secretas que ninguém desbloqueou ainda — mesma regra do resto do site
     .sort((a,b)=> a.pct - b.pct);
 }
