@@ -7,67 +7,8 @@
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 <style>
-:root{
-  --bg-void:#0a0c14; --bg-panel:#12151f; --bg-card:#171b28;
-  --line:#262c3e; --tera-cyan:#4fd8d0; --tera-violet:#a56bf0; --tera-amber:#f0b64f;
-  --text-main:#e9ecf5; --text-dim:#8b91a8; --text-faint:#565d78; --success:#5ed890; --danger:#e0607a;
-}
-body.light-theme{
-  --bg-void:#f5f6fa; --bg-panel:#ffffff; --bg-card:#eef0f6;
-  --line:#dcdfe8; --tera-cyan:#0e9488; --tera-violet:#7c4dc4; --tera-amber:#b8860b;
-  --text-main:#1a1d29; --text-dim:#4a5068; --text-faint:#8890a8; --success:#1a9d5c; --danger:#c23f5a;
-}
-.theme-toggle{
-  position:fixed;top:16px;right:16px;z-index:900;background:var(--bg-panel);border:1px solid var(--line);
-  color:var(--text-main);width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:16px;
-}
-.theme-toggle:hover{border-color:var(--tera-cyan);}
-.player-corner-badge{
-  position:fixed;top:16px;left:16px;z-index:900;display:flex;align-items:center;gap:8px;
-  background:var(--bg-panel);border:1px solid var(--line);border-radius:20px;padding:5px 12px 5px 5px;
-  text-decoration:none;color:var(--text-main);font-family:'Chakra Petch',sans-serif;font-size:12.5px;font-weight:600;
-}
-.player-corner-badge:hover{border-color:var(--tera-cyan);}
-.daily-bonus-icon{
-  position:fixed;top:82px;left:16px;z-index:899;width:38px;height:38px;border-radius:10px;
-  background:var(--bg-panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
-  font-size:16px;opacity:0.3;filter:grayscale(1);cursor:default;padding:0;
-}
-.daily-bonus-icon.available{
-  opacity:1;filter:none;cursor:pointer;border-color:var(--tera-amber);
-  box-shadow:0 0 12px rgba(240,182,79,0.4);animation:vseGiftPulse 1.6s ease-in-out infinite;
-}
-@keyframes vseGiftPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
-*{box-sizing:border-box;}
-body{
-  margin:0;background:var(--bg-void);
-  background-image:radial-gradient(circle at 15% 8%, rgba(165,107,240,0.10), transparent 40%),
-    radial-gradient(circle at 85% 92%, rgba(79,216,208,0.08), transparent 40%);
-  color:var(--text-main);font-family:'Inter',sans-serif;min-height:100vh;padding:0 0 60px 0;
-  transition:background-color .2s, color .2s;
-}
-.wrap{max-width:820px;margin:0 auto;padding:32px 20px;}
-.header{display:flex;align-items:center;gap:16px;margin-bottom:8px;}
-.crystal{width:38px;height:38px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));
-  clip-path:polygon(50% 0%, 100% 30%, 82% 100%, 18% 100%, 0% 30%);}
-h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0;letter-spacing:0.5px;}
-.subtitle{color:var(--text-dim);font-size:13px;margin:14px 0 6px 0;}
-.nav-link{color:var(--tera-cyan);font-size:12.5px;text-decoration:none;font-family:'Chakra Petch',sans-serif;}
-.nav-link:hover{text-decoration:underline;}
-.status-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);margin:14px 0 20px 0;}
-.status-dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
-.status-dot.on{background:var(--success);}
-.status-dot.off{background:var(--danger);}
-
-.card{background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px;}
-.card h2{font-family:'Chakra Petch',sans-serif;font-size:15px;margin:0 0 14px 0;color:var(--text-main);
-  display:flex;align-items:center;gap:8px;}
-.card h2::before{content:'';width:4px;height:15px;background:var(--tera-violet);border-radius:2px;}
-select{width:100%;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);
-  border-radius:8px;color:var(--text-main);font-family:'Inter',sans-serif;font-size:14px;margin-bottom:6px;}
-select:focus{outline:none;border-color:var(--tera-cyan);}
-
 .progress-bar{width:100%;height:8px;background:var(--bg-card);border-radius:4px;overflow:hidden;margin:10px 0;}
 .progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--tera-cyan),var(--tera-violet));border-radius:4px;transition:width .3s;}
 
@@ -75,12 +16,6 @@ select:focus{outline:none;border-color:var(--tera-cyan);}
 .achv-grid-fixed{grid-template-rows:repeat(2,1fr);}
 .achv-tier-section{background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px;}
 .achv-tier-header{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
-.tier-pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;}
-.page-btn{background:var(--bg-panel);border:1px solid var(--line);color:var(--text-dim);padding:6px 14px;
-  border-radius:8px;cursor:pointer;font-family:'Chakra Petch',sans-serif;font-size:13px;}
-.page-btn:hover:not(:disabled){border-color:var(--tera-cyan);color:var(--tera-cyan);}
-.page-btn:disabled{opacity:0.35;cursor:not-allowed;}
-.page-info{font-size:12px;color:var(--text-faint);}
 .achv-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start;position:relative;}
 .achv-card.earned{border-color:rgba(240,182,79,0.35);background:linear-gradient(135deg,rgba(240,182,79,0.06),rgba(165,107,240,0.04));}
 .achv-emoji{font-size:30px;flex-shrink:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;
@@ -103,34 +38,45 @@ select:focus{outline:none;border-color:var(--tera-cyan);}
   box-shadow:0 0 10px rgba(240,182,79,0.5);
 }
 .secret-badge{font-size:11px;filter:drop-shadow(0 0 3px rgba(165,107,240,0.6));}
-
-.empty-state{color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;}
-.footer-note{color:var(--text-faint);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.5;}
 </style>
 </head>
 <body>
-<button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro">🌙</button>
 <div id="playerCornerContainer"></div>
 
 <div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
   <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
     <h2>Entrar</h2>
-    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Nome</label>
+    <label>Nome</label>
     <select id="gateNameSelect"><option value="">— carregando jogadores —</option></select>
-    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Password</label>
-    <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()" style="width:100%;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);border-radius:8px;color:var(--text-main);font-size:14px;margin-bottom:6px;">
-    <button class="theme-toggle" style="position:static;width:100%;height:auto;padding:11px 20px;border-radius:8px;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));color:#0a0c14;border:none;font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:13.5px;cursor:pointer;margin-top:4px;" onclick="doGateLogin()">Entrar</button>
+    <label>Password</label>
+    <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()">
+    <button class="btn-primary" onclick="doGateLogin()">Entrar</button>
     <div id="gateError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;"></div>
   </div>
 </div>
 
+<div id="topbar" class="topbar" style="display:none;">
+  <a href="index.html" class="brand">
+    <div class="brand-mark"></div>
+    <div class="brand-name">Torneio VSE</div>
+  </a>
+  <nav class="topnav">
+    <a href="index.html">Início</a>
+    <a href="viewer.html">Bracket</a>
+    <a href="estatisticas.html">Estatísticas</a>
+    <a href="hall-da-fama.html">Hall da Fama</a>
+    <a href="loja.html">Loja</a>
+    <a href="conquistas.html" class="current">Conquistas</a>
+    <a href="palpites.html">Palpiteiro</a>
+  </nav>
+  <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
+</div>
+
 <div id="mainContent" class="wrap" style="display:none;">
-  <div class="header">
-    <div class="crystal"></div>
-    <div><h1>Conquistas</h1></div>
+  <div class="status-strip">
+    <span class="status-dot" id="statusDot"></span>
+    <span class="status-text" id="statusText">Conectando…</span>
   </div>
-  <div class="subtitle"><a class="nav-link" href="index.html">← Início</a> &nbsp;|&nbsp; <a class="nav-link" href="perfil.html">Meu perfil</a> &nbsp;|&nbsp; <a class="nav-link" href="estatisticas.html">Estatísticas</a> &nbsp;|&nbsp; <a class="nav-link" href="hall-da-fama.html">Hall da Fama</a></div>
-  <div class="status-line"><span class="status-dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
 
   <div class="card">
     <h2>A ver as conquistas de</h2>
@@ -183,6 +129,7 @@ async function doGateLogin(){
 function unlockContent(){
   document.getElementById('authGate').style.display = 'none';
   document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('topbar').style.display = 'flex';
   init();
 }
 
@@ -191,6 +138,7 @@ function doPlayerLogout(){
   loggedInPlayerName = null;
   document.getElementById('gatePassword').value = '';
   document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('topbar').style.display = 'none';
   document.getElementById('authGate').style.display = 'flex';
 }
 
@@ -354,7 +302,7 @@ function renderTierGrid(){
     const pageItems = tierAchievements.slice(startIdx, startIdx + ACHIEVEMENTS_PER_PAGE);
 
     const arrows = totalPages > 1 ? `
-      <div class="tier-pagination">
+      <div class="pagination">
         <button class="page-btn" onclick="changeTierPage('${tierKey}',-1)" ${tierPages[tierKey]<=1?'disabled':''}>←</button>
         <span class="page-info">${tierPages[tierKey]} / ${totalPages}</span>
         <button class="page-btn" onclick="changeTierPage('${tierKey}',1)" ${tierPages[tierKey]>=totalPages?'disabled':''}>→</button>
