@@ -1,0 +1,172 @@
+/* ======================================================================
+   styles.css — folha de estilo partilhada pelas páginas hospedadas do
+   Torneio Showdown - VSE. Carregada como <link>, tal como showdown-utils.js
+   é carregado como <script> — o mesmo mecanismo, para CSS em vez de JS.
+
+   Começou só a ser usada pela Loja (loja.html); as restantes páginas
+   continuam com o <style> interno delas por agora, até serem migradas
+   uma de cada vez. As variáveis de cor abaixo são exatamente as mesmas
+   já usadas em todas as páginas — não é uma paleta nova.
+   ====================================================================== */
+
+:root{
+  --bg-void:#0a0c14; --bg-panel:#12151f; --bg-card:#171b28;
+  --line:#262c3e; --tera-cyan:#4fd8d0; --tera-violet:#a56bf0; --tera-amber:#f0b64f;
+  --text-main:#e9ecf5; --text-dim:#8b91a8; --text-faint:#565d78; --success:#5ed890; --danger:#e0607a;
+  --shadow:0 1px 3px rgba(0,0,0,0.35);
+}
+body.light-theme{
+  --bg-void:#f5f6fa; --bg-panel:#ffffff; --bg-card:#eef0f6;
+  --line:#dcdfe8; --tera-cyan:#0e9488; --tera-violet:#7c4dc4; --tera-amber:#b8860b;
+  --text-main:#1a1d29; --text-dim:#4a5068; --text-faint:#8890a8; --success:#1a9d5c; --danger:#c23f5a;
+  --shadow:0 1px 2px rgba(20,22,40,0.08);
+}
+
+*{box-sizing:border-box;}
+body{
+  margin:0;background:var(--bg-void);
+  background-image:radial-gradient(circle at 15% 8%, rgba(165,107,240,0.10), transparent 40%),
+    radial-gradient(circle at 85% 92%, rgba(79,216,208,0.08), transparent 40%);
+  color:var(--text-main);font-family:'Inter',sans-serif;min-height:100vh;padding:0 0 60px 0;
+  transition:background-color .2s, color .2s;
+}
+
+/* ---------- Elementos fixos partilhados (inalterados de propósito —
+   são gerados por showdown-utils.js e usados por todas as páginas) ---------- */
+.theme-toggle{
+  position:fixed;top:16px;right:16px;z-index:900;background:var(--bg-panel);border:1px solid var(--line);
+  color:var(--text-main);width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:16px;
+}
+.theme-toggle:hover{border-color:var(--tera-cyan);}
+.player-corner-badge{
+  position:fixed;top:58px;left:16px;z-index:45;display:flex;align-items:center;gap:8px;
+  background:var(--bg-panel);border:1px solid var(--line);border-radius:20px;padding:5px 12px 5px 5px;
+  text-decoration:none;color:var(--text-main);font-family:'Chakra Petch',sans-serif;font-size:12.5px;font-weight:600;
+}
+.player-corner-badge:hover{border-color:var(--tera-cyan);}
+.daily-bonus-icon{
+  position:fixed;top:124px;left:16px;z-index:44;width:38px;height:38px;border-radius:10px;
+  background:var(--bg-panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
+  font-size:16px;opacity:0.3;filter:grayscale(1);cursor:default;padding:0;
+}
+.daily-bonus-icon.available{
+  opacity:1;filter:none;cursor:pointer;border-color:var(--tera-amber);
+  box-shadow:0 0 12px rgba(240,182,79,0.4);animation:vseGiftPulse 1.6s ease-in-out infinite;
+}
+@keyframes vseGiftPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
+
+/* ---------- Topbar novo (substitui .header + .subtitle) ---------- */
+.topbar{
+  position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:16px;
+  padding:10px 20px;background:color-mix(in srgb, var(--bg-panel) 90%, transparent);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--line);flex-wrap:wrap;
+}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto;text-decoration:none;}
+.brand-mark{width:26px;height:26px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));
+  clip-path:polygon(50% 0%, 100% 30%, 82% 100%, 18% 100%, 0% 30%);}
+.brand-name{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:15px;color:var(--text-main);letter-spacing:0.2px;}
+.topnav{display:flex;gap:2px;flex-wrap:wrap;}
+.topnav a{
+  font-family:'Chakra Petch',sans-serif;font-size:12px;font-weight:600;
+  color:var(--text-dim);text-decoration:none;padding:6px 10px;border-radius:7px;
+}
+.topnav a:hover{color:var(--text-main);background:var(--bg-card);}
+.topnav a.current{color:var(--tera-cyan);background:color-mix(in srgb, var(--tera-cyan) 12%, transparent);}
+
+.wrap{max-width:900px;margin:0 auto;padding:24px 20px;}
+h1{font-family:'Chakra Petch',sans-serif;font-size:23px;font-weight:700;margin:0;letter-spacing:0.5px;}
+.nav-link{color:var(--tera-cyan);font-size:12.5px;text-decoration:none;font-family:'Chakra Petch',sans-serif;}
+.nav-link:hover{text-decoration:underline;}
+
+/* ---------- Status strip novo (substitui .status-line + .coin-banner + #loyaltyBanner) ---------- */
+.status-strip{
+  display:flex;align-items:center;gap:22px;flex-wrap:wrap;
+  background:var(--bg-panel);border:1px solid var(--line);border-radius:14px;
+  padding:14px 18px;margin-bottom:20px;box-shadow:var(--shadow);
+}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);flex-shrink:0;}
+.status-dot.on{background:var(--success);}
+.status-dot.off{background:var(--danger);}
+.status-text{font-size:12px;color:var(--text-dim);}
+.metric{display:flex;flex-direction:column;gap:1px;}
+.metric .num{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:21px;font-variant-numeric:tabular-nums;line-height:1.1;color:var(--tera-amber);}
+.metric .lbl{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}
+.loyalty-pill{
+  margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11.5px;
+  color:var(--success);background:color-mix(in srgb, var(--success) 12%, transparent);
+  border:1px solid color-mix(in srgb, var(--success) 35%, transparent);
+  border-radius:999px;padding:5px 12px;white-space:nowrap;
+}
+@media (max-width:640px){ .status-strip{padding:12px 14px;} .loyalty-pill{margin-left:0;} }
+
+/* ---------- Cartões ---------- */
+.card{background:var(--bg-panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:16px;box-shadow:var(--shadow);}
+.card h2{font-family:'Chakra Petch',sans-serif;font-size:14.5px;margin:0 0 14px 0;color:var(--text-main);
+  display:flex;align-items:center;gap:8px;}
+.card h2::before{content:'';width:4px;height:15px;background:var(--tera-violet);border-radius:2px;flex-shrink:0;}
+
+select,input[type=text],input[type=password],input[type=number]{width:100%;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);
+  border-radius:8px;color:var(--text-main);font-family:'Inter',sans-serif;font-size:14px;margin-bottom:6px;}
+select:focus,input:focus{outline:none;border-color:var(--tera-cyan);}
+label{display:block;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;margin:10px 0 5px;font-weight:600;}
+.btn-primary{
+  width:100%;background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));color:#0a0c14;
+  border:none;padding:11px 20px;border-radius:9px;font-family:'Chakra Petch',sans-serif;font-weight:700;
+  font-size:13.5px;cursor:pointer;margin-top:4px;
+}
+.btn-primary:hover:not(:disabled){filter:brightness(1.06);}
+.btn-primary:disabled{opacity:0.4;cursor:not-allowed;}
+.tiny{
+  font-family:'Chakra Petch',sans-serif;font-weight:600;font-size:11.5px;
+  background:var(--bg-card);border:1px solid var(--line);color:var(--text-dim);
+  border-radius:7px;padding:5px 10px;cursor:pointer;
+}
+.tiny:hover{border-color:var(--tera-cyan);color:var(--tera-cyan);}
+.tiny.danger:hover{border-color:var(--danger);color:var(--danger);}
+
+/* ---------- Abas ---------- */
+.tabs{display:flex;gap:2px;margin-bottom:20px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+.tab-btn{
+  flex:1;min-width:110px;padding:12px 10px;background:none;border:none;color:var(--text-faint);
+  font-family:'Chakra Petch',sans-serif;font-size:13px;font-weight:600;
+  cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;letter-spacing:0.3px;
+}
+.tab-btn:hover{color:var(--text-dim);}
+.tab-btn.active{color:var(--tera-cyan);border-bottom-color:var(--tera-cyan);}
+.shop-panel{display:none;}
+.shop-panel.active{display:block;}
+
+/* ---------- Grelha de cosméticos (tiles) ---------- */
+.shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:10px;}
+.shop-item{
+  background:var(--bg-card);border:1px solid var(--line);border-radius:11px;padding:11px;
+  text-align:center;display:flex;flex-direction:column;gap:8px;
+}
+.shop-swatch{width:100%;height:40px;border-radius:8px;}
+.shop-item-name{font-size:11.5px;color:var(--text-main);font-weight:500;line-height:1.25;flex:1;}
+.shop-btn{
+  width:100%;font-size:11px;padding:7px;border-radius:7px;background:var(--bg-panel);
+  border:1px solid var(--line);color:var(--text-dim);cursor:pointer;font-family:'Chakra Petch',sans-serif;font-weight:600;
+}
+.shop-btn:hover:not(:disabled){border-color:var(--tera-cyan);color:var(--tera-cyan);}
+.shop-btn:disabled{cursor:not-allowed;opacity:0.7;}
+
+.bet-placed{
+  font-size:12px;color:var(--success);background:color-mix(in srgb, var(--success) 10%, transparent);
+  border:1px solid color-mix(in srgb, var(--success) 30%, transparent);
+  border-radius:8px;padding:8px 12px;margin-bottom:10px;
+}
+
+.roulette-spinner{font-size:42px;text-align:center;padding:10px 0;animation:vseSpinPulse .3s ease-in-out infinite;}
+@keyframes vseSpinPulse{0%,100%{transform:scale(1) rotate(0deg);}50%{transform:scale(1.15) rotate(10deg);}}
+.lootbox-shake{font-size:42px;text-align:center;padding:10px 0;animation:vseBoxShake .15s ease-in-out infinite;}
+@keyframes vseBoxShake{0%,100%{transform:rotate(0deg) translateX(0);}25%{transform:rotate(-10deg) translateX(-3px);}75%{transform:rotate(10deg) translateX(3px);}}
+.reveal-pop{animation:vseRevealPop .4s ease-out;text-align:center;font-size:15px;padding:8px 0;}
+@keyframes vseRevealPop{0%{transform:scale(0.6);opacity:0;}60%{transform:scale(1.12);}100%{transform:scale(1);opacity:1;}}
+
+.history-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--text-dim);
+  padding:9px 0;gap:8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;}
+.history-row:last-child{border-bottom:none;}
+
+.empty-state{color:var(--text-faint);font-size:13px;text-align:center;padding:20px 0;}
+.footer-note{color:var(--text-faint);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.5;}
