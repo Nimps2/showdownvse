@@ -2133,6 +2133,29 @@ async function checkNewAchievements(supabaseUrl, supabaseAnonKey, name, earnedSe
   }
 }
 
+// ---------- Webhook do Discord a partir das páginas hospedadas ----------
+// Espelha o postToDiscord() do gestor, mas o link do webhook vem do
+// Supabase (tabela site_settings) em vez do localStorage — o gestor é
+// local ao computador do organizador, e estas páginas correm no browser
+// de cada jogador, sem acesso a esse localStorage.
+async function postToDiscordFromSite(supabaseUrl, supabaseAnonKey, payload){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.1&select=discord_webhook_url`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    const rows = await res.json();
+    const url = rows && rows[0] && rows[0].discord_webhook_url;
+    if(!url) return false;
+    const body = typeof payload === 'string' ? { content: payload } : payload;
+    const postRes = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    return postRes.ok;
+  } catch(e){
+    return false;
+  }
+}
+
 // ---------- Cartão exportável de confronto direto entre dois jogadores ----------
 function generateHeadToHeadCardCanvas(nameA, nameB, winsA, winsB){
   const canvas = document.createElement('canvas');

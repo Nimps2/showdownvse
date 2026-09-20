@@ -265,6 +265,10 @@ async function renderProfile(){
         const a = ACHIEVEMENTS.find(x=>x.id===id);
         const secretLabel = a && a.secret ? `<br><span style="font-size:11px;opacity:0.85;">🕵️ Esta era uma conquista secreta!</span>` : '';
         if(a) setTimeout(()=> showCelebrationToast(`🎖️ Conquista desbloqueada!<br>${a.emoji} ${escapeHtml(a.name)}${secretLabel}<br><span style="font-size:11.5px;opacity:0.85;">+${ACHIEVEMENT_COIN_BONUS} 🪙</span>`, 6500), i*700);
+        if(a && a.secret){
+          const shownName = (playerProfiles[name] && playerProfiles[name].nickname) || name;
+          postToDiscordFromSite(SUPABASE_URL, SUPABASE_ANON_KEY, `🕵️ **${shownName}** desbloqueou a conquista secreta **${a.emoji} ${a.name}**!`);
+        }
       });
     });
   }
