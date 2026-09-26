@@ -518,6 +518,16 @@ function renderMyDraw(){
   if(locked) html += `<div class="locked-banner">🔒 Este torneio já foi concluído. Os sets ficam bloqueados para consulta — já não é possível alterá-los.</div>`;
   html += `<div class="player-result"><div class="pname">${playerName}</div>`;
 
+  if(!locked){
+    html += `<details class="set-details" id="teamImportDetails" style="margin-bottom:12px;">
+      <summary>📋 Importar o time inteiro de uma vez</summary>
+      <div class="hint">Cole aqui o time completo exportado do Showdown (os 6 Pokémon, separados por uma linha em branco). Cada um é colocado no sítio certo pelo nome da espécie.</div>
+      <textarea id="teamPasteBox" rows="14" placeholder="Pokémon @ Item&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2&#10;&#10;Outro Pokémon @ Item&#10;..."></textarea>
+      <button class="copy-btn" onclick="importWholeTeam(this)">Importar time inteiro</button><span class="save-msg"></span>
+      <div id="teamImportFeedback" style="font-size:12px;line-height:1.5;margin-top:8px;"></div>
+    </details>`;
+  }
+
   (d.random||[]).forEach((r,i)=>{
     const boxId = `box-r-${i}`;
     const pasteId = `paste-r-${i}`;
@@ -600,8 +610,91 @@ function importMyMon(pIdx, idx, kind, btn){
   saveMyDraws(pIdx, btn, raw);
 }
 
-async function saveMyDraws(pIdx, btn, importedSetText){
-  if(!currentTournamentId){ alert('Nenhum torneio carregado.'); return; }
+// Import do time inteiro: casa cada bloco do texto colado com um dos
+// sorteios do jogador pelo nome da espécie (4 aleatórios, espécie já fixa;
+// o que sobrar preenche as 2 escolhas livres). Tudo ou nada — se algo não
+// bater certo, não grava nada e explica exatamente o quê.
+async function importWholeTeam(btn){
+  const feedback = document.getElementById('teamImportFeedback');
+  const fail = (html) => { feedback.style.color = 'var(--danger)'; feedback.innerHTML = html + ' Nada foi guardado.'; };
+
+  const pIdx = loggedInPlayerName ? currentData.players.indexOf(loggedInPlayerName) : -1;
+  if(pIdx === -1){ fail('Sessão inválida — entre novamente.'); return; }
+  if(currentData.champion){ fail('Torneio concluído — bloqueado.'); return; }
+  const raw = document.getElementById('teamPasteBox').value.trim();
+  if(!raw){ fail('Cole o time antes de clicar.'); return; }
+  const entries = parseShowdownTeamImport(raw);
+  if(!entries.length){ fail('Não reconheci nenhum Pokémon neste texto — confira o formato.'); return; }
+  const d = currentData.draws && currentData.draws[pIdx];
+  if(!d){ fail('O sorteio ainda não foi feito.'); return; }
+
+  const norm = s => (s || '').trim().toLowerCase();
+  const used = new Array(entries.length).fill(false);
+  const findUnused = species => entries.findIndex((e,i) => !used[i] && norm(e.parsed.name) === norm(species));
+  const nameOf = i => escapeHtml(entries[i].parsed.name);
+
+  const randomSlots = d.random || [];
+  const freeSlots = d.free || [];
+
+  const randomAssign = [];
+  const missing = [];
+  randomSlots.forEach((r, i) => {
+    const ei = findUnused(r.mon);
+    if(ei === -1){ missing.push(r.mon); randomAssign[i] = -1; }
+    else { used[ei] = true; randomAssign[i] = ei; }
+  });
+  const leftover = entries.map((_, i) => i).filter(i => !used[i]);
+
+  if(missing.length){
+    let msg = `Não encontrei no texto: <b>${missing.map(escapeHtml).join(', ')}</b> (sorteados para si).`;
+    if(leftover.length) msg += ` No texto sobraram: <b>${leftover.map(nameOf).join(', ')}</b> — confira se o nome da espécie está igual ao sorteado.`;
+    fail(msg);
+    return;
+  }
+  if(leftover.length > freeSlots.length){
+    fail(`Há Pokémon a mais no texto — o time são ${randomSlots.length} sorteados + ${freeSlots.length} escolhas livres. Não cabem: <b>${leftover.slice(freeSlots.length).map(nameOf).join(', ')}</b>.`);
+    return;
+  }
+  if(leftover.length < freeSlots.length){
+    fail(`Faltam Pokémon no texto para as escolhas livres — o time são ${randomSlots.length} sorteados + ${freeSlots.length} escolhas livres, e só encontrei ${randomSlots.length + leftover.length}.`);
+    return;
+  }
+
+  // Escolhas livres: quem já tinha um nome fica no mesmo sítio se esse Pokémon
+  // vier no texto; o resto preenche os lugares que sobrarem, por ordem.
+  const freeAssign = new Array(freeSlots.length).fill(-1);
+  const pool = leftover.slice();
+  freeSlots.forEach((f, i) => {
+    if(!f.name) return;
+    const at = pool.findIndex(ei => norm(entries[ei].parsed.name) === norm(f.name));
+    if(at !== -1){ freeAssign[i] = pool[at]; pool.splice(at, 1); }
+  });
+  freeSlots.forEach((f, i) => { if(freeAssign[i] === -1) freeAssign[i] = pool.shift(); });
+
+  const previous = JSON.parse(JSON.stringify(currentData.draws[pIdx]));
+  randomSlots.forEach((r, i) => {
+    const e = entries[randomAssign[i]];
+    d.random[i] = { mon: r.mon, text: e.raw, src:'manual', moves: e.parsed.moves, item: e.parsed.item, ability: e.parsed.ability };
+  });
+  freeSlots.forEach((f, i) => {
+    const e = entries[freeAssign[i]];
+    d.free[i] = { name: e.parsed.name, text: e.raw, src:'manual', moves: e.parsed.moves, item: e.parsed.item, ability: e.parsed.ability };
+  });
+
+  const ok = await saveMyDraws(pIdx, btn, raw, 'Importou o time inteiro');
+  if(!ok){
+    currentData.draws[pIdx] = previous;
+    fail('Não foi possível guardar — tente de novo.');
+    return;
+  }
+  const newFeedback = document.getElementById('teamImportFeedback');
+  const newDetails = document.getElementById('teamImportDetails');
+  if(newDetails) newDetails.open = true;
+  if(newFeedback){ newFeedback.style.color = 'var(--success)'; newFeedback.textContent = `✓ Time importado — ${entries.length} Pokémon guardados.`; }
+}
+
+async function saveMyDraws(pIdx, btn, importedSetText, logPrefix){
+  if(!currentTournamentId){ alert('Nenhum torneio carregado.'); return false; }
   try{
     const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}&select=data`, {headers: sbHeaders()});
     if(!res.ok) throw new Error('Falha ao ler dados atuais (HTTP '+res.status+')');
@@ -621,10 +714,12 @@ async function saveMyDraws(pIdx, btn, importedSetText){
     renderMyDraw();
     showSaveFeedback(btn, 'Guardado ✓', false);
     if(importedSetText && loggedInPlayerName){
-      logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'sorteio', `Importou um set:\n${importedSetText}`);
+      logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'sorteio', `${logPrefix || 'Importou um set'}:\n${importedSetText}`);
     }
+    return true;
   } catch(e){
     showSaveFeedback(btn, 'Erro ao guardar — tente de novo', true);
+    return false;
   }
 }
 

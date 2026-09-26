@@ -68,6 +68,20 @@ function parseShowdownImport(text){
   return result;
 }
 
+// Recebe o export de um time inteiro do Showdown (vários Pokémon
+// separados por linha em branco) e devolve uma lista de
+// { raw, parsed } — um por bloco não vazio, reaproveitando
+// parseShowdownImport() para cada um. Não valida nada sobre o torneio
+// (a quem cada Pokémon pertence, etc.) — isso é responsabilidade de
+// quem chama, ver importWholeTeam() em viewer.html.
+function parseShowdownTeamImport(text){
+  return text.split(/\n\s*\n/)
+    .map(block => block.trim())
+    .filter(block => block.length > 0)
+    .map(raw => ({ raw, parsed: parseShowdownImport(raw) }))
+    .filter(entry => entry.parsed && entry.parsed.name);
+}
+
 // ---------- Estatísticas: agregação de resultados por jogador ----------
 // Usado por estatisticas.html e perfil.html. Recebe as linhas devolvidas pelo
 // Supabase (cada uma com tier/status/created_at/data) e devolve um objeto
