@@ -216,7 +216,7 @@ async function fetchRegisteredPlayerNames(supabaseUrl, supabaseAnonKey){
 // ---------- Perfil: apelido, foto (por link), mensagem de estado, moedas e personalização ----------
 // Devolve um mapa { nomeReal: {nickname, photo_url, status_message, coins, ownedCosmetics, equippedBackground, equippedAccent} }.
 async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
-  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent,equipped_frame,equipped_name_effect,equipped_title,equipped_badges,profile_background_url,guaranteed_bye,elo_chart_unlocked,featured_achievements,total_daily_claims,special_tags,birthday_month,birthday_day`, {headers: sbAuthHeaders(supabaseAnonKey)});
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?select=name,nickname,photo_url,status_message,coins,owned_cosmetics,equipped_background,equipped_accent,equipped_frame,equipped_name_effect,equipped_title,equipped_badges,profile_background_url,site_background_url,guaranteed_bye,elo_chart_unlocked,featured_achievements,total_daily_claims,special_tags,birthday_month,birthday_day`, {headers: sbAuthHeaders(supabaseAnonKey)});
   if(!res.ok) return {};
   const rows = await res.json();
   const map = {};
@@ -227,7 +227,8 @@ async function fetchPlayerProfiles(supabaseUrl, supabaseAnonKey){
       equippedBackground: r.equipped_background || null, equippedAccent: r.equipped_accent || null,
       equippedFrame: r.equipped_frame || null, equippedNameEffect: r.equipped_name_effect || null,
       equippedTitle: r.equipped_title || null, equippedBadges: r.equipped_badges || [],
-      profileBackgroundUrl: r.profile_background_url || null, guaranteedBye: !!r.guaranteed_bye,
+      profileBackgroundUrl: r.profile_background_url || null, siteBackgroundUrl: r.site_background_url || null,
+      guaranteedBye: !!r.guaranteed_bye,
       eloChartUnlocked: !!r.elo_chart_unlocked, featuredAchievements: r.featured_achievements || [],
       totalDailyClaims: r.total_daily_claims || 0, loyaltyDiscountPct: computeLoyaltyDiscountPct(r.total_daily_claims),
       specialTags: r.special_tags || [], birthdayMonth: r.birthday_month || null, birthdayDay: r.birthday_day || null
@@ -304,7 +305,8 @@ const COSMETIC_CATALOG = {
     { id:'badge_analyst', name:'Analista',      price:30, emoji:'🔍' }
   ],
   features: [
-    { id:'feature_custom_pagebg', name:'Fundo de perfil personalizado (foto)', price:120 }
+    { id:'feature_custom_pagebg', name:'Fundo de perfil personalizado (foto)', price:120 },
+    { id:'feature_custom_sitebg', name:'Fundo de página personalizado (foto)', price:150 }
   ]
 };
 const MAX_EQUIPPED_BADGES = 3;
@@ -386,6 +388,19 @@ async function setProfileBackgroundUrl(supabaseUrl, supabaseAnonKey, name, url){
     method:'PATCH',
     headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
     body: JSON.stringify({ profile_background_url: url || null })
+  });
+  return res.ok;
+}
+
+// Define o link da foto usada como fundo da PÁGINA de perfil inteira (só
+// faz sentido depois de comprar 'feature_custom_sitebg') — diferente do
+// fundo do cartão principal (feature_custom_pagebg/profile_background_url
+// acima), os dois são independentes e um jogador pode ter os dois.
+async function setSiteBackgroundUrl(supabaseUrl, supabaseAnonKey, name, url){
+  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+    method:'PATCH',
+    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+    body: JSON.stringify({ site_background_url: url || null })
   });
   return res.ok;
 }

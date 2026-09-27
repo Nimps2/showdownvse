@@ -88,6 +88,8 @@
       <div class="shop-grid" id="shopBadges"></div>
       <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Fundo de perfil (foto)</div>
       <div id="shopCustomBg"></div>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Fundo de página (foto)</div>
+      <div id="shopCustomSiteBg"></div>
       <div class="footer-note" style="margin-top:14px;">Para equipar o que já possui, vá ao seu <a class="nav-link" href="perfil.html">perfil</a> e clique em "Customizar".</div>
     </div>
   </div>
@@ -398,6 +400,7 @@ function renderAll(){
   document.getElementById('shopTitles').innerHTML = COSMETIC_CATALOG.titles.filter(item=>!item.auctionOnly).map(item => shopItemHtml(item, 'title', myProfile)).join('');
   document.getElementById('shopBadges').innerHTML = COSMETIC_CATALOG.badges.map(item => shopBadgeItemHtml(item, myProfile)).join('');
   document.getElementById('shopCustomBg').innerHTML = shopCustomBgHtml(myProfile);
+  document.getElementById('shopCustomSiteBg').innerHTML = shopCustomSiteBgHtml(myProfile);
 
   // Vantagens
   document.getElementById('guaranteedByeInfo').innerHTML = myProfile.guaranteedBye
@@ -671,6 +674,18 @@ function shopCustomBgHtml(profile){
   return `<div class="shop-item" style="max-width:240px;">
     <div class="shop-item-name">${escapeHtml(item.name)}</div>
     <button class="shop-btn" onclick="doBuyCosmetic('feature_custom_pagebg')">Comprar 🪙${item.price}</button>
+  </div>`;
+}
+
+function shopCustomSiteBgHtml(profile){
+  const owned = (profile.ownedCosmetics||[]).includes('feature_custom_sitebg');
+  const item = getCosmeticById('feature_custom_sitebg');
+  if(owned){
+    return `<div class="empty-state" style="text-align:left;padding:8px 0;">✅ Já desbloqueado — defina a foto no seu <a class="nav-link" href="perfil.html">perfil</a>.</div>`;
+  }
+  return `<div class="shop-item" style="max-width:240px;">
+    <div class="shop-item-name">${escapeHtml(item.name)}</div>
+    <button class="shop-btn" onclick="doBuyCosmetic('feature_custom_sitebg')">Comprar 🪙${item.price}</button>
   </div>`;
 }
 

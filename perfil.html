@@ -308,6 +308,24 @@ async function renderProfile(){
     ? `background-image:linear-gradient(rgba(10,12,20,0.72),rgba(10,12,20,0.72)),url('${profile.profileBackgroundUrl.replace(/'/g,"\\'")}');background-size:cover;background-position:center;`
     : '';
 
+  // Fundo da PÁGINA inteira (diferente do fundo do cartão acima) — cosmético
+  // separado (feature_custom_sitebg/siteBackgroundUrl), independente. Aplica-se
+  // sempre que se renderiza este perfil (próprio ou de outro jogador) e
+  // remove-se sozinho quando não há nada a mostrar, para não ficar "pegado"
+  // ao trocar de perfil.
+  const hasCustomSiteBg = (profile.ownedCosmetics||[]).includes('feature_custom_sitebg') && profile.siteBackgroundUrl;
+  if(hasCustomSiteBg){
+    document.body.style.backgroundImage = `linear-gradient(rgba(10,12,20,0.72),rgba(10,12,20,0.72)),url('${profile.siteBackgroundUrl.replace(/'/g,"\\'")}')`;
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundAttachment = 'fixed';
+  } else {
+    document.body.style.backgroundImage = '';
+    document.body.style.backgroundSize = '';
+    document.body.style.backgroundPosition = '';
+    document.body.style.backgroundAttachment = '';
+  }
+
   container.innerHTML = `
     <div class="card" style="${cardBgStyle}">
       ${!isOwnProfile ? `<div style="margin-bottom:12px;"><a class="nav-link" href="perfil.html">← Ver o meu perfil</a></div>` : ''}
@@ -521,6 +539,8 @@ async function renderProfile(){
       <div class="shop-grid">${COSMETIC_CATALOG.badges.map(item => customizeBadgeHtml(item, profile)).join('')}</div>
       <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Fundo de perfil (foto)</div>
       ${customizeBgHtml(profile)}
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Fundo de página (foto)</div>
+      ${customizeSiteBgHtml(profile)}
       <div class="footer-note" style="margin-top:14px;">Não tem o que quer? Visite a <a class="nav-link" href="loja.html">loja</a> para comprar mais.</div>
     </div>
 
@@ -650,6 +670,17 @@ function customizeBgHtml(profile){
   </div>`;
 }
 
+function customizeSiteBgHtml(profile){
+  const owned = (profile.ownedCosmetics||[]).includes('feature_custom_sitebg');
+  if(!owned){
+    return `<div class="empty-state" style="text-align:left;padding:4px 0;">Ainda não comprou este item — disponível na <a class="nav-link" href="loja.html">loja</a>.</div>`;
+  }
+  return `<div style="max-width:340px;">
+    <input type="text" id="editSiteBgUrl" placeholder="Link da foto de fundo" value="${escapeHtml(profile.siteBackgroundUrl || '')}">
+    <button class="shop-btn" onclick="doSaveSiteBgUrl()">Guardar fundo da página</button>
+  </div>`;
+}
+
 async function doEquipCosmetic(type, id){
   const ok = await equipCosmetic(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, type, id);
   if(ok){
@@ -687,6 +718,19 @@ async function doSaveProfileBgUrl(){
     renderProfile();
     document.getElementById('customizePanel').style.display = 'block';
     logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'perfil', `Definiu novo fundo de perfil: ${url || '(removido)'}`);
+  } else {
+    alert('Não foi possível guardar o fundo. Tente novamente.');
+  }
+}
+
+async function doSaveSiteBgUrl(){
+  const url = document.getElementById('editSiteBgUrl').value.trim();
+  const ok = await setSiteBackgroundUrl(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, url);
+  if(ok){
+    playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    renderProfile();
+    document.getElementById('customizePanel').style.display = 'block';
+    logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'perfil', `Definiu novo fundo de página: ${url || '(removido)'}`);
   } else {
     alert('Não foi possível guardar o fundo. Tente novamente.');
   }
