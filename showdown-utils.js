@@ -276,7 +276,7 @@ const COSMETIC_CATALOG = {
     { id:'frame_gold',  name:'Faíscas',       price:60,  effect:'sparks' },
     { id:'frame_neon',  name:'Estrelado',     price:60,  effect:'starry' },
     { id:'frame_royal', name:'Florescer',     price:100, effect:'blossom' },
-    { id:'frame_diamond', name:'Moldura de Diamante', price:0, effect:'starry', auctionOnly:true }
+    { id:'frame_diamond', name:'Diamante Prismático', price:0, effect:'diamond', auctionOnly:true }
   ],
   nameEffects: [
     { id:'effect_none',  name:'Nenhum',  price:0,  css:'' },
@@ -433,6 +433,30 @@ function ensureAvatarFxStyles(){
     .avatar-fx-blossom span{width:7px;height:7px;background:var(--fx-color);
       border-radius:0% 100% 0% 100%;animation:vseBlossomBloom 3s ease-in-out infinite;}
 
+    /* Diamante Prismático (exclusivo de leilão): anel prismático que gira à volta
+       do avatar, brilho que varre a foto, e 4 gemas nos pontos cardeais que
+       piscam em sequência, seguindo o anel. Usa --fx-color + branco, por isso
+       continua a respeitar a cor escolhida em "Fundo do Avatar" (e a Aurora). */
+    @property --vse-dia-angle{syntax:'<angle>';inherits:false;initial-value:0deg;}
+    @keyframes vseDiaSpin{to{--vse-dia-angle:360deg;}}
+    @keyframes vseDiaShine{0%,50%{background-position:160% 0;}100%{background-position:-60% 0;}}
+    @keyframes vseDiaGlint{0%,100%{opacity:0.5;transform:translate(-50%,-50%) scale(0.75) rotate(0deg);}9%{opacity:1;transform:translate(-50%,-50%) scale(1.35) rotate(18deg);}26%{opacity:0.6;transform:translate(-50%,-50%) scale(0.9) rotate(0deg);}}
+    .avatar-fx-diamond::before{content:'';position:absolute;inset:14%;border-radius:32%;padding:2px;
+      background:conic-gradient(from var(--vse-dia-angle),transparent 0deg,var(--fx-color) 35deg,#fff 70deg,var(--fx-color) 105deg,transparent 140deg,transparent 180deg,color-mix(in srgb,var(--fx-color) 55%,transparent) 215deg,transparent 250deg,transparent 360deg),
+        linear-gradient(color-mix(in srgb,var(--fx-color) 22%,transparent),color-mix(in srgb,var(--fx-color) 22%,transparent));
+      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+      mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;
+      animation:vseDiaSpin 4s linear infinite;}
+    .avatar-fx-diamond::after{content:'';position:absolute;inset:18%;border-radius:28%;
+      background:linear-gradient(115deg,transparent 42%,rgba(255,255,255,0.5) 50%,transparent 58%) 160% 0/250% 100% no-repeat;
+      animation:vseDiaShine 4s ease-in-out infinite;}
+    .avatar-fx-diamond span{width:var(--fx-gem,9px);height:var(--fx-gem,9px);
+      background:radial-gradient(circle,color-mix(in srgb,var(--fx-color) 65%,#fff) 0%,transparent 68%);
+      animation:vseDiaGlint 4s ease-in-out infinite;}
+    .avatar-fx-diamond span::before{content:'';position:absolute;inset:16%;
+      background:linear-gradient(160deg,#fff 0 32%,color-mix(in srgb,var(--fx-color) 55%,#fff) 32% 62%,var(--fx-color) 62%);
+      clip-path:polygon(50% 100%,0% 38%,22% 0%,78% 0%,100% 38%);}
+
     @keyframes vseFxHueRotate{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
     .avatar-fx-layer.avatar-fx-multicolor{animation:vseFxHueRotate 5s linear infinite;}
   `;
@@ -454,21 +478,29 @@ function frameEffectPreviewHtml(effectType){
 }
 
 const AVATAR_FX_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
-const AVATAR_FX_COUNTS = { sparks:6, starry:6, blossom:5 };
+const AVATAR_FX_COUNTS = { sparks:6, starry:6, blossom:5, diamond:4 };
+// Efeitos que não usam os primeiros N ângulos da lista acima — o Diamante
+// quer as 4 gemas espalhadas pelos pontos cardeais (direita, baixo, esquerda,
+// cima), pela ordem em que o anel as "visita" ao rodar.
+const AVATAR_FX_ANGLE_OVERRIDES = { diamond:[0, 90, 180, 270] };
+// Duração (s) do ciclo de cada efeito, para espaçar o atraso de cada partícula.
+const AVATAR_FX_PERIODS = { diamond:4 };
 
 function avatarFxParticlesHtml(effectType, radiusPct){
   const count = AVATAR_FX_COUNTS[effectType] || 6;
-  return AVATAR_FX_ANGLES.slice(0, count).map((deg, i)=>{
+  const angles = AVATAR_FX_ANGLE_OVERRIDES[effectType] || AVATAR_FX_ANGLES.slice(0, count);
+  const period = AVATAR_FX_PERIODS[effectType] || 2.4;
+  return angles.map((deg, i)=>{
     const rad = deg * Math.PI / 180;
     const x = 50 + radiusPct * Math.cos(rad);
     const y = 50 + radiusPct * Math.sin(rad);
-    const delay = (i * (2.4 / count)).toFixed(2);
+    const delay = (i * (period / count)).toFixed(2);
     return `<span style="top:${y.toFixed(1)}%;left:${x.toFixed(1)}%;animation-delay:${delay}s;"></span>`;
   }).join('');
 }
 
 // effectColor: cor (hex) escolhida em "Fundo do Avatar". effectType: 'none' |
-// 'sparks' | 'starry' | 'blossom'. multiColor: true para a Aurora Animada,
+// 'sparks' | 'starry' | 'blossom' | 'diamond'. multiColor: true para a Aurora Animada,
 // faz o efeito ciclar de cor continuamente em vez de ficar fixo.
 function avatarHtml(name, photoUrl, sizePx, effectColor, effectType, multiColor){
   const size = sizePx || 44;
@@ -492,7 +524,9 @@ function avatarHtml(name, photoUrl, sizePx, effectColor, effectType, multiColor)
   const particles = avatarFxParticlesHtml(effectType, 42);
   const multiClass = multiColor ? ' avatar-fx-multicolor' : '';
 
-  return `<div class="avatar-fx-wrap" style="--fx-color:${color};width:${wrapSize}px;height:${wrapSize}px;">
+  const gemSize = Math.max(Math.round(size*0.2), 7);
+
+  return `<div class="avatar-fx-wrap" style="--fx-color:${color};--fx-gem:${gemSize}px;width:${wrapSize}px;height:${wrapSize}px;">
     <div class="avatar-fx-layer avatar-fx-${effectType}${multiClass}">${particles}</div>
     ${innerHtml}
   </div>`;
