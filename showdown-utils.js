@@ -1159,6 +1159,9 @@ function computeRemainingTiersInCycle(rows){
 // Devolve {ok, reason} — 'insufficient' | 'invalid' | 'error' | true
 async function castTierVote(supabaseUrl, supabaseAnonKey, name, tier, amount){
   if(!amount || amount <= 0) return {ok:false, reason:'invalid'};
+  // Durante um evento o tier das semanas seguintes é fixo — votar só gastaria moedas em vão.
+  const activeEv = await fetchActiveEvent(supabaseUrl, supabaseAnonKey);
+  if(isTierVotingLockedByEvent(activeEv)) return {ok:false, reason:'event_locked'};
   const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
   const rows = await res.json();
   if(!rows || !rows[0]) return {ok:false, reason:'error'};
@@ -2803,4 +2806,100 @@ function computeNextUncelebratedMilestone(fund){
   const reached = Math.floor((fund.total_collected||0) / HOUSE_FUND_MILESTONE_STEP) * HOUSE_FUND_MILESTONE_STEP;
   if(reached > 0 && reached > (fund.last_milestone||0)) return reached;
   return null;
+}
+
+// ---------- Eventos: regiões por geração (evento "Volta ao Mundo") ----------
+// Região = geração em que a ESPÉCIE foi introduzida (Pokédex Nacional 1–151 Kanto,
+// 152–251 Johto, 252–386 Hoenn, 387–493 Sinnoh). Formas regionais/alternativas contam
+// na geração da espécie base (ex.: Tauros-Paldea-Blaze = Kanto). Gerado uma vez a
+// partir do pokedex do Pokémon Showdown. COPIADO À MÃO para torneio_showdown.html
+// (o gestor não carrega este ficheiro) — manter as duas cópias iguais.
+const EVENT_REGIONS = {
+  kanto:  { label:'Kanto',  dex:'#1–151' },
+  johto:  { label:'Johto',  dex:'#152–251' },
+  hoenn:  { label:'Hoenn',  dex:'#252–386' },
+  sinnoh: { label:'Sinnoh', dex:'#387–493' }
+};
+const EVENT_REGION_SPECIES = {
+  kanto: 'bulbasaur ivysaur venusaur charmander charmeleon charizard squirtle wartortle blastoise caterpie metapod '
+    + 'butterfree weedle kakuna beedrill pidgey pidgeotto pidgeot rattata raticate spearow fearow ekans arbok pikachu '
+    + 'raichu sandshrew sandslash nidoranf nidorina nidoqueen nidoranm nidorino nidoking clefairy clefable vulpix '
+    + 'ninetales jigglypuff wigglytuff zubat golbat oddish gloom vileplume paras parasect venonat venomoth diglett '
+    + 'dugtrio meowth persian psyduck golduck mankey primeape growlithe arcanine poliwag poliwhirl poliwrath abra '
+    + 'kadabra alakazam machop machoke machamp bellsprout weepinbell victreebel tentacool tentacruel geodude graveler '
+    + 'golem ponyta rapidash slowpoke slowbro magnemite magneton farfetchd doduo dodrio seel dewgong grimer muk '
+    + 'shellder cloyster gastly haunter gengar onix drowzee hypno krabby kingler voltorb electrode exeggcute '
+    + 'exeggutor cubone marowak hitmonlee hitmonchan lickitung koffing weezing rhyhorn rhydon chansey tangela '
+    + 'kangaskhan horsea seadra goldeen seaking staryu starmie mrmime scyther jynx electabuzz magmar pinsir tauros '
+    + 'magikarp gyarados lapras ditto eevee vaporeon jolteon flareon porygon omanyte omastar kabuto kabutops '
+    + 'aerodactyl snorlax articuno zapdos moltres dratini dragonair dragonite mewtwo mew',
+  johto: 'chikorita bayleef meganium cyndaquil quilava typhlosion totodile croconaw feraligatr sentret furret hoothoot '
+    + 'noctowl ledyba ledian spinarak ariados crobat chinchou lanturn pichu cleffa igglybuff togepi togetic natu xatu '
+    + 'mareep flaaffy ampharos bellossom marill azumarill sudowoodo politoed hoppip skiploom jumpluff aipom sunkern '
+    + 'sunflora yanma wooper quagsire espeon umbreon murkrow slowking misdreavus unown wobbuffet girafarig pineco '
+    + 'forretress dunsparce gligar steelix snubbull granbull qwilfish scizor shuckle heracross sneasel teddiursa '
+    + 'ursaring slugma magcargo swinub piloswine corsola remoraid octillery delibird mantine skarmory houndour '
+    + 'houndoom kingdra phanpy donphan porygon2 stantler smeargle tyrogue hitmontop smoochum elekid magby miltank '
+    + 'blissey raikou entei suicune larvitar pupitar tyranitar lugia hooh celebi',
+  hoenn: 'treecko grovyle sceptile torchic combusken blaziken mudkip marshtomp swampert poochyena mightyena zigzagoon '
+    + 'linoone wurmple silcoon beautifly cascoon dustox lotad lombre ludicolo seedot nuzleaf shiftry taillow swellow '
+    + 'wingull pelipper ralts kirlia gardevoir surskit masquerain shroomish breloom slakoth vigoroth slaking nincada '
+    + 'ninjask shedinja whismur loudred exploud makuhita hariyama azurill nosepass skitty delcatty sableye mawile '
+    + 'aron lairon aggron meditite medicham electrike manectric plusle minun volbeat illumise roselia gulpin swalot '
+    + 'carvanha sharpedo wailmer wailord numel camerupt torkoal spoink grumpig spinda trapinch vibrava flygon cacnea '
+    + 'cacturne swablu altaria zangoose seviper lunatone solrock barboach whiscash corphish crawdaunt baltoy claydol '
+    + 'lileep cradily anorith armaldo feebas milotic castform kecleon shuppet banette duskull dusclops tropius '
+    + 'chimecho absol wynaut snorunt glalie spheal sealeo walrein clamperl huntail gorebyss relicanth luvdisc bagon '
+    + 'shelgon salamence beldum metang metagross regirock regice registeel latias latios kyogre groudon rayquaza '
+    + 'jirachi deoxys',
+  sinnoh: 'turtwig grotle torterra chimchar monferno infernape piplup prinplup empoleon starly staravia staraptor bidoof '
+    + 'bibarel kricketot kricketune shinx luxio luxray budew roserade cranidos rampardos shieldon bastiodon burmy '
+    + 'wormadam mothim combee vespiquen pachirisu buizel floatzel cherubi cherrim shellos gastrodon ambipom drifloon '
+    + 'drifblim buneary lopunny mismagius honchkrow glameow purugly chingling stunky skuntank bronzor bronzong bonsly '
+    + 'mimejr happiny chatot spiritomb gible gabite garchomp munchlax riolu lucario hippopotas hippowdon skorupi '
+    + 'drapion croagunk toxicroak carnivine finneon lumineon mantyke snover abomasnow weavile magnezone lickilicky '
+    + 'rhyperior tangrowth electivire magmortar togekiss yanmega leafeon glaceon gliscor mamoswine porygonz gallade '
+    + 'probopass dusknoir froslass rotom uxie mesprit azelf dialga palkia heatran regigigas giratina cresselia phione '
+    + 'manaphy darkrai shaymin arceus'
+};
+let _eventRegionIndex = null;
+function eventSpeciesId(name){ return String(name||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+// Devolve 'kanto' | 'johto' | 'hoenn' | 'sinnoh', ou null se a espécie não pertence a
+// nenhuma das 4 regiões. Tenta o nome inteiro (Ho-Oh, Porygon-Z, Nidoran-F...) e depois
+// prefixos separados por hífen (Tauros-Paldea-Blaze -> Tauros) para apanhar as formas.
+function getEventRegionOfSpecies(name){
+  if(!_eventRegionIndex){
+    _eventRegionIndex = {};
+    Object.keys(EVENT_REGION_SPECIES).forEach(r=>{
+      EVENT_REGION_SPECIES[r].split(' ').forEach(id=>{ if(id) _eventRegionIndex[id] = r; });
+    });
+  }
+  const full = eventSpeciesId(name);
+  if(_eventRegionIndex[full]) return _eventRegionIndex[full];
+  const parts = String(name||'').split('-');
+  for(let k = parts.length - 1; k >= 1; k--){
+    const id = eventSpeciesId(parts.slice(0, k).join('-'));
+    if(_eventRegionIndex[id]) return _eventRegionIndex[id];
+  }
+  return null;
+}
+function isSpeciesInEventRegion(name, region){ return getEventRegionOfSpecies(name) === region; }
+
+// Evento ativo (ou null). Devolve null também se a tabela `events` ainda não existir,
+// para as páginas continuarem a funcionar antes de o SQL ser corrido.
+async function fetchActiveEvent(supabaseUrl, supabaseAnonKey){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/events?status=eq.active&select=*&order=created_at.desc&limit=1`, {
+      headers: sbAuthHeaders(supabaseAnonKey)
+    });
+    if(!res.ok) return null;
+    const rows = await res.json();
+    return rows && rows[0] ? rows[0] : null;
+  } catch(e){ return null; }
+}
+
+// Enquanto um evento ativo ainda tiver semanas sem torneio criado, o tier da próxima semana
+// é fixo (National Dex AG) — por isso a votação de tier (que custa moedas) fica bloqueada.
+function isTierVotingLockedByEvent(ev){
+  return !!(ev && ev.status === 'active' && ev.current_week < ev.total_weeks);
 }

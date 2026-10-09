@@ -434,6 +434,7 @@ function renderBracket(){
   }
   const nameLabel = currentData.name ? escapeHtml(currentData.name) + ' ' : '';
   let html = `<h2>${nameLabel}<span class="tier-pill">${currentData.tier||''}</span> <span style="font-size:10.5px;color:var(--text-faint);font-weight:400;text-transform:none;">🔴 ao vivo — atualiza sozinho</span></h2>`;
+  html += eventBannerHtml();
   let lastLabel = null;
   matches.forEach(m=>{
     if(m.label !== lastLabel){
@@ -452,6 +453,29 @@ function renderBracket(){
 
 // escapeHtml, parseStatString, parseShowdownImport e copyText agora vivem em
 // showdown-utils.js (carregado no <head>), partilhado com o gestor.
+
+// ---------- Torneios de evento (ex.: "Volta ao Mundo") ----------
+// Quando o torneio tem `event` (gravado pelo gestor), só valem Pokémon da região da semana.
+function eventBannerHtml(){
+  const ev = currentData && currentData.event;
+  if(!ev || !EVENT_REGIONS[ev.region]) return '';
+  const r = EVENT_REGIONS[ev.region];
+  return `<div class="event-banner">🌍 <b>${escapeHtml(ev.name || 'Evento')}</b> — Semana ${ev.week}: só Pokémon de <b>${r.label}</b> (${r.dex}). Vale para o torneio e para os x1 do evento.</div>`;
+}
+
+// Devolve { ok:true } ou { ok:false, short, long } para um nome de espécie num torneio de evento.
+function checkEventRegion(speciesName){
+  const ev = currentData && currentData.event;
+  if(!ev || !EVENT_REGIONS[ev.region]) return { ok:true };
+  const found = getEventRegionOfSpecies(speciesName);
+  if(found === ev.region) return { ok:true };
+  const r = EVENT_REGIONS[ev.region];
+  return {
+    ok:false,
+    short: `Fora da região do evento: ${speciesName} não é de ${r.label}`,
+    long: `<b>${escapeHtml(speciesName)}</b> não é de ${r.label} (${r.dex})` + (found ? ` — é de ${EVENT_REGIONS[found].label}` : ' — é de outra geração')
+  };
+}
 
 const REROLL_COST = 30;
 async function requestReroll(pIdx, slotIndex, monName){
@@ -515,6 +539,7 @@ function renderMyDraw(){
       </details>`;
 
   let html = `<h2>Os seus Pokémon</h2>`;
+  html += eventBannerHtml();
   if(locked) html += `<div class="locked-banner">🔒 Este torneio já foi concluído. Os sets ficam bloqueados para consulta — já não é possível alterá-los.</div>`;
   html += `<div class="player-result"><div class="pname">${playerName}</div>`;
 
@@ -597,6 +622,8 @@ function importMyMon(pIdx, idx, kind, btn){
   if(!raw){ showSaveFeedback(btn, 'Cole o import antes de clicar', true); return; }
   const parsed = parseShowdownImport(raw);
   if(!parsed || !parsed.name){ showSaveFeedback(btn, 'Não reconheci o import — confira o formato', true); return; }
+  const regionCheck = checkEventRegion(parsed.name);
+  if(!regionCheck.ok){ showSaveFeedback(btn, regionCheck.short, true); return; }
 
   if(!currentData.draws) currentData.draws = {};
   if(!currentData.draws[pIdx]) currentData.draws[pIdx] = { random:[{},{},{},{}], free:[{name:'',text:''},{name:'',text:''}] };
@@ -657,6 +684,13 @@ async function importWholeTeam(btn){
   }
   if(leftover.length < freeSlots.length){
     fail(`Faltam Pokémon no texto para as escolhas livres — o time são ${randomSlots.length} sorteados + ${freeSlots.length} escolhas livres, e só encontrei ${randomSlots.length + leftover.length}.`);
+    return;
+  }
+
+  // Torneio de evento: as escolhas livres (o que sobrou do texto) também têm de ser da região.
+  const outsideRegion = leftover.map(i => ({ i, check: checkEventRegion(entries[i].parsed.name) })).filter(x => !x.check.ok);
+  if(outsideRegion.length){
+    fail(`Fora da regra do evento: ${outsideRegion.map(x => x.check.long).join('; ')}.`);
     return;
   }
 

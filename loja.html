@@ -119,9 +119,12 @@
     <div class="card">
       <h2>🗳️ Votar no tier da próxima semana</h2>
       <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">Financie o tier que quer jogar a seguir — quem juntar mais moedas num tier tem mais peso na escolha do organizador. Só entram os tiers que ainda faltam no ciclo atual.</div>
-      <select id="tierVoteSelect"></select>
-      <input type="number" id="tierVoteAmount" placeholder="Quantas moedas?" min="1">
-      <button class="btn-primary" onclick="doCastTierVote()">Votar</button>
+      <div id="tierVoteLockedNote" class="event-banner" style="display:none;"></div>
+      <div id="tierVoteControls">
+        <select id="tierVoteSelect"></select>
+        <input type="number" id="tierVoteAmount" placeholder="Quantas moedas?" min="1">
+        <button class="btn-primary" onclick="doCastTierVote()">Votar</button>
+      </div>
       <div style="margin-top:14px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">Votação atual</div>
       <div id="tierVoteStandingsList"><div class="empty-state">A carregar…</div></div>
     </div>
@@ -250,6 +253,7 @@ let playerProfiles = {};
 let allRows = [];
 let remainingTiers = [];
 let tierVoteStandings = [];
+let activeEvent = null; // evento ativo (tabela events) ou null — bloqueia a votação de tier
 let generosityRanking = [];
 let rouletteHistory = [];
 let rouletteRanking = [];
@@ -359,6 +363,7 @@ async function init(){
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
     remainingTiers = computeRemainingTiersInCycle(allRows);
+    activeEvent = await fetchActiveEvent(SUPABASE_URL, SUPABASE_ANON_KEY);
     tierVoteStandings = await fetchTierVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY);
     generosityRanking = await fetchGenerosityRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
     rouletteHistory = await fetchRouletteTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 20);
@@ -412,6 +417,13 @@ function renderAll(){
     ? '✅ Já desbloqueado — veja o gráfico no seu perfil.'
     : `Desbloqueia para sempre um gráfico mostrando como o seu Elo mudou ao longo dos torneios. Custa 🪙${ELO_CHART_PRICE}.`;
   document.getElementById('eloChartBtn').style.display = myProfile.eloChartUnlocked ? 'none' : 'block';
+
+  // Durante um evento o tier é fixo (National Dex AG) — a votação fica bloqueada.
+  const votingLocked = isTierVotingLockedByEvent(activeEvent);
+  document.getElementById('tierVoteControls').style.display = votingLocked ? 'none' : '';
+  const lockedNote = document.getElementById('tierVoteLockedNote');
+  lockedNote.style.display = votingLocked ? '' : 'none';
+  if(votingLocked) lockedNote.innerHTML = `🌍 Votação fechada durante o evento <b>${escapeHtml(activeEvent.name)}</b>: o tier das semanas do evento é fixo (National Dex AG). Volta a abrir quando o torneio da última semana for criado.`;
 
   const tierSel = document.getElementById('tierVoteSelect');
   tierSel.innerHTML = remainingTiers.map(t=>`<option value="${t}">${t}</option>`).join('');
@@ -815,6 +827,12 @@ async function doCastTierVote(){
   if(!amount || amount <= 0){ alert('Digite uma quantidade de moedas válida.'); return; }
   const result = await castTierVote(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, tier, amount);
   if(!result.ok){
+    if(result.reason === 'event_locked'){
+      alert('A votação de tier está fechada durante o evento — o tier é fixo. Nenhuma moeda foi gasta.');
+      activeEvent = await fetchActiveEvent(SUPABASE_URL, SUPABASE_ANON_KEY);
+      renderAll();
+      return;
+    }
     alert(result.reason === 'insufficient' ? 'Você não tem moedas suficientes para esse voto.' : 'Não foi possível processar. Tente novamente.');
     return;
   }
