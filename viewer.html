@@ -460,7 +460,7 @@ function eventBannerHtml(){
   const ev = currentData && currentData.event;
   if(!ev || !EVENT_REGIONS[ev.region]) return '';
   const r = EVENT_REGIONS[ev.region];
-  return `<div class="event-banner">🌍 <b>${escapeHtml(ev.name || 'Evento')}</b> — Semana ${ev.week}: só Pokémon de <b>${r.label}</b> (${r.dex}). Vale para o torneio e para os x1 do evento.</div>`;
+  return `<div class="event-banner">🌍 <b>${escapeHtml(ev.name || 'Evento')}</b> — Semana ${ev.week}: só Pokémon de <b>${r.label}</b> (${r.dex}), na forma original (sem formas regionais). Vale para o torneio e para os x1 do evento.</div>`;
 }
 
 // Devolve { ok:true } ou { ok:false, short, long } para um nome de espécie num torneio de evento.
@@ -468,8 +468,16 @@ function checkEventRegion(speciesName){
   const ev = currentData && currentData.event;
   if(!ev || !EVENT_REGIONS[ev.region]) return { ok:true };
   const found = getEventRegionOfSpecies(speciesName);
-  if(found === ev.region) return { ok:true };
+  if(isSpeciesAllowedInEventRegion(speciesName, ev.region)) return { ok:true };
   const r = EVENT_REGIONS[ev.region];
+  // Região certa mas é uma forma regional/variante: só vale a forma original
+  if(found === ev.region){
+    return {
+      ok:false,
+      short: `Fora da regra do evento: ${speciesName} é uma forma regional — só vale a forma original`,
+      long: `<b>${escapeHtml(speciesName)}</b> é uma forma regional/variante — neste evento só vale a forma original`
+    };
+  }
   return {
     ok:false,
     short: `Fora da região do evento: ${speciesName} não é de ${r.label}`,

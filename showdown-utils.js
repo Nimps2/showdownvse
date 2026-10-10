@@ -1147,6 +1147,8 @@ function computeRemainingTiersInCycle(rows){
   sorted.forEach(r=>{
     const tier = r.tier;
     if(!tier) return;
+    // Torneios de evento têm o tier próprio "Evento" (não é um dos tiers do ciclo) — ignorar.
+    if(!ALL_TIERS.includes(tier)) return;
     if(usedInCycle.size >= ALL_TIERS.length) usedInCycle = new Set();
     usedInCycle.add(tier);
   });
@@ -2821,46 +2823,47 @@ const EVENT_REGIONS = {
   sinnoh: { label:'Sinnoh', dex:'#387–493' }
 };
 const EVENT_REGION_SPECIES = {
-  kanto: 'bulbasaur ivysaur venusaur charmander charmeleon charizard squirtle wartortle blastoise caterpie metapod '
-    + 'butterfree weedle kakuna beedrill pidgey pidgeotto pidgeot rattata raticate spearow fearow ekans arbok pikachu '
-    + 'raichu sandshrew sandslash nidoranf nidorina nidoqueen nidoranm nidorino nidoking clefairy clefable vulpix '
-    + 'ninetales jigglypuff wigglytuff zubat golbat oddish gloom vileplume paras parasect venonat venomoth diglett '
-    + 'dugtrio meowth persian psyduck golduck mankey primeape growlithe arcanine poliwag poliwhirl poliwrath abra '
-    + 'kadabra alakazam machop machoke machamp bellsprout weepinbell victreebel tentacool tentacruel geodude graveler '
-    + 'golem ponyta rapidash slowpoke slowbro magnemite magneton farfetchd doduo dodrio seel dewgong grimer muk '
-    + 'shellder cloyster gastly haunter gengar onix drowzee hypno krabby kingler voltorb electrode exeggcute '
-    + 'exeggutor cubone marowak hitmonlee hitmonchan lickitung koffing weezing rhyhorn rhydon chansey tangela '
-    + 'kangaskhan horsea seadra goldeen seaking staryu starmie mrmime scyther jynx electabuzz magmar pinsir tauros '
-    + 'magikarp gyarados lapras ditto eevee vaporeon jolteon flareon porygon omanyte omastar kabuto kabutops '
-    + 'aerodactyl snorlax articuno zapdos moltres dratini dragonair dragonite mewtwo mew',
-  johto: 'chikorita bayleef meganium cyndaquil quilava typhlosion totodile croconaw feraligatr sentret furret hoothoot '
-    + 'noctowl ledyba ledian spinarak ariados crobat chinchou lanturn pichu cleffa igglybuff togepi togetic natu xatu '
-    + 'mareep flaaffy ampharos bellossom marill azumarill sudowoodo politoed hoppip skiploom jumpluff aipom sunkern '
-    + 'sunflora yanma wooper quagsire espeon umbreon murkrow slowking misdreavus unown wobbuffet girafarig pineco '
-    + 'forretress dunsparce gligar steelix snubbull granbull qwilfish scizor shuckle heracross sneasel teddiursa '
-    + 'ursaring slugma magcargo swinub piloswine corsola remoraid octillery delibird mantine skarmory houndour '
-    + 'houndoom kingdra phanpy donphan porygon2 stantler smeargle tyrogue hitmontop smoochum elekid magby miltank '
-    + 'blissey raikou entei suicune larvitar pupitar tyranitar lugia hooh celebi',
-  hoenn: 'treecko grovyle sceptile torchic combusken blaziken mudkip marshtomp swampert poochyena mightyena zigzagoon '
-    + 'linoone wurmple silcoon beautifly cascoon dustox lotad lombre ludicolo seedot nuzleaf shiftry taillow swellow '
-    + 'wingull pelipper ralts kirlia gardevoir surskit masquerain shroomish breloom slakoth vigoroth slaking nincada '
-    + 'ninjask shedinja whismur loudred exploud makuhita hariyama azurill nosepass skitty delcatty sableye mawile '
-    + 'aron lairon aggron meditite medicham electrike manectric plusle minun volbeat illumise roselia gulpin swalot '
-    + 'carvanha sharpedo wailmer wailord numel camerupt torkoal spoink grumpig spinda trapinch vibrava flygon cacnea '
-    + 'cacturne swablu altaria zangoose seviper lunatone solrock barboach whiscash corphish crawdaunt baltoy claydol '
-    + 'lileep cradily anorith armaldo feebas milotic castform kecleon shuppet banette duskull dusclops tropius '
-    + 'chimecho absol wynaut snorunt glalie spheal sealeo walrein clamperl huntail gorebyss relicanth luvdisc bagon '
-    + 'shelgon salamence beldum metang metagross regirock regice registeel latias latios kyogre groudon rayquaza '
-    + 'jirachi deoxys',
-  sinnoh: 'turtwig grotle torterra chimchar monferno infernape piplup prinplup empoleon starly staravia staraptor bidoof '
-    + 'bibarel kricketot kricketune shinx luxio luxray budew roserade cranidos rampardos shieldon bastiodon burmy '
-    + 'wormadam mothim combee vespiquen pachirisu buizel floatzel cherubi cherrim shellos gastrodon ambipom drifloon '
-    + 'drifblim buneary lopunny mismagius honchkrow glameow purugly chingling stunky skuntank bronzor bronzong bonsly '
-    + 'mimejr happiny chatot spiritomb gible gabite garchomp munchlax riolu lucario hippopotas hippowdon skorupi '
-    + 'drapion croagunk toxicroak carnivine finneon lumineon mantyke snover abomasnow weavile magnezone lickilicky '
-    + 'rhyperior tangrowth electivire magmortar togekiss yanmega leafeon glaceon gliscor mamoswine porygonz gallade '
-    + 'probopass dusknoir froslass rotom uxie mesprit azelf dialga palkia heatran regigigas giratina cresselia phione '
-    + 'manaphy darkrai shaymin arceus'
+  kanto: 'Bulbasaur,Ivysaur,Venusaur,Charmander,Charmeleon,Charizard,Squirtle,Wartortle,Blastoise,Caterpie,Metapod,'
+    + 'Butterfree,Weedle,Kakuna,Beedrill,Pidgey,Pidgeotto,Pidgeot,Rattata,Raticate,Spearow,Fearow,Ekans,Arbok,'
+    + 'Pikachu,Raichu,Sandshrew,Sandslash,Nidoran-F,Nidorina,Nidoqueen,Nidoran-M,Nidorino,Nidoking,Clefairy,'
+    + 'Clefable,Vulpix,Ninetales,Jigglypuff,Wigglytuff,Zubat,Golbat,Oddish,Gloom,Vileplume,Paras,Parasect,Venonat,'
+    + 'Venomoth,Diglett,Dugtrio,Meowth,Persian,Psyduck,Golduck,Mankey,Primeape,Growlithe,Arcanine,Poliwag,'
+    + 'Poliwhirl,Poliwrath,Abra,Kadabra,Alakazam,Machop,Machoke,Machamp,Bellsprout,Weepinbell,Victreebel,Tentacool,'
+    + 'Tentacruel,Geodude,Graveler,Golem,Ponyta,Rapidash,Slowpoke,Slowbro,Magnemite,Magneton,Farfetch’d,Doduo,'
+    + 'Dodrio,Seel,Dewgong,Grimer,Muk,Shellder,Cloyster,Gastly,Haunter,Gengar,Onix,Drowzee,Hypno,Krabby,Kingler,'
+    + 'Voltorb,Electrode,Exeggcute,Exeggutor,Cubone,Marowak,Hitmonlee,Hitmonchan,Lickitung,Koffing,Weezing,Rhyhorn,'
+    + 'Rhydon,Chansey,Tangela,Kangaskhan,Horsea,Seadra,Goldeen,Seaking,Staryu,Starmie,Mr. Mime,Scyther,Jynx,'
+    + 'Electabuzz,Magmar,Pinsir,Tauros,Magikarp,Gyarados,Lapras,Ditto,Eevee,Vaporeon,Jolteon,Flareon,Porygon,'
+    + 'Omanyte,Omastar,Kabuto,Kabutops,Aerodactyl,Snorlax,Articuno,Zapdos,Moltres,Dratini,Dragonair,Dragonite,'
+    + 'Mewtwo,Mew',
+  johto: 'Chikorita,Bayleef,Meganium,Cyndaquil,Quilava,Typhlosion,Totodile,Croconaw,Feraligatr,Sentret,Furret,'
+    + 'Hoothoot,Noctowl,Ledyba,Ledian,Spinarak,Ariados,Crobat,Chinchou,Lanturn,Pichu,Cleffa,Igglybuff,Togepi,'
+    + 'Togetic,Natu,Xatu,Mareep,Flaaffy,Ampharos,Bellossom,Marill,Azumarill,Sudowoodo,Politoed,Hoppip,Skiploom,'
+    + 'Jumpluff,Aipom,Sunkern,Sunflora,Yanma,Wooper,Quagsire,Espeon,Umbreon,Murkrow,Slowking,Misdreavus,Unown,'
+    + 'Wobbuffet,Girafarig,Pineco,Forretress,Dunsparce,Gligar,Steelix,Snubbull,Granbull,Qwilfish,Scizor,Shuckle,'
+    + 'Heracross,Sneasel,Teddiursa,Ursaring,Slugma,Magcargo,Swinub,Piloswine,Corsola,Remoraid,Octillery,Delibird,'
+    + 'Mantine,Skarmory,Houndour,Houndoom,Kingdra,Phanpy,Donphan,Porygon2,Stantler,Smeargle,Tyrogue,Hitmontop,'
+    + 'Smoochum,Elekid,Magby,Miltank,Blissey,Raikou,Entei,Suicune,Larvitar,Pupitar,Tyranitar,Lugia,Ho-Oh,Celebi',
+  hoenn: 'Treecko,Grovyle,Sceptile,Torchic,Combusken,Blaziken,Mudkip,Marshtomp,Swampert,Poochyena,Mightyena,Zigzagoon,'
+    + 'Linoone,Wurmple,Silcoon,Beautifly,Cascoon,Dustox,Lotad,Lombre,Ludicolo,Seedot,Nuzleaf,Shiftry,Taillow,'
+    + 'Swellow,Wingull,Pelipper,Ralts,Kirlia,Gardevoir,Surskit,Masquerain,Shroomish,Breloom,Slakoth,Vigoroth,'
+    + 'Slaking,Nincada,Ninjask,Shedinja,Whismur,Loudred,Exploud,Makuhita,Hariyama,Azurill,Nosepass,Skitty,Delcatty,'
+    + 'Sableye,Mawile,Aron,Lairon,Aggron,Meditite,Medicham,Electrike,Manectric,Plusle,Minun,Volbeat,Illumise,'
+    + 'Roselia,Gulpin,Swalot,Carvanha,Sharpedo,Wailmer,Wailord,Numel,Camerupt,Torkoal,Spoink,Grumpig,Spinda,'
+    + 'Trapinch,Vibrava,Flygon,Cacnea,Cacturne,Swablu,Altaria,Zangoose,Seviper,Lunatone,Solrock,Barboach,Whiscash,'
+    + 'Corphish,Crawdaunt,Baltoy,Claydol,Lileep,Cradily,Anorith,Armaldo,Feebas,Milotic,Castform,Kecleon,Shuppet,'
+    + 'Banette,Duskull,Dusclops,Tropius,Chimecho,Absol,Wynaut,Snorunt,Glalie,Spheal,Sealeo,Walrein,Clamperl,'
+    + 'Huntail,Gorebyss,Relicanth,Luvdisc,Bagon,Shelgon,Salamence,Beldum,Metang,Metagross,Regirock,Regice,'
+    + 'Registeel,Latias,Latios,Kyogre,Groudon,Rayquaza,Jirachi,Deoxys',
+  sinnoh: 'Turtwig,Grotle,Torterra,Chimchar,Monferno,Infernape,Piplup,Prinplup,Empoleon,Starly,Staravia,Staraptor,'
+    + 'Bidoof,Bibarel,Kricketot,Kricketune,Shinx,Luxio,Luxray,Budew,Roserade,Cranidos,Rampardos,Shieldon,Bastiodon,'
+    + 'Burmy,Wormadam,Mothim,Combee,Vespiquen,Pachirisu,Buizel,Floatzel,Cherubi,Cherrim,Shellos,Gastrodon,Ambipom,'
+    + 'Drifloon,Drifblim,Buneary,Lopunny,Mismagius,Honchkrow,Glameow,Purugly,Chingling,Stunky,Skuntank,Bronzor,'
+    + 'Bronzong,Bonsly,Mime Jr.,Happiny,Chatot,Spiritomb,Gible,Gabite,Garchomp,Munchlax,Riolu,Lucario,Hippopotas,'
+    + 'Hippowdon,Skorupi,Drapion,Croagunk,Toxicroak,Carnivine,Finneon,Lumineon,Mantyke,Snover,Abomasnow,Weavile,'
+    + 'Magnezone,Lickilicky,Rhyperior,Tangrowth,Electivire,Magmortar,Togekiss,Yanmega,Leafeon,Glaceon,Gliscor,'
+    + 'Mamoswine,Porygon-Z,Gallade,Probopass,Dusknoir,Froslass,Rotom,Uxie,Mesprit,Azelf,Dialga,Palkia,Heatran,'
+    + 'Regigigas,Giratina,Cresselia,Phione,Manaphy,Darkrai,Shaymin,Arceus'
 };
 let _eventRegionIndex = null;
 function eventSpeciesId(name){ return String(name||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
@@ -2871,7 +2874,7 @@ function getEventRegionOfSpecies(name){
   if(!_eventRegionIndex){
     _eventRegionIndex = {};
     Object.keys(EVENT_REGION_SPECIES).forEach(r=>{
-      EVENT_REGION_SPECIES[r].split(' ').forEach(id=>{ if(id) _eventRegionIndex[id] = r; });
+      EVENT_REGION_SPECIES[r].split(',').forEach(nm=>{ if(nm) _eventRegionIndex[eventSpeciesId(nm)] = r; });
     });
   }
   const full = eventSpeciesId(name);
@@ -2884,6 +2887,25 @@ function getEventRegionOfSpecies(name){
   return null;
 }
 function isSpeciesInEventRegion(name, region){ return getEventRegionOfSpecies(name) === region; }
+// Nomes (como o Showdown os escreve) de todas as espécies base de uma região.
+function getEventRegionSpeciesNames(region){
+  return EVENT_REGION_SPECIES[region] ? EVENT_REGION_SPECIES[region].split(',') : [];
+}
+
+// Nas semanas de evento só vale a forma ORIGINAL da espécie: formas regionais
+// (Alola, Galar, Hisui, Paldea — ex.: Tauros-Paldea-Aqua) e as variantes do Pikachu com
+// boné (Pikachu-Hoenn, -Kalos...) ficam de fora. COPIADO À MÃO para torneio_showdown.html.
+function isEventExcludedForme(name){
+  const n = String(name || '');
+  return /-(Alola|Galar|Hisui|Paldea)(-|$)/.test(n) || /^Pikachu-/.test(n);
+}
+// É esta espécie válida na região da semana? (região certa E forma original)
+function isSpeciesAllowedInEventRegion(name, region){
+  return getEventRegionOfSpecies(name) === region && !isEventExcludedForme(name);
+}
+// Tier gravado nos torneios de evento (próprio, para não contar como National Dex AG nas
+// estatísticas, nem no ciclo de votação de tier). A pool de Pokémon é a da National Dex AG.
+const EVENT_TIER_LABEL = 'Evento';
 
 // Evento ativo (ou null). Devolve null também se a tabela `events` ainda não existir,
 // para as páginas continuarem a funcionar antes de o SQL ser corrido.
