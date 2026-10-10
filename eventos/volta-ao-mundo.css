@@ -386,6 +386,9 @@ body.light-theme .ev-theme-volta-ao-mundo [data-region="sinnoh"]{--accent:#7c4dc
 .ev-theme-volta-ao-mundo .vm-x1btn.no:hover{border-color:var(--danger);color:var(--danger);}
 .ev-theme-volta-ao-mundo .vm-x1btn:disabled{opacity:0.5;cursor:default;}
 .ev-theme-volta-ao-mundo .vm-duel-replay{display:inline-block;margin-top:8px;font-size:12px;color:var(--tera-cyan);}
+.ev-theme-volta-ao-mundo .vm-x1replay{width:100%;margin:8px 0 0;font-size:12px;}
+.ev-theme-volta-ao-mundo .vm-x1replay-row{display:flex;gap:8px;align-items:center;margin-top:8px;}
+.ev-theme-volta-ao-mundo .vm-x1replay-row .vm-x1replay{margin:0;flex:1;}
 @media (max-width:640px){
   .ev-theme-volta-ao-mundo .vm-duels{grid-template-columns:1fr;}
   .ev-theme-volta-ao-mundo .vm-x1send-row{flex-direction:column;}

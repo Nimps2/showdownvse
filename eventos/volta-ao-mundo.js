@@ -95,7 +95,13 @@
   };
 
   // ---------- Pré-visualização de um cosmético (para as etiquetas de nível) ----------
-  function cosmeticName(id){ const c = getCosmeticById(id); return c ? c.name : id; }
+  // Se o catálogo (showdown-utils.js em cache) não conhecer o prémio, mostra algo legível em vez do código em bruto.
+  function cosmeticName(id){
+    const c = getCosmeticById(id);
+    if(c) return c.name;
+    const lv = LEVELS.find(l => l.cosmeticId === id);
+    return lv ? `Prémio do nível ${lv.level}` : 'Prémio do evento';
+  }
   function cosmeticPreview(id){
     const c = getCosmeticById(id);
     if(!c) return '';
@@ -405,15 +411,23 @@
     const verdict = (r.status === 'confirmed' || r.status === 'resolved')
       ? (w ? `<div class="vm-duel-verdict">🏆 Vitória de <b>${escapeHtml(w)}</b></div>` : '<div class="vm-duel-verdict">Anulado pelo organizador</div>')
       : (r.status === 'reported' && w ? `<div class="vm-duel-verdict soft">${escapeHtml(r.reported_by)} registou: vitória de <b>${escapeHtml(w)}</b></div>` : '');
-    const replay = r.replay_path && (r.status === 'confirmed' || r.status === 'resolved')
+    const replay = r.replay_path && ['reported', 'confirmed', 'resolved'].includes(r.status)
       ? `<a class="vm-duel-replay" href="${encodeURI(r.replay_path).replace(/"/g, '%22')}" target="_blank" rel="noopener">▶ Ver replay</a>` : '';
+    const isPlayer = r.challenger_name === ctx.me || r.opponent_name === ctx.me;
+    // Antes de registar o resultado: campo opcional para colar o link do replay do Showdown.
+    const replayField = acts.includes('win')
+      ? `<input type="text" class="vm-x1replay" id="x1rp-${sid}" placeholder="Link do replay do Showdown (opcional) — replay.pokemonshowdown.com/…">` : '';
+    // Depois: quem jogou ainda pode juntar o link se faltar.
+    const replayAdd = isPlayer && !r.replay_path && ['reported', 'confirmed', 'resolved'].includes(r.status)
+      ? `<div class="vm-x1replay-row"><input type="text" class="vm-x1replay" id="x1rp-${sid}" placeholder="Juntar o link do replay do Showdown"><button class="vm-x1btn" onclick="doX1Replay('${sid}',this)">Juntar replay</button></div>` : '';
     return `<div class="vm-duel s-${r.status}${acts.length ? ' mine' : ''}">
       <div class="vm-duel-top"><span>⚔️ Semana ${r.week}${region ? ' · ' + region : ''}</span><span class="vm-duel-status">${st.label}</span></div>
       <div class="vm-duel-vs">${side(r.challenger_name)}<span class="vm-duel-x">VS</span>${side(r.opponent_name)}</div>
       <ol class="vm-steps">${steps}</ol>
       ${verdict}${r.status === 'disputed' && r.note ? `<div class="vm-duel-note">“${escapeHtml(r.note)}”</div>` : ''}
+      ${replayField}
       ${acts.length ? `<div class="vm-duel-actions">${acts.map(a => `<button class="vm-x1btn ${X1_BTN[a].cls}" onclick="doX1Act('${sid}','${a}',this)">${X1_BTN[a].text}</button>`).join('')}</div>` : ''}
-      ${replay}
+      ${replay}${replayAdd}
     </div>`;
   }
 
@@ -421,7 +435,7 @@
     const cur = ctx.ev.current_week;
     const regionKey = mod.weeks[Math.max(0, Math.min(cur, mod.weeks.length) - 1)].region, r = EVENT_REGIONS[regionKey];
     const intro = `<div class="vm-board-intro"><h3 class="vm-h3">⚔️ Duelos no aeroporto</h3>
-      <p>Desafia outro viajante para um x1 no Showdown. <b>Só valem Pokémon de ${r.label} (${r.dex}), na forma original.</b> Combinem o jogo, e depois <b>registem o resultado aqui</b> (quem jogou regista, o outro confirma). Envia o ficheiro do replay ao organizador para ficar guardado.</p></div>`;
+      <p>Desafia outro viajante para um x1 no Showdown. <b>Só valem Pokémon de ${r.label} (${r.dex}), na forma original.</b> Combinem o jogo, e depois <b>registem o resultado aqui</b> (quem jogou regista, o outro confirma). Ao registar, podes <b>colar o link do replay</b> do Showdown (<i>Upload and share replay</i>) — assim fica guardado e toda a gente o pode ver.</p></div>`;
     if(cur < 1) return intro + '<div class="vm-wall-empty">Os desafios abrem com o torneio da Semana 1.</div>';
     const q = EventCore.x1.quota(ctx);
     const names = (ctx.playerNames || []).filter(n => n !== ctx.me).sort((a, b) => a.localeCompare(b));

@@ -63,8 +63,8 @@
   <div class="footer-note">As missões são calculadas a partir do que já fizeste no site — clica em "Reclamar" para receber os prémios.</div>
 </div>
 
-<script src="showdown-utils.js"></script>
-<script src="eventos-core.js?v=20261011a"></script>
+<script src="showdown-utils.js?v=20261011c"></script>
+<script src="eventos-core.js?v=20261011c"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -169,9 +169,10 @@ const evApi = () => ({ ui, x1On: X1_ENABLED && !!ctx && ctx.x1Available !== fals
 // Separadores visíveis: o dos x1 só existe se estiver ligado e a tabela existir.
 const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && evApi().x1On));
 
-// Versão dos ficheiros do evento (eventos-core.js e eventos/<slug>.*): MUDAR sempre que algum deles mudar,
-// para o browser não misturar ficheiros novos com versões antigas em cache.
-const EV_ASSET_VERSION = '20261011a';
+// Versão dos ficheiros do evento (showdown-utils.js, eventos-core.js e eventos/<slug>.*): MUDAR (aqui e nas
+// duas <script src="...?v="> lá em cima) sempre que algum deles mudar, para o browser não misturar ficheiros
+// novos com versões antigas em cache.
+const EV_ASSET_VERSION = '20261011c';
 
 // Carrega o CSS e o JS do evento ativo (cada evento tem o seu par). O slug só pode ter a-z, 0-9 e "-".
 function loadEventAssets(slug){
@@ -201,7 +202,7 @@ async function init(){
   const root = document.getElementById('eventRoot');
   // Depois de uma atualização do site, o browser pode ainda ter em cache o showdown-utils.js antigo
   // (sem as funções do evento). Em vez de um erro genérico, diz o que fazer.
-  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1){
+  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || !getCosmeticById('frame_vm_esquadrilha')){
     setStatus(false, 'Ficheiros antigos em cache.');
     root.innerHTML = '<div class="card"><div class="empty-state">O teu browser ainda tem ficheiros antigos do site em cache. Faz <b>Ctrl+F5</b> para atualizar e abre esta página outra vez.</div></div>';
     return;
@@ -362,8 +363,13 @@ async function doX1Act(id, act, btn){
   if(act === 'accept')       r = await EventCore.x1.respond(ctx, id, true);
   else if(act === 'decline'){ if(!confirm(`Recusar o desafio de ${other}?`)) return; r = await EventCore.x1.respond(ctx, id, false); }
   else if(act === 'cancel'){  if(!confirm(`Cancelar o desafio a ${other}?`)) return;  r = await EventCore.x1.cancel(ctx, id); }
-  else if(act === 'win'){     if(!confirm(`Confirmas que GANHASTE contra ${other}?`)) return; r = await EventCore.x1.report(ctx, id, loggedInPlayerName); }
-  else if(act === 'lose'){    if(!confirm(`Confirmas que PERDESTE contra ${other}?`)) return; r = await EventCore.x1.report(ctx, id, other); }
+  else if(act === 'win' || act === 'lose'){
+    const rpInput = document.getElementById('x1rp-' + id);
+    const replayUrl = rpInput ? rpInput.value : '';
+    if(EventCore.x1.cleanReplayUrl(replayUrl) === null){ alert('O link do replay tem de ser do Showdown, assim: https://replay.pokemonshowdown.com/…  (ou deixa em branco).'); return; }
+    if(!confirm(act === 'win' ? `Confirmas que GANHASTE contra ${other}?` : `Confirmas que PERDESTE contra ${other}?`)) return;
+    r = await EventCore.x1.report(ctx, id, act === 'win' ? loggedInPlayerName : other, replayUrl);
+  }
   else if(act === 'confirm')  r = await EventCore.x1.confirm(ctx, id);
   else if(act === 'dispute'){ const note = prompt(`Porque contestas o resultado de ${row.reported_by}? (opcional — o organizador vai decidir)`); if(note === null) return; r = await EventCore.x1.dispute(ctx, id, note); }
   else return;
@@ -378,6 +384,18 @@ async function doX1Act(id, act, btn){
   } else {
     alert('Não foi possível concluir agora. Tenta outra vez.');
   }
+  renderAll();
+}
+
+async function doX1Replay(id, btn){
+  const input = document.getElementById('x1rp-' + id);
+  const url = input ? input.value : '';
+  if(!EventCore.x1.cleanReplayUrl(url)){ alert('Cola um link do Showdown, assim: https://replay.pokemonshowdown.com/…'); return; }
+  if(btn) btn.disabled = true;
+  const r = await EventCore.x1.addReplay(ctx, id, url);
+  if(r.ok) showCelebrationToast('▶ Replay juntado ao desafio!', 4000);
+  else if(r.reason === 'changed' || r.reason === 'notyet') alert('Este desafio já tem replay ou mudou entretanto. Atualizei a lista.');
+  else alert('Não foi possível juntar o replay agora. Tenta outra vez.');
   renderAll();
 }
 

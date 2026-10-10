@@ -340,10 +340,18 @@ const EventCore = (function(){
       logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', `Desafiou ${opponent} para um x1 (semana ${ctx.ev.current_week})`);
       return { ok:true };
     },
-    async _go(ctx, id, from, patch, logText){
+    // Só aceita links de replays do Showdown (https://replay.pokemonshowdown.com/<id>): o que um jogador escreve aqui
+    // aparece como link para todos, por isso nada de endereços arbitrários. '' = sem link; null = inválido.
+    cleanReplayUrl(v){
+      v = String(v || '').trim();
+      if(!v) return '';
+      v = v.split('#')[0].split('?')[0];
+      return /^https:\/\/replay\.pokemonshowdown\.com\/[A-Za-z0-9._~\/-]+$/.test(v) ? v : null;
+    },
+    async _go(ctx, id, from, patch, logText, extraFilter){
       let res;
       try{
-        res = await fetch(`${URL_}/rest/v1/x1_challenges?id=eq.${enc(id)}&status=eq.${from}`, {
+        res = await fetch(`${URL_}/rest/v1/x1_challenges?id=eq.${enc(id)}&status=eq.${from}${extraFilter || ''}`, {
           method:'PATCH',
           headers: Object.assign(sbAuthHeaders(KEY_), { 'Content-Type':'application/json', 'Prefer':'return=representation' }),
           body: JSON.stringify(patch)
@@ -371,12 +379,25 @@ const EventCore = (function(){
       return x1._go(ctx, id, 'pending', { status:'cancelled' }, `Cancelou o desafio x1 a ${r.opponent_name}`);
     },
     // Qualquer um dos dois regista quem ganhou (só depois de aceite)
-    report(ctx, id, winner){
+    report(ctx, id, winner, replayUrl){
       const r = x1.get(ctx, id);
       if(!r || (r.challenger_name !== ctx.me && r.opponent_name !== ctx.me)) return Promise.resolve({ ok:false, reason:'notyours' });
       if(winner !== r.challenger_name && winner !== r.opponent_name) return Promise.resolve({ ok:false, reason:'badwinner' });
-      return x1._go(ctx, id, 'accepted', { status:'reported', reported_winner: winner, reported_by: ctx.me, reported_at: new Date().toISOString() },
+      const url = x1.cleanReplayUrl(replayUrl);
+      if(url === null) return Promise.resolve({ ok:false, reason:'badreplay' });
+      const patch = { status:'reported', reported_winner: winner, reported_by: ctx.me, reported_at: new Date().toISOString() };
+      if(url) patch.replay_path = url;
+      return x1._go(ctx, id, 'accepted', patch,
         `Registou o resultado do x1 ${r.challenger_name} vs ${r.opponent_name}: vitória de ${winner}`);
+    },
+    // Quem jogou pode juntar o link do replay depois (só se ainda não houver nenhum; o organizador pode sempre mudar no gestor)
+    addReplay(ctx, id, replayUrl){
+      const r = x1.get(ctx, id);
+      if(!r || (r.challenger_name !== ctx.me && r.opponent_name !== ctx.me)) return Promise.resolve({ ok:false, reason:'notyours' });
+      if(r.replay_path || !['reported', 'confirmed', 'resolved'].includes(r.status)) return Promise.resolve({ ok:false, reason:'notyet' });
+      const url = x1.cleanReplayUrl(replayUrl);
+      if(!url) return Promise.resolve({ ok:false, reason:'badreplay' });
+      return x1._go(ctx, id, r.status, { replay_path: url }, `Juntou o replay do x1 ${r.challenger_name} vs ${r.opponent_name}`, '&replay_path=is.null');
     },
     // O OUTRO jogador (não quem registou) confirma ou contesta
     confirm(ctx, id){
