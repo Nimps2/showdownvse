@@ -195,3 +195,7 @@ label{display:block;font-size:11px;color:var(--text-faint);text-transform:upperc
   background:var(--bg-panel);border:1px solid color-mix(in srgb,var(--tera-cyan) 55%,transparent);
   box-shadow:0 0 10px color-mix(in srgb,var(--tera-cyan) 35%,transparent);transition:transform .15s;}
 .event-corner-icon:hover{transform:scale(1.1);}
+.event-corner-icon.has-alert::after{content:'';position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;
+  background:var(--danger);border:2px solid var(--bg-panel);animation:vseAlertPulse 1.6s ease-in-out infinite;}
+@keyframes vseAlertPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.25);}}
+@media (prefers-reduced-motion:reduce){.event-corner-icon.has-alert::after{animation:none;}}

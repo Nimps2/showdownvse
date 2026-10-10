@@ -64,7 +64,7 @@
 </div>
 
 <script src="showdown-utils.js"></script>
-<script src="eventos-core.js?v=20261010d"></script>
+<script src="eventos-core.js?v=20261011a"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -162,14 +162,16 @@ let mod = null;           // definição do evento (eventos/<slug>.js)
 let ctx = null;           // dados do jogador neste evento (EventCore.load)
 let myProfile = {};
 let activeTab = 'passaporte';
-const X1_ENABLED = false; // os desafios x1 chegam na fase seguinte
+const X1_ENABLED = true;  // desafios x1 ligados (se a tabela x1_challenges não existir, o separador some sozinho)
 // Estado só de interface (sobrevive aos re-desenhos): sanfonas abertas, rascunho do postal, animações já feitas.
 const ui = { open: {}, draft: '', justClaimed: null, routeAnimated: false, intro: true };
-const evApi = () => ({ ui, x1On: X1_ENABLED });
+const evApi = () => ({ ui, x1On: X1_ENABLED && !!ctx && ctx.x1Available !== false });
+// Separadores visíveis: o dos x1 só existe se estiver ligado e a tabela existir.
+const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && evApi().x1On));
 
 // Versão dos ficheiros do evento (eventos-core.js e eventos/<slug>.*): MUDAR sempre que algum deles mudar,
 // para o browser não misturar ficheiros novos com versões antigas em cache.
-const EV_ASSET_VERSION = '20261010d';
+const EV_ASSET_VERSION = '20261011a';
 
 // Carrega o CSS e o JS do evento ativo (cada evento tem o seu par). O slug só pode ter a-z, 0-9 e "-".
 function loadEventAssets(slug){
@@ -199,7 +201,7 @@ async function init(){
   const root = document.getElementById('eventRoot');
   // Depois de uma atualização do site, o browser pode ainda ter em cache o showdown-utils.js antigo
   // (sem as funções do evento). Em vez de um erro genérico, diz o que fazer.
-  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board){
+  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1){
     setStatus(false, 'Ficheiros antigos em cache.');
     root.innerHTML = '<div class="card"><div class="empty-state">O teu browser ainda tem ficheiros antigos do site em cache. Faz <b>Ctrl+F5</b> para atualizar e abre esta página outra vez.</div></div>';
     return;
@@ -229,6 +231,7 @@ async function init(){
     document.body.classList.add('ev-body-' + ev.slug);   // céu e cores do evento (CSS do módulo)
 
     ctx = await EventCore.load(ev, loggedInPlayerName);
+    ctx.playerNames = Object.keys(profiles);
     setStatus(true, `Ligado — ${ev.name}: semana ${ev.current_week} de ${ev.total_weeks}.`);
     renderAll();
     await syncRewards();
@@ -245,11 +248,13 @@ function renderAll(){
   captureDraft();
   const root = document.getElementById('eventRoot');
   const a = evApi();
-  const tabsHtml = `<div class="ev-tabs" role="tablist">` + mod.tabs.map(t => {
+  const tabs = visibleTabs();
+  if(!tabs.some(t => t.key === activeTab)) activeTab = tabs[0].key;
+  const tabsHtml = `<div class="ev-tabs" role="tablist">` + tabs.map(t => {
     const badge = t.badge ? t.badge(ctx, a) : 0;
     return `<button class="ev-tab${t.key === activeTab ? ' active' : ''}" role="tab" onclick="switchEventTab('${t.key}')"><span class="ico">${t.icon}</span>${t.label}${badge ? `<span class="badge">${badge}</span>` : ''}</button>`;
   }).join('') + `</div>`;
-  root.innerHTML = tabsHtml + mod.tabs.map(t => `<div id="panel-${t.key}" class="shop-panel${t.key === activeTab ? ' active' : ''}">${t.render(ctx, a)}</div>`).join('');
+  root.innerHTML = tabsHtml + tabs.map(t => `<div id="panel-${t.key}" class="shop-panel${t.key === activeTab ? ' active' : ''}">${t.render(ctx, a)}</div>`).join('');
   document.body.dataset.evRegion = mod.currentRegion(ctx);
   if(mod.afterRender) mod.afterRender(activeTab, root, ctx, ui);
   ui.intro = false;
@@ -257,7 +262,8 @@ function renderAll(){
 
 function switchEventTab(tab){
   activeTab = tab;
-  document.querySelectorAll('#eventRoot .ev-tab').forEach((b, i) => b.classList.toggle('active', mod.tabs[i].key === tab));
+  const tabs = visibleTabs();
+  document.querySelectorAll('#eventRoot .ev-tab').forEach((b, i) => b.classList.toggle('active', tabs[i].key === tab));
   document.querySelectorAll('#eventRoot .shop-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
   if(mod.afterRender) mod.afterRender(tab, document.getElementById('eventRoot'), ctx, ui);
 }
@@ -327,6 +333,62 @@ async function doReact(messageId, emojiIdx){
   await EventCore.board.react(ctx, messageId, emoji);
   renderAll();
 }
+
+// ---------- Desafios x1 ----------
+async function doX1Send(btn){
+  const sel = document.getElementById('x1Opponent');
+  const opp = sel ? sel.value : '';
+  if(!opp){ alert('Escolhe o adversário.'); return; }
+  if(btn) btn.disabled = true;
+  const r = await EventCore.x1.send(ctx, opp);
+  if(r.ok){
+    showCelebrationToast(`⚔️ Desafio enviado a <b>${escapeHtml(opp)}</b>! Quando aceitar, combinem o jogo no Showdown.`, 5000);
+  } else {
+    const msg = r.reason === 'quota' ? 'Já enviaste os 3 desafios desta semana.'
+      : r.reason === 'dup' ? 'Já desafiaste este jogador esta semana — escolhe outro.'
+      : r.reason === 'noweek' ? 'Os desafios abrem com o torneio da Semana 1.'
+      : r.reason === 'self' ? 'Não te podes desafiar a ti próprio.'
+      : r.reason === 'noname' ? 'Escolhe o adversário.' : 'Não foi possível enviar agora. Tenta outra vez.';
+    alert(msg);
+  }
+  renderAll();
+}
+
+async function doX1Act(id, act, btn){
+  const row = EventCore.x1.get(ctx, id);
+  if(!row) return;
+  const other = row.challenger_name === loggedInPlayerName ? row.opponent_name : row.challenger_name;
+  let r;
+  if(act === 'accept')       r = await EventCore.x1.respond(ctx, id, true);
+  else if(act === 'decline'){ if(!confirm(`Recusar o desafio de ${other}?`)) return; r = await EventCore.x1.respond(ctx, id, false); }
+  else if(act === 'cancel'){  if(!confirm(`Cancelar o desafio a ${other}?`)) return;  r = await EventCore.x1.cancel(ctx, id); }
+  else if(act === 'win'){     if(!confirm(`Confirmas que GANHASTE contra ${other}?`)) return; r = await EventCore.x1.report(ctx, id, loggedInPlayerName); }
+  else if(act === 'lose'){    if(!confirm(`Confirmas que PERDESTE contra ${other}?`)) return; r = await EventCore.x1.report(ctx, id, other); }
+  else if(act === 'confirm')  r = await EventCore.x1.confirm(ctx, id);
+  else if(act === 'dispute'){ const note = prompt(`Porque contestas o resultado de ${row.reported_by}? (opcional — o organizador vai decidir)`); if(note === null) return; r = await EventCore.x1.dispute(ctx, id, note); }
+  else return;
+  if(btn) btn.disabled = true;
+  if(r.ok){
+    const t = { accept:'✔ Desafio aceite — combinem o jogo e registem o resultado.', decline:'Desafio recusado.', cancel:'Desafio cancelado.',
+                win:`🏆 Vitória registada — falta ${other} confirmar.`, lose:`Resultado registado — falta ${other} confirmar.`,
+                confirm:'✔ Resultado confirmado!', dispute:'⚠ Contestado — o organizador vai decidir.' }[act];
+    showCelebrationToast(t, 4500);
+  } else if(r.reason === 'changed'){
+    alert('Este desafio foi alterado entretanto (a outra pessoa foi mais rápida). Atualizei a lista.');
+  } else {
+    alert('Não foi possível concluir agora. Tenta outra vez.');
+  }
+  renderAll();
+}
+
+// Enquanto o separador dos x1 está aberto, vai ver de 30 em 30 s se há novidades (sem apagar o que estás a escrever).
+setInterval(async () => {
+  if(document.hidden || !ctx || activeTab !== 'x1' || !evApi().x1On) return;
+  const before = JSON.stringify(ctx.x1.map(r => [r.id, r.status]));
+  await EventCore.x1.refresh(ctx);
+  const focusInside = document.activeElement && document.activeElement.closest && document.activeElement.closest('.vm-x1send');
+  if(!focusInside && JSON.stringify(ctx.x1.map(r => [r.id, r.status])) !== before) renderAll();
+}, 30000);
 
 // Garante os cosméticos de todos os níveis já atingidos e avisa dos novos.
 async function syncRewards(){

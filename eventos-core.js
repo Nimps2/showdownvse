@@ -41,16 +41,17 @@ const EventCore = (function(){
   async function load(ev, me){
     const tournaments = await fetchEventTournaments(URL_, KEY_, ev.id);
     const since = enc(ev.starts_at || ev.created_at);
-    const [claims, tx, gifts, lottery, nick, preds, board] = await Promise.all([
+    const [claims, tx, gifts, lottery, nick, preds, board, x1data] = await Promise.all([
       getJson(`event_claims?event_id=eq.${enc(ev.id)}&select=id,player_name,mission_id,xp,currency,coins`, []),
       getJson(`coin_transactions?player_name=eq.${enc(me)}&created_at=gte.${since}&select=reason,amount,created_at`, []),
       getJson(`gifts?from_name=eq.${enc(me)}&created_at=gte.${since}&select=to_name,amount,created_at`, []),
       getJson(`lottery_tickets?buyer_name=eq.${enc(me)}&created_at=gte.${since}&select=ticket_count,created_at`, []),
       getJson(`activity_log?actor_name=eq.${enc(me)}&actor_type=eq.jogador&category=eq.palpite&action=like.${enc('Votou*Apelido da Semana')}&created_at=gte.${since}&select=created_at`, []),
       getJson(`predictions?predictor_name=eq.${enc(me)}&created_at=gte.${since}&select=tournament_id,match_id,predicted_winner,created_at`, []),
-      loadBoard(ev)
+      loadBoard(ev),
+      loadX1(ev, me)
     ]);
-    const ctx = { ev, me, tournaments, claims, tx, gifts, lottery, nick, preds, board, x1: [] };
+    const ctx = { ev, me, tournaments, claims, tx, gifts, lottery, nick, preds, board, x1: x1data.rows, x1Available: x1data.available };
     ctx.weekStats = computeWeekStats(ctx);
     ctx.windows = computeWindows(ctx);
     ctx.claimedIds = new Set(claims.filter(c => c.player_name === me).map(c => c.mission_id));
@@ -62,6 +63,18 @@ const EventCore = (function(){
     if(!m.ok) return { available:false, messages:[], reactions:[] };
     const r = await getJson(`event_message_reactions?event_id=eq.${enc(ev.id)}&select=id,message_id,reactor_name,emoji,created_at&limit=3000`, []);
     return { available:true, messages: m.data, reactions: r };
+  }
+
+  // Desafios x1 em que o jogador participa (como desafiante E como adversário) — 2 pedidos em vez de `or=`
+  // porque os nomes podem ter caracteres especiais. Tabela em falta -> {available:false}.
+  async function loadX1(ev, me){
+    const base = `x1_challenges?event_id=eq.${enc(ev.id)}&select=*&order=created_at.desc&limit=300`;
+    const [a, b] = await Promise.all([ getJsonStatus(`${base}&challenger_name=eq.${enc(me)}`), getJsonStatus(`${base}&opponent_name=eq.${enc(me)}`) ]);
+    if(!a.ok || !b.ok) return { available:false, rows:[] };
+    const seen = new Set(), rows = [];
+    a.data.concat(b.data).forEach(r => { if(!seen.has(r.id)){ seen.add(r.id); rows.push(r); } });
+    rows.sort((x, y) => Date.parse(y.created_at) - Date.parse(x.created_at));
+    return { available:true, rows };
   }
 
   // ---------- Janelas de semana ----------
@@ -173,7 +186,7 @@ const EventCore = (function(){
   // Semanas que ainda não abriram (week > current_week) saem marcadas como `locked`.
   // Missões do quadro só aparecem se as tabelas do quadro existirem.
   function expandMissions(mod, ev, opts, ctx){
-    const x1On = !!(opts && opts.x1);
+    const x1On = !!(opts && opts.x1) && (!ctx || ctx.x1Available !== false);
     const boardOn = !ctx || ctx.board.available;
     const list = [];
     mod.weeks.forEach((w, i) => {
@@ -181,7 +194,8 @@ const EventCore = (function(){
       mod.missions.weekly.forEach(def => {
         if(def.needs === 'x1' && !x1On) return;
         if(def.needs === 'board' && !boardOn) return;
-        list.push(Object.assign({}, def, { id: `w${week}_${def.key}`, scope: 'week', week, locked: week > ev.current_week }));
+        list.push(Object.assign({}, def, { id: `w${week}_${def.key}`, scope: 'week', week, locked: week > ev.current_week,
+          grantsCosmeticId: def.grants ? def.grants[week] : undefined }));
       });
     });
     mod.missions.event.forEach(def => {
@@ -232,7 +246,6 @@ const EventCore = (function(){
     try{
       // dados frescos: o progresso pode ter mudado desde que a página abriu
       const fresh = await load(ctx.ev, ctx.me);
-      fresh.x1 = ctx.x1;
       const st = evaluate(fresh, mission);
       if(mission.locked) return { ok:false, reason:'locked' };
       if(st.claimed) { Object.assign(ctx, fresh); return { ok:false, reason:'already' }; }
@@ -246,7 +259,7 @@ const EventCore = (function(){
         headers: Object.assign(sbAuthHeaders(KEY_), { 'Content-Type':'application/json', 'Prefer':'return=representation' }),
         body: JSON.stringify([row])
       });
-      if(res.status === 409){ const x1 = fresh.x1; Object.assign(ctx, await load(ctx.ev, ctx.me)); ctx.x1 = x1; return { ok:false, reason:'already' }; }
+      if(res.status === 409){ Object.assign(ctx, await load(ctx.ev, ctx.me)); return { ok:false, reason:'already' }; }
       if(!res.ok) return { ok:false, reason:'error' };
       const inserted = await res.json();
       const claimId = inserted && inserted[0] && inserted[0].id;
@@ -263,10 +276,14 @@ const EventCore = (function(){
       }
       logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', `Reclamou a missão "${mission.title}" (+${row.xp} XP, ${row.currency} milhas, 🪙${row.coins})`);
 
-      const x1 = ctx.x1;
+      // 3) cosmético ligado à missão (ex.: título "Campeão de Kanto"); se falhar, o sync da página tenta de novo
+      let granted = [];
+      if(mission.grantsCosmeticId){
+        const g = await grantCosmetic(URL_, KEY_, ctx.me, [mission.grantsCosmeticId]);
+        granted = g.added || [];
+      }
       Object.assign(ctx, await load(ctx.ev, ctx.me));
-      ctx.x1 = x1;
-      return { ok:true, rewards: { xp: row.xp, miles: row.currency, coins: row.coins } };
+      return { ok:true, rewards: { xp: row.xp, miles: row.currency, coins: row.coins }, granted };
     } finally {
       claimsInFlight.delete(mission.id);
     }
@@ -277,11 +294,119 @@ const EventCore = (function(){
   async function syncLevelRewards(ctx, mod, ownedList){
     const lv = levelFor(mod, totals(ctx, ctx.me).xp).level;
     const want = mod.levels.filter(l => l.level <= lv).map(l => l.cosmeticId);
+    expandMissions(mod, ctx.ev, { x1: true }, ctx).forEach(m => {
+      if(m.grantsCosmeticId && ctx.claimedIds.has(m.id) && !want.includes(m.grantsCosmeticId)) want.push(m.grantsCosmeticId);
+    });
     const missing = ownedList ? want.filter(id => !ownedList.includes(id)) : want;
     if(!missing.length) return [];
     const r = await grantCosmetic(URL_, KEY_, ctx.me, missing);
     return r.added || [];
   }
+
+  // ---------- Desafios x1 ----------
+  // Fluxo: pending -> accepted -> reported -> confirmed ; ramos: declined, cancelled, disputed -> resolved (organizador).
+  // Cada transição é um PATCH condicional ao estado anterior (status=eq.<anterior>): se outra pessoa mudou
+  // entretanto, a resposta vem vazia e devolvemos 'changed' (o ecrã recarrega).
+  const X1_DEAD = ['declined', 'cancelled'];
+  const x1 = {
+    MAX_PER_WEEK: 3,
+    sentThisWeek(ctx){ return ctx.x1.filter(r => r.challenger_name === ctx.me && r.week === ctx.ev.current_week && !X1_DEAD.includes(r.status)); },
+    quota(ctx){ const sent = x1.sentThisWeek(ctx); return { used: sent.length, max: x1.MAX_PER_WEEK, left: Math.max(0, x1.MAX_PER_WEEK - sent.length), opponents: new Set(sent.map(r => r.opponent_name)) }; },
+    // Devolve null se pode enviar, ou o motivo: 'noweek' | 'self' | 'noname' | 'quota' | 'dup'
+    cannotSend(ctx, opponent){
+      if(ctx.ev.current_week < 1) return 'noweek';
+      if(!opponent) return 'noname';
+      if(opponent === ctx.me) return 'self';
+      const q = x1.quota(ctx);
+      if(q.left <= 0) return 'quota';
+      if(q.opponents.has(opponent)) return 'dup';
+      return null;
+    },
+    async refresh(ctx){ const r = await loadX1(ctx.ev, ctx.me); ctx.x1 = r.rows; ctx.x1Available = r.available; return r; },
+    async send(ctx, opponent){
+      await x1.refresh(ctx); // quota com dados frescos
+      const why = x1.cannotSend(ctx, opponent);
+      if(why) return { ok:false, reason: why };
+      let res;
+      try{
+        res = await fetch(`${URL_}/rest/v1/x1_challenges`, {
+          method:'POST',
+          headers: Object.assign(sbAuthHeaders(KEY_), { 'Content-Type':'application/json', 'Prefer':'return=minimal' }),
+          body: JSON.stringify([{ event_id: ctx.ev.id, week: ctx.ev.current_week, challenger_name: ctx.me, opponent_name: opponent, status: 'pending' }])
+        });
+      } catch(e){ return { ok:false, reason:'error' }; }
+      if(!res.ok) return { ok:false, reason:'error' };
+      await x1.refresh(ctx);
+      logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', `Desafiou ${opponent} para um x1 (semana ${ctx.ev.current_week})`);
+      return { ok:true };
+    },
+    async _go(ctx, id, from, patch, logText){
+      let res;
+      try{
+        res = await fetch(`${URL_}/rest/v1/x1_challenges?id=eq.${enc(id)}&status=eq.${from}`, {
+          method:'PATCH',
+          headers: Object.assign(sbAuthHeaders(KEY_), { 'Content-Type':'application/json', 'Prefer':'return=representation' }),
+          body: JSON.stringify(patch)
+        });
+      } catch(e){ return { ok:false, reason:'error' }; }
+      if(!res.ok) return { ok:false, reason:'error' };
+      const rows = await res.json();
+      await x1.refresh(ctx);
+      if(!rows || !rows.length) return { ok:false, reason:'changed' };   // outra pessoa mudou o estado primeiro
+      if(logText) logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', logText);
+      return { ok:true, row: rows[0] };
+    },
+    get(ctx, id){ return ctx.x1.find(r => r.id === id) || null; },
+    // O adversário aceita ou recusa
+    respond(ctx, id, accept){
+      const r = x1.get(ctx, id);
+      if(!r || r.opponent_name !== ctx.me) return Promise.resolve({ ok:false, reason:'notyours' });
+      return x1._go(ctx, id, 'pending', accept ? { status:'accepted', accepted_at: new Date().toISOString() } : { status:'declined' },
+        `${accept ? 'Aceitou' : 'Recusou'} o desafio x1 de ${r.challenger_name}`);
+    },
+    // Quem enviou pode cancelar enquanto ninguém respondeu
+    cancel(ctx, id){
+      const r = x1.get(ctx, id);
+      if(!r || r.challenger_name !== ctx.me) return Promise.resolve({ ok:false, reason:'notyours' });
+      return x1._go(ctx, id, 'pending', { status:'cancelled' }, `Cancelou o desafio x1 a ${r.opponent_name}`);
+    },
+    // Qualquer um dos dois regista quem ganhou (só depois de aceite)
+    report(ctx, id, winner){
+      const r = x1.get(ctx, id);
+      if(!r || (r.challenger_name !== ctx.me && r.opponent_name !== ctx.me)) return Promise.resolve({ ok:false, reason:'notyours' });
+      if(winner !== r.challenger_name && winner !== r.opponent_name) return Promise.resolve({ ok:false, reason:'badwinner' });
+      return x1._go(ctx, id, 'accepted', { status:'reported', reported_winner: winner, reported_by: ctx.me, reported_at: new Date().toISOString() },
+        `Registou o resultado do x1 ${r.challenger_name} vs ${r.opponent_name}: vitória de ${winner}`);
+    },
+    // O OUTRO jogador (não quem registou) confirma ou contesta
+    confirm(ctx, id){
+      const r = x1.get(ctx, id);
+      if(!r || (r.challenger_name !== ctx.me && r.opponent_name !== ctx.me) || r.reported_by === ctx.me) return Promise.resolve({ ok:false, reason:'notyours' });
+      return x1._go(ctx, id, 'reported', { status:'confirmed', confirmed_at: new Date().toISOString() },
+        `Confirmou o resultado do x1 ${r.challenger_name} vs ${r.opponent_name}`);
+    },
+    dispute(ctx, id, note){
+      const r = x1.get(ctx, id);
+      if(!r || (r.challenger_name !== ctx.me && r.opponent_name !== ctx.me) || r.reported_by === ctx.me) return Promise.resolve({ ok:false, reason:'notyours' });
+      return x1._go(ctx, id, 'reported', { status:'disputed', note: String(note || '').slice(0, 200) || null },
+        `Contestou o resultado do x1 ${r.challenger_name} vs ${r.opponent_name}`);
+    },
+    // Para a vista: o que este jogador pode/deve fazer neste desafio
+    actionsFor(ctx, r){
+      const mine = r.challenger_name === ctx.me, theirs = r.opponent_name === ctx.me;
+      if(!mine && !theirs) return [];
+      if(r.status === 'pending') return theirs ? ['accept', 'decline'] : ['cancel'];
+      if(r.status === 'accepted') return ['win', 'lose'];
+      if(r.status === 'reported') return r.reported_by === ctx.me ? [] : ['confirm', 'dispute'];
+      return [];
+    },
+    // Quantos precisam de ti agora (para o selo do separador)
+    waitingOnMe(ctx){
+      return ctx.x1.filter(r => r.status === 'pending' ? r.opponent_name === ctx.me
+        : r.status === 'reported' ? (r.reported_by !== ctx.me && (r.challenger_name === ctx.me || r.opponent_name === ctx.me)) : false).length;
+    },
+    winnerOf, isConfirmed
+  };
 
   // ---------- Quadro de mensagens (cartões-postais) ----------
   const board = {
@@ -343,5 +468,5 @@ const EventCore = (function(){
     hasPostedToday(ctx){ return ctx.board.messages.some(m => m.author_name === ctx.me && m.day === utcDay()); }
   };
 
-  return { init, load, computeWeekStats, measure, expandMissions, evaluate, totals, levelFor, ranking, claimMission, syncLevelRewards, board, utcDay };
+  return { init, load, computeWeekStats, measure, expandMissions, evaluate, totals, levelFor, ranking, claimMission, syncLevelRewards, board, x1, utcDay };
 })();

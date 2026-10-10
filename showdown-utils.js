@@ -260,7 +260,8 @@ const COSMETIC_CATALOG = {
     { id:'bg_gold',     name:'Ouro Puro',    price:150, css:'linear-gradient(135deg,#f0b64f,#b8860b)', color:'#f0b64f' },
     { id:'bg_aurora',   name:'Aurora Animada', price:220, css:'linear-gradient(270deg,#4fd8d0,#a56bf0,#f0b64f,#4fd8d0)', color:'#a56bf0', multiColor:['#4fd8d0','#a56bf0','#f0b64f'] },
     // Itens de EVENTO (eventOnly): price 0, nunca à venda — só se ganham ao subir de nível no evento.
-    { id:'bg_vm_ceu',   name:'Céu de Viagem', price:0, css:'linear-gradient(135deg,#4fa8f0,#f0b64f)', color:'#4fa8f0', eventOnly:'volta-ao-mundo' }
+    { id:'bg_vm_ceu',   name:'Céu de Viagem', price:0, css:'linear-gradient(135deg,#4fa8f0,#f0b64f)', color:'#4fa8f0', eventOnly:'volta-ao-mundo' },
+    { id:'bg_vm_porsol', name:'Pôr do Sol Mundial', price:0, css:'linear-gradient(270deg,#f0b64f,#e0607a,#a56bf0,#f0b64f)', color:'#e0607a', multiColor:['#f0b64f','#e0607a','#a56bf0'], eventOnly:'volta-ao-mundo' }
   ],
   accents: [
     { id:'accent_default', name:'Ciano (padrão)', price:0,  color:'#4fd8d0' },
@@ -279,13 +280,15 @@ const COSMETIC_CATALOG = {
     { id:'frame_neon',  name:'Estrelado',     price:60,  effect:'starry' },
     { id:'frame_royal', name:'Florescer',     price:100, effect:'blossom' },
     { id:'frame_diamond', name:'Diamante Prismático', price:0, effect:'diamond', auctionOnly:true },
-    { id:'frame_vm_rota', name:'Rota Aérea', price:0, effect:'plane', eventOnly:'volta-ao-mundo' }
+    { id:'frame_vm_rota', name:'Rota Aérea', price:0, effect:'plane', eventOnly:'volta-ao-mundo' },
+    { id:'frame_vm_esquadrilha', name:'Esquadrilha', price:0, effect:'fleet', eventOnly:'volta-ao-mundo' }
   ],
   nameEffects: [
     { id:'effect_none',  name:'Nenhum',  price:0,  css:'' },
     { id:'effect_glow',  name:'Brilho',  price:70, css:'text-shadow:0 0 8px currentColor;' },
     { id:'effect_pulse', name:'Pulsar',  price:90, css:'animation:vsePulseName 1.5s ease-in-out infinite;' },
-    { id:'effect_vm_rasto', name:'Rasto de Avião', price:0, css:'text-shadow:-5px 0 6px rgba(79,216,208,0.55),-11px 0 8px rgba(79,216,208,0.28);', eventOnly:'volta-ao-mundo' }
+    { id:'effect_vm_rasto', name:'Rasto de Avião', price:0, css:'text-shadow:-5px 0 6px rgba(79,216,208,0.55),-11px 0 8px rgba(79,216,208,0.28);', eventOnly:'volta-ao-mundo' },
+    { id:'effect_vm_aurora', name:'Aurora de Cabine', price:0, css:'background:linear-gradient(90deg,#4fa8f0,#a56bf0,#f0b64f);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;', eventOnly:'volta-ao-mundo' }
   ],
   titles: [
     { id:'title_none',         name:'Nenhum',              price:0,  text:'' },
@@ -297,7 +300,12 @@ const COSMETIC_CATALOG = {
     { id:'title_roulette_king',name:'Rei da Roleta',       price:60, text:'🎰 Rei da Roleta' },
     { id:'title_reroll_master',name:'Mestre das Trocas',   price:60, text:'🔄 Mestre das Trocas' },
     { id:'title_auction_legend', name:'Lenda do Leilão',   price:0, text:'💠 Lenda do Leilão', auctionOnly:true },
-    { id:'title_vm_mochileiro', name:'Mochileiro', price:0, text:'🧳 Mochileiro', eventOnly:'volta-ao-mundo' }
+    { id:'title_vm_mochileiro', name:'Mochileiro', price:0, text:'🧳 Mochileiro', eventOnly:'volta-ao-mundo' },
+    { id:'title_vm_piloto', name:'Piloto de Linha', price:0, text:'🛩️ Piloto de Linha', eventOnly:'volta-ao-mundo' },
+    { id:'title_vm_campeao_kanto',  name:'Campeão de Kanto',  price:0, text:'🗼 Campeão de Kanto',  eventOnly:'volta-ao-mundo' },
+    { id:'title_vm_campeao_johto',  name:'Campeão de Johto',  price:0, text:'🔔 Campeão de Johto',  eventOnly:'volta-ao-mundo' },
+    { id:'title_vm_campeao_hoenn',  name:'Campeão de Hoenn',  price:0, text:'🌋 Campeão de Hoenn',  eventOnly:'volta-ao-mundo' },
+    { id:'title_vm_campeao_sinnoh', name:'Campeão de Sinnoh', price:0, text:'❄️ Campeão de Sinnoh', eventOnly:'volta-ao-mundo' }
   ],
   badges: [
     { id:'badge_stall',   name:'Fã de Stall',   price:30, emoji:'🐌' },
@@ -479,6 +487,17 @@ function ensureAvatarFxStyles(){
     .avatar-fx-plane span::after{content:'';position:absolute;top:calc(2% + var(--fx-gem,9px)*0.85);left:calc(50% - 24%);width:24%;height:2px;
       background:linear-gradient(90deg,transparent,var(--fx-color));opacity:0.55;}
 
+    /* Esquadrilha (evento Volta ao Mundo, nível 12): 3 aviões a rodar em órbitas diferentes (um em sentido
+       contrário). Mesma técnica da Rota Aérea: cada <span> ocupa a camada toda e RODA. */
+    .avatar-fx-fleet span{top:0!important;left:0!important;width:100%;height:100%;animation:vsePlaneOrbit 8s linear infinite;animation-delay:0s!important;}
+    .avatar-fx-fleet span:nth-child(2){animation-duration:11s;animation-direction:reverse;}
+    .avatar-fx-fleet span:nth-child(3){animation-duration:15s;animation-delay:-5s!important;}
+    .avatar-fx-fleet span::before{content:'';position:absolute;top:2%;left:50%;width:calc(var(--fx-gem,9px)*1.3);height:calc(var(--fx-gem,9px)*1.3);
+      transform:translate(-50%,0) rotate(90deg);background:var(--fx-color);
+      clip-path:polygon(50% 0%,60% 38%,100% 62%,100% 74%,58% 62%,56% 84%,72% 94%,72% 100%,50% 94%,28% 100%,28% 94%,44% 84%,42% 62%,0% 74%,0% 62%,40% 38%);}
+    .avatar-fx-fleet span:nth-child(2)::before{top:9%;opacity:0.85;transform:translate(-50%,0) rotate(-90deg);}
+    .avatar-fx-fleet span:nth-child(3)::before{top:16%;opacity:0.7;}
+
     @keyframes vseFxHueRotate{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
     .avatar-fx-layer.avatar-fx-multicolor{animation:vseFxHueRotate 5s linear infinite;}
   `;
@@ -500,11 +519,11 @@ function frameEffectPreviewHtml(effectType){
 }
 
 const AVATAR_FX_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
-const AVATAR_FX_COUNTS = { sparks:6, starry:6, blossom:5, diamond:4, plane:1 };
+const AVATAR_FX_COUNTS = { sparks:6, starry:6, blossom:5, diamond:4, plane:1, fleet:3 };
 // Efeitos que não usam os primeiros N ângulos da lista acima — o Diamante
 // quer as 4 gemas espalhadas pelos pontos cardeais (direita, baixo, esquerda,
 // cima), pela ordem em que o anel as "visita" ao rodar.
-const AVATAR_FX_ANGLE_OVERRIDES = { diamond:[0, 90, 180, 270], plane:[0] };
+const AVATAR_FX_ANGLE_OVERRIDES = { diamond:[0, 90, 180, 270], plane:[0], fleet:[0, 0, 0] };
 // Duração (s) do ciclo de cada efeito, para espaçar o atraso de cada partícula.
 const AVATAR_FX_PERIODS = { diamond:4 };
 
@@ -522,7 +541,7 @@ function avatarFxParticlesHtml(effectType, radiusPct){
 }
 
 // effectColor: cor (hex) escolhida em "Fundo do Avatar". effectType: 'none' |
-// 'sparks' | 'starry' | 'blossom' | 'diamond' | 'plane'. multiColor: true para a Aurora Animada,
+// 'sparks' | 'starry' | 'blossom' | 'diamond' | 'plane' | 'fleet'. multiColor: true para a Aurora Animada,
 // faz o efeito ciclar de cor continuamente em vez de ficar fixo.
 function avatarHtml(name, photoUrl, sizePx, effectColor, effectType, multiColor){
   const size = sizePx || 44;
@@ -3000,5 +3019,31 @@ async function mountEventCornerIcon(supabaseUrl, supabaseAnonKey){
     const week = ev.current_week > 0 ? ` — Semana ${ev.current_week} de ${ev.total_weeks}` : ' — começa em breve';
     const title = `Evento: ${ev.name}${week}`.replace(/"/g, '&quot;');
     container.insertAdjacentHTML('beforeend', `<a href="eventos.html" id="eventCornerIcon" class="event-corner-icon" title="${title}">🌍</a>`);
+    // Bolinha vermelha: desafio x1 por responder ou resultado por confirmar (nome lido do login guardado).
+    const me = localStorage.getItem('player_login_name');
+    if(me){
+      const n = await countEventX1Alerts(supabaseUrl, supabaseAnonKey, ev.id, me);
+      const icon = document.getElementById('eventCornerIcon');
+      if(n > 0 && icon){
+        icon.classList.add('has-alert');
+        icon.title = `${title} — ${n} desafio${n === 1 ? '' : 's'} x1 à tua espera`.replace(/"/g, '&quot;');
+      }
+    }
   } catch(e){ /* não crítico */ }
+}
+
+// Quantos x1 estão à espera DESTE jogador: desafios recebidos por responder (pending) + resultados que
+// o outro registou e que ele ainda não confirmou (reported, reported_by != ele). 0 se a tabela não existir.
+async function countEventX1Alerts(supabaseUrl, supabaseAnonKey, eventId, name){
+  try{
+    const e = encodeURIComponent, h = { headers: sbAuthHeaders(supabaseAnonKey) };
+    const base = `${supabaseUrl}/rest/v1/x1_challenges?event_id=eq.${e(eventId)}&select=status,reported_by`;
+    const [a, b] = await Promise.all([
+      fetch(`${base}&opponent_name=eq.${e(name)}&status=in.(pending,reported)`, h),
+      fetch(`${base}&challenger_name=eq.${e(name)}&status=eq.reported`, h)
+    ]);
+    if(!a.ok || !b.ok) return 0;
+    const rows = (await a.json()).concat(await b.json());
+    return rows.filter(r => r.status === 'pending' || (r.status === 'reported' && r.reported_by !== name)).length;
+  } catch(e){ return 0; }
 }

@@ -17,7 +17,12 @@
     { level:5, xp:1000, cosmeticId:'effect_vm_rasto' },
     { level:6, xp:1450, cosmeticId:'badge_vm_hoenn' },
     { level:7, xp:2000, cosmeticId:'badge_vm_sinnoh' },
-    { level:8, xp:2600, cosmeticId:'frame_vm_rota' }
+    { level:8, xp:2600, cosmeticId:'frame_vm_rota' },
+    // 9-12: prestígio de quem também compete (3200 XP > 2860, o máximo de quem nunca ganha nada)
+    { level:9,  xp:3200, cosmeticId:'title_vm_piloto' },
+    { level:10, xp:3900, cosmeticId:'effect_vm_aurora' },
+    { level:11, xp:4600, cosmeticId:'bg_vm_porsol' },
+    { level:12, xp:5400, cosmeticId:'frame_vm_esquadrilha' }
   ];
 
   // Grupos de missões = "portas de embarque".
@@ -37,7 +42,8 @@
       { key:'win1',     group:'torneio',  title:'Primeira vitória',       desc:'Ganha 1 partida no torneio (desistências não contam).',     check:{type:'wins', target:1},           xp:80,  miles:15, coins:8 },
       { key:'win3',     group:'torneio',  title:'Em rota',                desc:'Ganha 3 partidas no torneio.',                              check:{type:'wins', target:3},           xp:120, miles:20, coins:12 },
       { key:'final',    group:'torneio',  title:'Chegada ao destino',     desc:'Chega à final do torneio.',                                 check:{type:'final'},                     xp:150, miles:25, coins:15 },
-      { key:'champion', group:'torneio',  title:'Campeão da região',      desc:'Sê o campeão do torneio da semana.',                        check:{type:'champion'},                  xp:250, miles:40, coins:30 },
+      { key:'champion', group:'torneio',  title:'Campeão da região',      desc:'Sê o campeão do torneio da semana — e ganha o título de Campeão dessa região.', check:{type:'champion'},        xp:250, miles:40, coins:30,
+        grants:{ 1:'title_vm_campeao_kanto', 2:'title_vm_campeao_johto', 3:'title_vm_campeao_hoenn', 4:'title_vm_campeao_sinnoh' } },
 
       { key:'daily3',   group:'viajante', title:'Passageiro frequente',   desc:'Reclama o bónus diário 3 vezes esta semana.',               check:{type:'dailyW', target:3},          xp:40,  miles:8,  coins:5 },
       { key:'daily6',   group:'viajante', title:'Cliente VIP',            desc:'Reclama o bónus diário 6 vezes esta semana.',               check:{type:'dailyW', target:6},          xp:60,  miles:10, coins:8 },
@@ -291,7 +297,7 @@
       <div class="vm-bar"><div style="width:${lv.pct}%"></div></div>
       <div class="vm-xp-next">${nextTxt}</div>
     </div>
-    <div class="vm-log" style="--frac:${frac}">
+    <div class="vm-log" style="--frac:${frac};--n:${n};--minw:${n * 114}px">
       <div class="vm-log-scroll">
         <div class="vm-log-track"><i></i><span class="vm-log-plane">✈️</span></div>
         <div class="vm-tags">${tags}</div>
@@ -372,6 +378,70 @@
       <div class="vm-week-body"><div class="vm-gate">${ev.map((m, i) => passHtml(m, ctx, api, i + 1)).join('')}</div></div>
     </details>`;
     return html;
+  }
+
+  // ---------- Separador 4: Desafios x1 ----------
+  const X1_STATUS = {
+    pending:   { label:'À espera de resposta', step:0 }, accepted:  { label:'Aceite — joguem e registem o resultado', step:1 },
+    reported:  { label:'Resultado registado — falta confirmar', step:2 }, confirmed: { label:'Confirmado', step:3 },
+    disputed:  { label:'Contestado — decide o organizador', step:2 }, resolved:  { label:'Resolvido pelo organizador', step:3 },
+    declined:  { label:'Recusado', step:-1 }, cancelled: { label:'Cancelado', step:-1 }
+  };
+  const STEPS = ['Enviado', 'Aceite', 'Resultado', 'Confirmado'];
+  const X1_BTN = {
+    accept:  { cls:'go',   text:'✔ Aceitar' },   decline: { cls:'no',   text:'✖ Recusar' },    cancel:  { cls:'no',   text:'Cancelar desafio' },
+    win:     { cls:'go',   text:'🏆 Eu ganhei' }, lose:    { cls:'',     text:'Eu perdi' },
+    confirm: { cls:'go',   text:'✔ Confirmar resultado' }, dispute: { cls:'no', text:'⚠ Contestar' }
+  };
+
+  function duelHtml(r, ctx){
+    const st = X1_STATUS[r.status] || { label: r.status, step: 0 };
+    const w = EventCore.x1.winnerOf(r);
+    const acts = EventCore.x1.actionsFor(ctx, r);
+    const region = r.week >= 1 && r.week <= mod.weeks.length ? EVENT_REGIONS[mod.weeks[r.week - 1].region].label : '';
+    const side = name => `<div class="vm-duel-p${w === name && (r.status === 'confirmed' || r.status === 'resolved') ? ' win' : ''}${name === ctx.me ? ' me' : ''}"><b>${escapeHtml(name)}</b><small>${name === r.challenger_name ? 'desafiante' : 'adversário'}</small></div>`;
+    const steps = STEPS.map((t, i) => `<li class="${st.step < 0 ? 'x' : (i <= st.step ? 'on' : '')}${i === st.step && st.step >= 0 ? ' cur' : ''}">${t}</li>`).join('');
+    const sid = String(r.id).replace(/[^a-zA-Z0-9_-]/g, '');
+    const verdict = (r.status === 'confirmed' || r.status === 'resolved')
+      ? (w ? `<div class="vm-duel-verdict">🏆 Vitória de <b>${escapeHtml(w)}</b></div>` : '<div class="vm-duel-verdict">Anulado pelo organizador</div>')
+      : (r.status === 'reported' && w ? `<div class="vm-duel-verdict soft">${escapeHtml(r.reported_by)} registou: vitória de <b>${escapeHtml(w)}</b></div>` : '');
+    const replay = r.replay_path && (r.status === 'confirmed' || r.status === 'resolved')
+      ? `<a class="vm-duel-replay" href="${encodeURI(r.replay_path).replace(/"/g, '%22')}" target="_blank" rel="noopener">▶ Ver replay</a>` : '';
+    return `<div class="vm-duel s-${r.status}${acts.length ? ' mine' : ''}">
+      <div class="vm-duel-top"><span>⚔️ Semana ${r.week}${region ? ' · ' + region : ''}</span><span class="vm-duel-status">${st.label}</span></div>
+      <div class="vm-duel-vs">${side(r.challenger_name)}<span class="vm-duel-x">VS</span>${side(r.opponent_name)}</div>
+      <ol class="vm-steps">${steps}</ol>
+      ${verdict}${r.status === 'disputed' && r.note ? `<div class="vm-duel-note">“${escapeHtml(r.note)}”</div>` : ''}
+      ${acts.length ? `<div class="vm-duel-actions">${acts.map(a => `<button class="vm-x1btn ${X1_BTN[a].cls}" onclick="doX1Act('${sid}','${a}',this)">${X1_BTN[a].text}</button>`).join('')}</div>` : ''}
+      ${replay}
+    </div>`;
+  }
+
+  function renderX1(ctx, api){
+    const cur = ctx.ev.current_week;
+    const regionKey = mod.weeks[Math.max(0, Math.min(cur, mod.weeks.length) - 1)].region, r = EVENT_REGIONS[regionKey];
+    const intro = `<div class="vm-board-intro"><h3 class="vm-h3">⚔️ Duelos no aeroporto</h3>
+      <p>Desafia outro viajante para um x1 no Showdown. <b>Só valem Pokémon de ${r.label} (${r.dex}), na forma original.</b> Combinem o jogo, e depois <b>registem o resultado aqui</b> (quem jogou regista, o outro confirma). Envia o ficheiro do replay ao organizador para ficar guardado.</p></div>`;
+    if(cur < 1) return intro + '<div class="vm-wall-empty">Os desafios abrem com o torneio da Semana 1.</div>';
+    const q = EventCore.x1.quota(ctx);
+    const names = (ctx.playerNames || []).filter(n => n !== ctx.me).sort((a, b) => a.localeCompare(b));
+    const opts = '<option value="">— escolhe o adversário —</option>' + names.map(n =>
+      `<option value="${escapeHtml(n).replace(/"/g, '&quot;')}"${q.opponents.has(n) ? ' disabled' : ''}>${escapeHtml(n)}${q.opponents.has(n) ? ' (já desafiado)' : ''}</option>`).join('');
+    const send = `<div class="vm-x1send">
+      <div class="vm-x1send-top"><b>Novo desafio</b><span class="vm-x1quota${q.left === 0 ? ' full' : ''}">${q.used}/${q.max} esta semana</span></div>
+      <div class="vm-x1send-row"><select id="x1Opponent" ${q.left === 0 ? 'disabled' : ''}>${opts}</select>
+        <button class="vm-send" onclick="doX1Send(this)" ${q.left === 0 ? 'disabled' : ''}>⚔️ Desafiar</button></div>
+      ${q.left === 0 ? '<small>Já enviaste os 3 desafios desta semana — voltas a poder na próxima.</small>' : '<small>Máximo 3 desafios enviados por semana, a jogadores diferentes. Recusados e cancelados não contam.</small>'}
+    </div>`;
+    const rows = ctx.x1;
+    const forMe = rows.filter(r2 => (r2.status === 'pending' && r2.opponent_name === ctx.me) || (r2.status === 'reported' && r2.reported_by !== ctx.me && (r2.challenger_name === ctx.me || r2.opponent_name === ctx.me)));
+    const forMeIds = new Set(forMe.map(r2 => r2.id));
+    const ongoing = rows.filter(r2 => !forMeIds.has(r2.id) && ['pending', 'accepted', 'reported', 'disputed'].includes(r2.status));
+    const done = rows.filter(r2 => ['confirmed', 'resolved', 'declined', 'cancelled'].includes(r2.status));
+    const sect = (title, list, empty) => `<h3 class="vm-h3">${title}</h3>` + (list.length ? `<div class="vm-duels">${list.map(r2 => duelHtml(r2, ctx)).join('')}</div>` : `<div class="vm-wall-empty">${empty}</div>`);
+    return intro + send + sect('📬 Para ti', forMe, 'Nada à tua espera. Quando alguém te desafiar (ou registar um resultado para confirmares), aparece aqui.')
+      + sect('✈️ Em curso', ongoing, 'Nenhum desafio em curso.')
+      + (done.length ? sect('🗂 Histórico', done, '') : '');
   }
 
   // Quantas missões já estão cumpridas e à espera de serem reclamadas (para o selo do separador).
@@ -476,11 +546,18 @@
     tabs: [
       { key:'passaporte', icon:'🧭', label:'Passaporte', render: renderPassport },
       { key:'missoes',    icon:'🎯', label:'Missões',    render: renderMissions, badge: readyCount },
-      { key:'quadro',     icon:'📮', label:'Quadro',     render: renderBoard }
+      { key:'quadro',     icon:'📮', label:'Quadro',     render: renderBoard },
+      { key:'x1',         icon:'⚔️', label:'x1',         render: renderX1, needs:'x1', badge: ctx => EventCore.x1.waitingOnMe(ctx) }
     ],
     // Região da semana atual (a casca usa-a para colorir o céu da página).
     currentRegion(ctx){ const c = ctx.ev.current_week; return mod.weeks[Math.max(0, Math.min(c, mod.weeks.length) - 1)].region; },
-    afterRender(tabKey, root, ctx, ui){ if(tabKey === 'passaporte') animateRoute(root, ctx, ui); },
+    afterRender(tabKey, root, ctx, ui){
+      if(tabKey === 'passaporte'){
+        animateRoute(root, ctx, ui);
+        const sc = root.querySelector('.vm-log-scroll'), tag = root.querySelector('.vm-tag.next') || root.querySelector('.vm-tag.unlocked:last-of-type');
+        if(sc && tag && sc.scrollWidth > sc.clientWidth) sc.scrollLeft = Math.max(0, tag.offsetLeft - sc.clientWidth / 2 + tag.offsetWidth / 2);
+      }
+    },
     cosmeticName, cosmeticPreview, celebrate
   };
   (window.EVENT_MODULES = window.EVENT_MODULES || {})[mod.slug] = mod;
