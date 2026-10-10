@@ -16,6 +16,7 @@
 body{display:flex;align-items:center;justify-content:center;}
 .player-corner-badge{top:16px;}
 .daily-bonus-icon{top:82px;}
+.event-corner-icon{top:128px;}
 .wrap{max-width:480px;width:100%;padding:32px 20px;text-align:center;}
 .crystal{
   width:56px;height:56px;margin:0 auto 20px auto;
@@ -78,6 +79,14 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
     </div>
   </a>
 
+  <a class="nav-card" href="eventos.html">
+    <div class="nav-icon">🌍</div>
+    <div class="nav-text">
+      <h2>Eventos</h2>
+      <p>O evento da temporada: missões, níveis, cosméticos exclusivos e desafios x1.</p>
+    </div>
+  </a>
+
   <a class="nav-card" href="loja.html">
     <div class="nav-icon">🛍️</div>
     <div class="nav-text">
@@ -109,6 +118,7 @@ async function loadCornerBadge(){
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, savedName).then(available=>{
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
+    mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY);
   } catch(e){
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(null, null);
   }

@@ -258,7 +258,9 @@ const COSMETIC_CATALOG = {
     { id:'bg_galaxy',   name:'Galáxia',      price:80,  css:'linear-gradient(135deg,#7c4dc4,#1a1d29)', color:'#7c4dc4' },
     { id:'bg_fire',     name:'Fogo',         price:80,  css:'linear-gradient(135deg,#e0607a,#f0b64f)', color:'#e0607a' },
     { id:'bg_gold',     name:'Ouro Puro',    price:150, css:'linear-gradient(135deg,#f0b64f,#b8860b)', color:'#f0b64f' },
-    { id:'bg_aurora',   name:'Aurora Animada', price:220, css:'linear-gradient(270deg,#4fd8d0,#a56bf0,#f0b64f,#4fd8d0)', color:'#a56bf0', multiColor:['#4fd8d0','#a56bf0','#f0b64f'] }
+    { id:'bg_aurora',   name:'Aurora Animada', price:220, css:'linear-gradient(270deg,#4fd8d0,#a56bf0,#f0b64f,#4fd8d0)', color:'#a56bf0', multiColor:['#4fd8d0','#a56bf0','#f0b64f'] },
+    // Itens de EVENTO (eventOnly): price 0, nunca à venda — só se ganham ao subir de nível no evento.
+    { id:'bg_vm_ceu',   name:'Céu de Viagem', price:0, css:'linear-gradient(135deg,#4fa8f0,#f0b64f)', color:'#4fa8f0', eventOnly:'volta-ao-mundo' }
   ],
   accents: [
     { id:'accent_default', name:'Ciano (padrão)', price:0,  color:'#4fd8d0' },
@@ -276,12 +278,14 @@ const COSMETIC_CATALOG = {
     { id:'frame_gold',  name:'Faíscas',       price:60,  effect:'sparks' },
     { id:'frame_neon',  name:'Estrelado',     price:60,  effect:'starry' },
     { id:'frame_royal', name:'Florescer',     price:100, effect:'blossom' },
-    { id:'frame_diamond', name:'Diamante Prismático', price:0, effect:'diamond', auctionOnly:true }
+    { id:'frame_diamond', name:'Diamante Prismático', price:0, effect:'diamond', auctionOnly:true },
+    { id:'frame_vm_rota', name:'Rota Aérea', price:0, effect:'plane', eventOnly:'volta-ao-mundo' }
   ],
   nameEffects: [
     { id:'effect_none',  name:'Nenhum',  price:0,  css:'' },
     { id:'effect_glow',  name:'Brilho',  price:70, css:'text-shadow:0 0 8px currentColor;' },
-    { id:'effect_pulse', name:'Pulsar',  price:90, css:'animation:vsePulseName 1.5s ease-in-out infinite;' }
+    { id:'effect_pulse', name:'Pulsar',  price:90, css:'animation:vsePulseName 1.5s ease-in-out infinite;' },
+    { id:'effect_vm_rasto', name:'Rasto de Avião', price:0, css:'text-shadow:-5px 0 6px rgba(79,216,208,0.55),-11px 0 8px rgba(79,216,208,0.28);', eventOnly:'volta-ao-mundo' }
   ],
   titles: [
     { id:'title_none',         name:'Nenhum',              price:0,  text:'' },
@@ -292,7 +296,8 @@ const COSMETIC_CATALOG = {
     { id:'title_untouchable',  name:'O Intocável',         price:60, text:'🛡️ O Intocável' },
     { id:'title_roulette_king',name:'Rei da Roleta',       price:60, text:'🎰 Rei da Roleta' },
     { id:'title_reroll_master',name:'Mestre das Trocas',   price:60, text:'🔄 Mestre das Trocas' },
-    { id:'title_auction_legend', name:'Lenda do Leilão',   price:0, text:'💠 Lenda do Leilão', auctionOnly:true }
+    { id:'title_auction_legend', name:'Lenda do Leilão',   price:0, text:'💠 Lenda do Leilão', auctionOnly:true },
+    { id:'title_vm_mochileiro', name:'Mochileiro', price:0, text:'🧳 Mochileiro', eventOnly:'volta-ao-mundo' }
   ],
   badges: [
     { id:'badge_stall',   name:'Fã de Stall',   price:30, emoji:'🐌' },
@@ -302,7 +307,11 @@ const COSMETIC_CATALOG = {
     { id:'badge_hazards', name:'Fã de Hazards', price:30, emoji:'🕸️' },
     { id:'badge_allin',   name:'All-in',        price:30, emoji:'🎲' },
     { id:'badge_collector', name:'Colecionador', price:50, emoji:'🗂️' },
-    { id:'badge_analyst', name:'Analista',      price:30, emoji:'🔍' }
+    { id:'badge_analyst', name:'Analista',      price:30, emoji:'🔍' },
+    { id:'badge_vm_kanto',  name:'Selo de Kanto',  price:0, emoji:'🗼', eventOnly:'volta-ao-mundo' },
+    { id:'badge_vm_johto',  name:'Selo de Johto',  price:0, emoji:'🔔', eventOnly:'volta-ao-mundo' },
+    { id:'badge_vm_hoenn',  name:'Selo de Hoenn',  price:0, emoji:'🌋', eventOnly:'volta-ao-mundo' },
+    { id:'badge_vm_sinnoh', name:'Selo de Sinnoh', price:0, emoji:'❄️', eventOnly:'volta-ao-mundo' }
   ],
   features: [
     { id:'feature_custom_pagebg', name:'Fundo de perfil personalizado (foto)', price:120 },
@@ -324,6 +333,7 @@ function getCosmeticById(id){
 async function buyCosmetic(supabaseUrl, supabaseAnonKey, name, cosmeticId){
   const item = getCosmeticById(cosmeticId);
   if(!item) return {ok:false, reason:'notfound'};
+  if(item.eventOnly) return {ok:false, reason:'eventonly'}; // itens de evento nunca se compram
   const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins,owned_cosmetics,total_daily_claims`, {headers: sbAuthHeaders(supabaseAnonKey)});
   const rows = await res.json();
   if(!rows || !rows[0]) return {ok:false, reason:'notfound'};
@@ -457,6 +467,18 @@ function ensureAvatarFxStyles(){
       background:linear-gradient(160deg,#fff 0 32%,color-mix(in srgb,var(--fx-color) 55%,#fff) 32% 62%,var(--fx-color) 62%);
       clip-path:polygon(50% 100%,0% 38%,22% 0%,78% 0%,100% 38%);}
 
+    /* Rota Aérea (evento Volta ao Mundo): um avião a dar a volta ao avatar. O <span> ocupa a
+       camada toda e RODA (não animamos a própria camada, senão a classe multicolor da Aurora
+       sobrepunha-se); o avião é o ::before no topo do span e o rasto é o ::after. */
+    @keyframes vsePlaneOrbit{to{transform:rotate(360deg);}}
+    .avatar-fx-plane span{top:0!important;left:0!important;width:100%;height:100%;
+      animation:vsePlaneOrbit 7s linear infinite;animation-delay:0s!important;}
+    .avatar-fx-plane span::before{content:'';position:absolute;top:2%;left:50%;width:calc(var(--fx-gem,9px)*1.7);height:calc(var(--fx-gem,9px)*1.7);
+      transform:translate(-50%,0) rotate(90deg);background:var(--fx-color);
+      clip-path:polygon(50% 0%,60% 38%,100% 62%,100% 74%,58% 62%,56% 84%,72% 94%,72% 100%,50% 94%,28% 100%,28% 94%,44% 84%,42% 62%,0% 74%,0% 62%,40% 38%);}
+    .avatar-fx-plane span::after{content:'';position:absolute;top:calc(2% + var(--fx-gem,9px)*0.85);left:calc(50% - 24%);width:24%;height:2px;
+      background:linear-gradient(90deg,transparent,var(--fx-color));opacity:0.55;}
+
     @keyframes vseFxHueRotate{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
     .avatar-fx-layer.avatar-fx-multicolor{animation:vseFxHueRotate 5s linear infinite;}
   `;
@@ -478,11 +500,11 @@ function frameEffectPreviewHtml(effectType){
 }
 
 const AVATAR_FX_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
-const AVATAR_FX_COUNTS = { sparks:6, starry:6, blossom:5, diamond:4 };
+const AVATAR_FX_COUNTS = { sparks:6, starry:6, blossom:5, diamond:4, plane:1 };
 // Efeitos que não usam os primeiros N ângulos da lista acima — o Diamante
 // quer as 4 gemas espalhadas pelos pontos cardeais (direita, baixo, esquerda,
 // cima), pela ordem em que o anel as "visita" ao rodar.
-const AVATAR_FX_ANGLE_OVERRIDES = { diamond:[0, 90, 180, 270] };
+const AVATAR_FX_ANGLE_OVERRIDES = { diamond:[0, 90, 180, 270], plane:[0] };
 // Duração (s) do ciclo de cada efeito, para espaçar o atraso de cada partícula.
 const AVATAR_FX_PERIODS = { diamond:4 };
 
@@ -500,7 +522,7 @@ function avatarFxParticlesHtml(effectType, radiusPct){
 }
 
 // effectColor: cor (hex) escolhida em "Fundo do Avatar". effectType: 'none' |
-// 'sparks' | 'starry' | 'blossom' | 'diamond'. multiColor: true para a Aurora Animada,
+// 'sparks' | 'starry' | 'blossom' | 'diamond' | 'plane'. multiColor: true para a Aurora Animada,
 // faz o efeito ciclar de cor continuamente em vez de ficar fixo.
 function avatarHtml(name, photoUrl, sizePx, effectColor, effectType, multiColor){
   const size = sizePx || 44;
@@ -2924,4 +2946,59 @@ async function fetchActiveEvent(supabaseUrl, supabaseAnonKey){
 // é fixo (National Dex AG) — por isso a votação de tier (que custa moedas) fica bloqueada.
 function isTierVotingLockedByEvent(ev){
   return !!(ev && ev.status === 'active' && ev.current_week < ev.total_weeks);
+}
+
+// ---------- Eventos: cosméticos, torneios do evento, botão de canto ----------
+// Dá cosméticos a um jogador SEM os duplicar. Devolve {ok, added:[ids realmente novos]}.
+// Lê e depois escreve (não é atómico — como todos os outros sítios que atribuem cosméticos).
+async function grantCosmetic(supabaseUrl, supabaseAnonKey, name, cosmeticIds){
+  const ids = (Array.isArray(cosmeticIds) ? cosmeticIds : [cosmeticIds]).filter(Boolean);
+  if(!name || !ids.length) return {ok:true, added:[]};
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=owned_cosmetics`, {headers: sbAuthHeaders(supabaseAnonKey)});
+    if(!res.ok) return {ok:false, added:[]};
+    const rows = await res.json();
+    if(!rows || !rows[0]) return {ok:false, added:[]};
+    const owned = rows[0].owned_cosmetics || [];
+    const added = ids.filter((id, i) => !owned.includes(id) && ids.indexOf(id) === i);
+    if(!added.length) return {ok:true, added:[]};
+    const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+      method:'PATCH',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify({ owned_cosmetics: owned.concat(added) })
+    });
+    return {ok: patchRes.ok, added: patchRes.ok ? added : []};
+  } catch(e){ return {ok:false, added:[]}; }
+}
+
+// Só os torneios de UM evento (filtro por data->event->>id no servidor), já só com os campos
+// que as missões precisam — ~3 KB em vez dos ~16 KB do torneio completo (o `draws` é 88%).
+// Devolve linhas no mesmo formato das outras páginas: {id, created_at, tier, status, data:{...}}.
+async function fetchEventTournaments(supabaseUrl, supabaseAnonKey, eventId){
+  try{
+    const sel = 'id,created_at,tier,status,name:data-%3E%3Ename,event:data-%3Eevent,players:data-%3Eplayers,matches:data-%3Ematches,champion:data-%3E%3Echampion';
+    const res = await fetch(`${supabaseUrl}/rest/v1/tournaments?data-%3Eevent-%3E%3Eid=eq.${encodeURIComponent(eventId)}&select=${sel}&order=created_at.asc`, {
+      headers: sbAuthHeaders(supabaseAnonKey)
+    });
+    if(!res.ok) return [];
+    const rows = await res.json();
+    return (rows || []).map(r => ({
+      id: r.id, created_at: r.created_at, tier: r.tier, status: r.status,
+      data: { name: r.name, event: r.event, players: r.players || [], matches: r.matches || [], champion: r.champion || null }
+    }));
+  } catch(e){ return []; }
+}
+
+// Botão de canto "🌍" (como o do perfil e o da recompensa diária) que abre a página do
+// evento. Só aparece enquanto houver um evento ativo. Chamar depois de #playerCornerContainer existir.
+async function mountEventCornerIcon(supabaseUrl, supabaseAnonKey){
+  try{
+    const container = document.getElementById('playerCornerContainer');
+    if(!container || document.getElementById('eventCornerIcon')) return;
+    const ev = await fetchActiveEvent(supabaseUrl, supabaseAnonKey);
+    if(!ev || document.getElementById('eventCornerIcon')) return;
+    const week = ev.current_week > 0 ? ` — Semana ${ev.current_week} de ${ev.total_weeks}` : ' — começa em breve';
+    const title = `Evento: ${ev.name}${week}`.replace(/"/g, '&quot;');
+    container.insertAdjacentHTML('beforeend', `<a href="eventos.html" id="eventCornerIcon" class="event-corner-icon" title="${title}">🌍</a>`);
+  } catch(e){ /* não crítico */ }
 }

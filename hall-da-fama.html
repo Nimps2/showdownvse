@@ -83,6 +83,7 @@
     <a href="loja.html">Loja</a>
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
+    <a href="eventos.html">Eventos</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
 </div>
@@ -262,6 +263,7 @@ async function init(){
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
+    mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY);
     populateHofTierFilter(rows);
     onHofFilterChange(); // respeita a pesquisa/filtro de tier já escolhidos (importa quando isto corre de novo sozinho, via polling)
     renderMvpList(rows);

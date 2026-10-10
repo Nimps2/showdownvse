@@ -109,6 +109,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
     <a href="loja.html">Loja</a>
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
+    <a href="eventos.html">Eventos</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
 </div>
@@ -293,6 +294,7 @@ async function init(){
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
+    mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY);
     currentTrophies = computeCurrentTrophies(tournaments);
     eloRatings = computeEloRatings(tournaments);
     renderTournamentSelect();

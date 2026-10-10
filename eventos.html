@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eventos — Torneio Showdown - VSE</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@600;700&family=Special+Elite&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+/* Só estrutura da casca. O VISUAL de cada evento vive em eventos/<slug>.css. */
+#eventRoot .ev-section{margin-top:6px;}
+#eventRoot .ev-soon{margin-top:16px;font-size:12.5px;color:var(--text-dim);}
+#eventRoot .card{margin-top:16px;}
+</style>
+</head>
+<body>
+<div id="playerCornerContainer"></div>
+<div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
+    <h2>Entrar</h2>
+    <label>Nome</label>
+    <select id="gateNameSelect"><option value="">— a carregar jogadores —</option></select>
+    <label>Password</label>
+    <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()">
+    <button class="btn-primary" onclick="doGateLogin()">Entrar</button>
+    <div id="gateError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;"></div>
+  </div>
+</div>
+
+<div id="topbar" class="topbar" style="display:none;">
+  <a href="index.html" class="brand">
+    <div class="brand-mark"></div>
+    <div class="brand-name">Torneio VSE</div>
+  </a>
+  <nav class="topnav">
+    <a href="index.html">Início</a>
+    <a href="viewer.html">Bracket</a>
+    <a href="estatisticas.html">Estatísticas</a>
+    <a href="hall-da-fama.html">Hall da Fama</a>
+    <a href="loja.html">Loja</a>
+    <a href="conquistas.html">Conquistas</a>
+    <a href="palpites.html">Palpiteiro</a>
+    <a href="eventos.html" class="current">Eventos</a>
+  </nav>
+  <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
+</div>
+
+<div id="mainContent" class="wrap" style="display:none;">
+  <div class="status-strip">
+    <span class="status-dot" id="statusDot"></span>
+    <span class="status-text" id="statusText">Conectando…</span>
+    <div class="metric"><div class="num" id="myCoinsDisplay">🪙 0</div><div class="lbl">Saldo</div></div>
+    <span class="status-text">Ligado como <b id="loggedInNameTop" style="color:var(--tera-cyan);"></b></span>
+    <a href="#" class="nav-link" style="margin-left:auto;" onclick="doPlayerLogout(); return false;">Trocar jogador</a>
+  </div>
+
+  <div id="eventRoot"><div class="empty-state">A carregar o evento…</div></div>
+
+  <div class="footer-note">As missões são calculadas a partir do que já fizeste no site — clica em "Reclamar" para receber os prémios.</div>
+</div>
+
+<script src="showdown-utils.js"></script>
+<script src="eventos-core.js"></script>
+<script>
+initTheme();
+ensureAvatarFxStyles();
+
+const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+
+let loggedInPlayerName = null;
+
+async function doGateLogin(){
+  const name = document.getElementById('gateNameSelect').value;
+  const password = document.getElementById('gatePassword').value;
+  const errEl = document.getElementById('gateError');
+  errEl.style.display = 'none';
+  if(!name){ errEl.textContent = 'Selecione o seu nome.'; errEl.style.display='block'; return; }
+  if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
+  const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
+  if(!result.ok){
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registrado pelo organizador.'
+      : result.reason==='wrongpass' ? 'Password incorreta.'
+      : 'Erro ao ligar à base de dados.';
+    errEl.style.display = 'block';
+    return;
+  }
+  localStorage.setItem('player_login_name', name);
+  loggedInPlayerName = name;
+  unlockContent();
+}
+
+function unlockContent(){
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('topbar').style.display = 'flex';
+  document.getElementById('loggedInNameTop').textContent = loggedInPlayerName;
+  init();
+}
+
+function doPlayerLogout(){
+  localStorage.removeItem('player_login_name');
+  loggedInPlayerName = null;
+  document.getElementById('gatePassword').value = '';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('topbar').style.display = 'none';
+  document.getElementById('authGate').style.display = 'flex';
+}
+
+async function pageBoot(){
+  const sel = document.getElementById('gateNameSelect');
+  try{
+    const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
+    names.forEach(n=>{
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+    const saved = localStorage.getItem('player_login_name');
+    if(saved && names.includes(saved)){
+      loggedInPlayerName = saved;
+      unlockContent();
+    }
+  } catch(e){
+    sel.innerHTML = '<option value="">— erro ao carregar jogadores —</option>';
+  }
+}
+
+function sbHeaders(){
+  return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+}
+function setStatus(ok, text){
+  document.getElementById('statusDot').className = 'status-dot ' + (ok?'on':'off');
+  document.getElementById('statusText').textContent = text;
+}
+
+let dailyBonusClaimInFlight = false;
+async function handleDailyBonusClick(){
+  if(dailyBonusClaimInFlight) return;
+  dailyBonusClaimInFlight = true;
+  const icon = document.getElementById('dailyBonusIcon');
+  if(icon) icon.classList.remove('available');
+  try{
+    const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+    if(result.awarded){
+      showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
+      refreshMyCoins();
+    }
+  } finally {
+    dailyBonusClaimInFlight = false;
+  }
+}
+
+// ---------- Estado da página ----------
+let activeEvent = null;   // linha da tabela events
+let mod = null;           // definição do evento (eventos/<slug>.js)
+let ctx = null;           // dados do jogador neste evento (EventCore.load)
+let myProfile = {};
+let activeTab = 'passaporte';
+const X1_ENABLED = false; // os desafios x1 chegam na fase seguinte
+
+// Carrega o CSS e o JS do evento ativo (cada evento tem o seu par). O slug só pode ter a-z, 0-9 e "-".
+function loadEventAssets(slug){
+  return new Promise((resolve, reject) => {
+    if(!/^[a-z0-9-]+$/.test(slug)){ reject(new Error('slug inválido')); return; }
+    const css = document.createElement('link');
+    css.rel = 'stylesheet'; css.href = `eventos/${slug}.css`;
+    document.head.appendChild(css);
+    const js = document.createElement('script');
+    js.src = `eventos/${slug}.js`;
+    js.onload = () => resolve();
+    js.onerror = () => reject(new Error('módulo do evento não encontrado'));
+    document.head.appendChild(js);
+  });
+}
+
+async function refreshMyCoins(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/players?name=eq.${encodeURIComponent(loggedInPlayerName)}&select=coins`, { headers: sbHeaders() });
+    const rows = await res.json();
+    if(rows && rows[0]) document.getElementById('myCoinsDisplay').textContent = `🪙 ${rows[0].coins || 0}`;
+  } catch(e){}
+}
+
+async function init(){
+  EventCore.init(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const root = document.getElementById('eventRoot');
+  try{
+    const [profiles, ev] = await Promise.all([
+      fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY),
+      fetchActiveEvent(SUPABASE_URL, SUPABASE_ANON_KEY)
+    ]);
+    myProfile = profiles[loggedInPlayerName] || {};
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
+    checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
+      document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
+    });
+    document.getElementById('myCoinsDisplay').textContent = `🪙 ${myProfile.coins || 0}`;
+
+    if(!ev){
+      setStatus(true, 'Ligado — não há nenhum evento ativo.');
+      root.innerHTML = '<div class="card"><h2>🌍 Eventos</h2><div class="empty-state">Não há nenhum evento ativo de momento. Quando houver, aparece aqui — com missões, níveis e prémios exclusivos.</div></div>';
+      return;
+    }
+    activeEvent = ev;
+    await loadEventAssets(ev.slug);
+    mod = (window.EVENT_MODULES || {})[ev.slug];
+    if(!mod) throw new Error('módulo do evento em falta');
+    root.className = 'ev-theme-' + ev.slug;
+
+    ctx = await EventCore.load(ev, loggedInPlayerName);
+    setStatus(true, `Ligado — ${ev.name}: semana ${ev.current_week} de ${ev.total_weeks}.`);
+    renderAll();
+    await syncRewards(null);
+  } catch(e){
+    console.error(e);
+    setStatus(false, 'Não foi possível carregar o evento.');
+    root.innerHTML = '<div class="card"><div class="empty-state">Não foi possível carregar o evento. Tenta recarregar a página.</div></div>';
+  }
+}
+
+// ---------- Renderização ----------
+function renderAll(){
+  const root = document.getElementById('eventRoot');
+  root.innerHTML = `
+    <div class="tabs">
+      <button class="tab-btn" onclick="switchEventTab('passaporte')">🧭 Passaporte</button>
+      <button class="tab-btn" onclick="switchEventTab('missoes')">🎯 Missões</button>
+    </div>
+    <div id="panel-passaporte" class="shop-panel">
+      ${mod.renderHero(ctx)}
+      <div class="ev-section">${mod.renderLevels(ctx)}</div>
+      <div class="card"><h2>🏆 Ranking do evento</h2>${rankingHtml()}</div>
+      ${X1_ENABLED ? '' : '<div class="ev-soon">⚔️ Os desafios x1 (até 3 por semana) chegam em breve — vão trazer mais missões.</div>'}
+    </div>
+    <div id="panel-missoes" class="shop-panel">${missionsHtml()}</div>`;
+  switchEventTab(activeTab);
+}
+
+function switchEventTab(tab){
+  activeTab = tab;
+  const map = { passaporte:0, missoes:1 };
+  document.querySelectorAll('#eventRoot .tab-btn').forEach((b,i) => b.classList.toggle('active', i === map[tab]));
+  document.querySelectorAll('#eventRoot .shop-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+}
+
+function rankingHtml(){
+  const rows = EventCore.ranking(ctx).slice(0, 10);
+  if(!rows.length) return '<div class="empty-state">Ainda ninguém reclamou missões. Sê o primeiro!</div>';
+  return rows.map((r, i) => {
+    const lv = EventCore.levelFor(mod, r.xp).level;
+    const medal = ['🥇','🥈','🥉'][i] || (i + 1);
+    return `<div class="ev-rank-row${r.name === loggedInPlayerName ? ' me' : ''}">
+      <span class="ev-rank-pos">${medal}</span>
+      <span class="ev-rank-name">${escapeHtml(r.name)}</span>
+      <span class="ev-rank-lvl">Nível ${lv}</span>
+      <span class="ev-rank-xp">${r.xp} XP</span>
+    </div>`;
+  }).join('');
+}
+
+function missionRowHtml(m){
+  const st = EventCore.evaluate(ctx, m);
+  const pct = st.target ? Math.round((st.value / st.target) * 100) : 0;
+  let action;
+  if(m.locked) action = '<span class="ev-m-state">🔒 por abrir</span>';
+  else if(st.claimed) action = '<span class="ev-m-state ok">✔ Reclamada</span>';
+  else if(st.done) action = `<button class="ev-m-btn" onclick="doClaim('${m.id}', this)">Reclamar</button>`;
+  else action = `<span class="ev-m-state">${st.value}/${st.target}</span>`;
+  const showBar = !m.locked && !st.claimed;
+  return `<div class="ev-mission${st.claimed ? ' claimed' : ''}">
+    <div>
+      <div class="ev-m-title">${escapeHtml(m.title)}</div>
+      <div class="ev-m-desc">${escapeHtml(m.desc)}</div>
+      ${showBar ? `<div class="ev-m-bar"><div style="width:${pct}%"></div></div>` : ''}
+      <div class="ev-m-rewards">
+        <span class="ev-chip">+${m.xp} XP</span>
+        <span class="ev-chip">${mod.currency.emoji} ${m.miles}</span>
+        ${m.coins ? `<span class="ev-chip">🪙 ${m.coins}</span>` : ''}
+      </div>
+    </div>
+    <div class="ev-m-action">${action}</div>
+  </div>`;
+}
+
+function missionsHtml(){
+  const all = EventCore.expandMissions(mod, activeEvent, { x1: X1_ENABLED });
+  let html = '';
+  mod.weeks.forEach((w, i) => {
+    const week = i + 1;
+    const r = EVENT_REGIONS[w.region];
+    const list = all.filter(m => m.scope === 'week' && m.week === week);
+    if(!list.length) return;
+    const locked = week > activeEvent.current_week;
+    html += `<div class="ev-week${locked ? ' locked' : ''}" data-region="${w.region}">
+      <div class="ev-week-head">
+        <span class="ev-wh-emoji">${mod.regionEmoji[w.region]}</span>
+        <div><div class="ev-wh-title">Semana ${week} — ${r.label}</div><div class="ev-wh-sub">${r.dex}</div></div>
+        <span class="ev-wh-pill">${locked ? '🔒 abre com o torneio da semana' : (week === activeEvent.current_week ? '✈️ semana atual' : 'encerrada')}</span>
+      </div>
+      ${list.map(missionRowHtml).join('')}
+    </div>`;
+  });
+  const globalList = all.filter(m => m.scope === 'event');
+  html += `<div class="ev-week">
+    <div class="ev-week-head">
+      <span class="ev-wh-emoji">🌍</span>
+      <div><div class="ev-wh-title">Missões do evento</div><div class="ev-wh-sub">valem durante todo o evento</div></div>
+    </div>
+    ${globalList.map(missionRowHtml).join('')}
+  </div>`;
+  return html;
+}
+
+// ---------- Ações ----------
+async function doClaim(missionId, btn){
+  const mission = EventCore.expandMissions(mod, activeEvent, { x1: X1_ENABLED }).find(m => m.id === missionId);
+  if(!mission) return;
+  if(btn) btn.disabled = true;
+  const levelBefore = EventCore.levelFor(mod, EventCore.totals(ctx, loggedInPlayerName).xp).level;
+  const r = await EventCore.claimMission(ctx, mission);
+  if(r.ok){
+    showCelebrationToast(`🎫 Missão cumprida: <b>${escapeHtml(mission.title)}</b><br><span style="font-size:11px;opacity:0.9;">+${r.rewards.xp} XP · ${mod.currency.emoji} ${r.rewards.miles}${r.rewards.coins ? ' · 🪙 ' + r.rewards.coins : ''}</span>`, 5500);
+    refreshMyCoins();
+    renderAll();
+    const levelAfter = EventCore.levelFor(mod, EventCore.totals(ctx, loggedInPlayerName).xp).level;
+    if(levelAfter > levelBefore){
+      setTimeout(() => showCelebrationToast(`⬆️ Subiste para o <b>nível ${levelAfter}</b>!`, 5500), 700);
+    }
+    await syncRewards(levelBefore);
+  } else {
+    const msg = r.reason === 'already' ? 'Esta missão já tinha sido reclamada.'
+      : r.reason === 'notdone' ? 'Ainda não cumpriste esta missão.'
+      : r.reason === 'payment' ? 'Não consegui pagar as moedas — a missão NÃO foi marcada como reclamada. Tenta outra vez.'
+      : r.reason === 'busy' ? '' : 'Não foi possível reclamar agora. Tenta outra vez.';
+    if(msg) alert(msg);
+    renderAll();
+  }
+}
+
+// Garante os cosméticos de todos os níveis já atingidos e avisa dos novos.
+async function syncRewards(){
+  const added = await EventCore.syncLevelRewards(ctx, mod, myProfile.ownedCosmetics);
+  if(!added.length) return;
+  myProfile.ownedCosmetics = (myProfile.ownedCosmetics || []).concat(added);
+  added.forEach((id, i) => {
+    setTimeout(() => showCelebrationToast(`🏅 Prémio de nível desbloqueado!<br><b>${escapeHtml(mod.cosmeticName(id))}</b><br><span style="font-size:11px;opacity:0.9;">Equipa-o em Perfil → Customizar</span>`, 7000), 1400 + i * 900);
+  });
+}
+
+pageBoot();
+</script>
+</body>
+</html>

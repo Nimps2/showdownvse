@@ -37,6 +37,7 @@
     <a href="loja.html" class="current">Loja</a>
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
+    <a href="eventos.html">Eventos</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
 </div>
@@ -362,6 +363,7 @@ async function init(){
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
+    mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY);
     remainingTiers = computeRemainingTiersInCycle(allRows);
     activeEvent = await fetchActiveEvent(SUPABASE_URL, SUPABASE_ANON_KEY);
     tierVoteStandings = await fetchTierVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -398,12 +400,12 @@ function renderAll(){
   renderWeeklyFeatured(myProfile);
 
   // Personalização
-  document.getElementById('shopBackgrounds').innerHTML = COSMETIC_CATALOG.backgrounds.map(item => shopItemHtml(item, 'background', myProfile)).join('');
-  document.getElementById('shopAccents').innerHTML = COSMETIC_CATALOG.accents.map(item => shopItemHtml(item, 'accent', myProfile)).join('');
-  document.getElementById('shopFrames').innerHTML = COSMETIC_CATALOG.frames.filter(item=>!item.auctionOnly).map(item => shopItemHtml(item, 'frame', myProfile)).join('');
-  document.getElementById('shopNameEffects').innerHTML = COSMETIC_CATALOG.nameEffects.map(item => shopItemHtml(item, 'nameEffect', myProfile)).join('');
-  document.getElementById('shopTitles').innerHTML = COSMETIC_CATALOG.titles.filter(item=>!item.auctionOnly).map(item => shopItemHtml(item, 'title', myProfile)).join('');
-  document.getElementById('shopBadges').innerHTML = COSMETIC_CATALOG.badges.map(item => shopBadgeItemHtml(item, myProfile)).join('');
+  document.getElementById('shopBackgrounds').innerHTML = COSMETIC_CATALOG.backgrounds.filter(item=>!item.eventOnly).map(item => shopItemHtml(item, 'background', myProfile)).join('');
+  document.getElementById('shopAccents').innerHTML = COSMETIC_CATALOG.accents.filter(item=>!item.eventOnly).map(item => shopItemHtml(item, 'accent', myProfile)).join('');
+  document.getElementById('shopFrames').innerHTML = COSMETIC_CATALOG.frames.filter(item=>!item.auctionOnly && !item.eventOnly).map(item => shopItemHtml(item, 'frame', myProfile)).join('');
+  document.getElementById('shopNameEffects').innerHTML = COSMETIC_CATALOG.nameEffects.filter(item=>!item.eventOnly).map(item => shopItemHtml(item, 'nameEffect', myProfile)).join('');
+  document.getElementById('shopTitles').innerHTML = COSMETIC_CATALOG.titles.filter(item=>!item.auctionOnly && !item.eventOnly).map(item => shopItemHtml(item, 'title', myProfile)).join('');
+  document.getElementById('shopBadges').innerHTML = COSMETIC_CATALOG.badges.filter(item=>!item.eventOnly).map(item => shopBadgeItemHtml(item, myProfile)).join('');
   document.getElementById('shopCustomBg').innerHTML = shopCustomBgHtml(myProfile);
   document.getElementById('shopCustomSiteBg').innerHTML = shopCustomSiteBgHtml(myProfile);
 
@@ -635,8 +637,9 @@ function shopItemHtml(item, type, profile){
     frame: profile.equippedFrame, nameEffect: profile.equippedNameEffect, title: profile.equippedTitle
   };
   const equippedId = fieldMap[type];
-  const owned = (item.price === 0 && !item.auctionOnly) || (profile.ownedCosmetics||[]).includes(item.id);
-  const equipped = equippedId ? equippedId === item.id : item.price === 0;
+  const isDefaultFree = item.price === 0 && !item.auctionOnly && !item.eventOnly; // só os itens base são "de graça para toda a gente"
+  const owned = isDefaultFree || (profile.ownedCosmetics||[]).includes(item.id);
+  const equipped = equippedId ? equippedId === item.id : isDefaultFree;
 
   let swatchHtml;
   if(type === 'background') swatchHtml = `<div class="shop-swatch" style="background:${item.css};"></div>`;
