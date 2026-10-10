@@ -126,7 +126,7 @@
     const r = EVENT_REGIONS[region], st = STOPS[i];
     return `<g class="vm-s ${state}" data-region="${region}" transform="translate(${st.x},${st.y})">
       <g class="vm-s-ink">
-        <circle r="45" class="ring1"/><circle r="38" class="ring2"/>
+        <circle r="45" class="ring1"/><circle r="44" class="grain" fill="url(#vmGrain)"/><circle r="38" class="ring2"/>
         <text y="-3" text-anchor="middle" class="emoji">${REGION_EMOJI[region]}</text>
         <text y="15" text-anchor="middle" class="rname">${r.label.toUpperCase()}</text>
         <text y="27" text-anchor="middle" class="rweek">SEMANA ${i + 1}</text>
@@ -141,12 +141,16 @@
     const stamps = mod.weeks.map((w, i) => stampSvg(i, w.region, stampState(ctx, i + 1))).join('');
     return `<svg class="vm-route-svg" viewBox="0 0 800 215" role="img" aria-label="Rota do evento pelas quatro regiões">
       <defs>
-        <filter id="vmInk" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.6"/></filter>
+        <pattern id="vmGrain" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.55"/><circle cx="3" cy="3" r="0.4"/></pattern>
       </defs>
       <path id="vmRoutePath" class="vm-route-base" d="${ROUTE_D}"/>
+      <path id="vmRouteGlow" class="vm-route-glow" d="${ROUTE_D}"/>
       <path id="vmRouteProg" class="vm-route-prog" d="${ROUTE_D}"/>
       ${stamps}
-      <g id="vmPlane" class="vm-plane-g"><path d="M0,-13 L4,-4 L19,3 L19,7 L4,3 L3,11 L9,14 L9,16 L0,14 L-9,16 L-9,14 L-3,11 L-4,3 L-19,7 L-19,3 L-4,-4 Z"/></g>
+      <g id="vmPlane" class="vm-plane-g">
+        <path class="halo" d="M0,-13 L4,-4 L19,3 L19,7 L4,3 L3,11 L9,14 L9,16 L0,14 L-9,16 L-9,14 L-3,11 L-4,3 L-19,7 L-19,3 L-4,-4 Z" transform="scale(1.55)"/>
+        <path class="body" d="M0,-13 L4,-4 L19,3 L19,7 L4,3 L3,11 L9,14 L9,16 L0,14 L-9,16 L-9,14 L-3,11 L-4,3 L-19,7 L-19,3 L-4,-4 Z"/>
+      </g>
     </svg>`;
   }
 
@@ -154,7 +158,7 @@
   function animateRoute(root, ctx, ui){
     const svg = root.querySelector('.vm-route-svg');
     if(!svg) return;
-    const path = svg.querySelector('#vmRoutePath'), prog = svg.querySelector('#vmRouteProg'), plane = svg.querySelector('#vmPlane');
+    const path = svg.querySelector('#vmRoutePath'), prog = svg.querySelector('#vmRouteProg'), glow = svg.querySelector('#vmRouteGlow'), plane = svg.querySelector('#vmPlane');
     if(!path.getTotalLength) return;
     const total = path.getTotalLength();
     const cur = ctx.ev.current_week;
@@ -178,6 +182,7 @@
       plane.setAttribute('transform', `translate(${p.x},${p.y}) rotate(${ang})`);
       const reach = target > 0 ? L + (stopL - target) * (L / target) : L;
       prog.style.strokeDasharray = `${reach} ${total}`;
+      glow.style.strokeDasharray = `${reach} ${total}`;
     };
     if(ui.routeAnimated || prefersReducedMotion() || target === 0){ place(target); plane.classList.add('landed'); ui.routeAnimated = true; return; }
     ui.routeAnimated = true;

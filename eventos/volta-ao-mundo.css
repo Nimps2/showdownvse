@@ -129,12 +129,14 @@ body.light-theme .ev-theme-volta-ao-mundo [data-region="sinnoh"]{--accent:#7c4dc
 /* ======================= Rota (SVG) ======================= */
 .ev-theme-volta-ao-mundo .vm-route-card{margin-top:16px;padding:6px 6px 0;border-radius:18px;background:var(--vm-panel);border:1px solid var(--line);
   backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);}
-.ev-theme-volta-ao-mundo .vm-route-svg{display:block;width:100%;height:auto;overflow:visible;}
+.ev-theme-volta-ao-mundo .vm-route-svg{display:block;width:100%;height:auto;overflow:visible;text-rendering:geometricPrecision;shape-rendering:geometricPrecision;}
 .ev-theme-volta-ao-mundo .vm-route-base{fill:none;stroke:var(--vm-gold-dim);stroke-width:2.4;stroke-dasharray:3 8;stroke-linecap:round;}
-.ev-theme-volta-ao-mundo .vm-route-prog{fill:none;stroke:var(--vm-gold);stroke-width:3.2;stroke-linecap:round;filter:drop-shadow(0 0 5px color-mix(in srgb,var(--vm-gold) 70%,transparent));}
-.ev-theme-volta-ao-mundo .vm-plane-g{fill:var(--tera-cyan);filter:drop-shadow(0 0 6px color-mix(in srgb,var(--tera-cyan) 70%,transparent));}
-.ev-theme-volta-ao-mundo .vm-plane-g.landed path{animation:vmPlaneGlow 2.4s ease-in-out infinite;}
-@keyframes vmPlaneGlow{0%,100%{opacity:1;}50%{opacity:0.72;}}
+.ev-theme-volta-ao-mundo .vm-route-prog{fill:none;stroke:var(--vm-gold);stroke-width:3.2;stroke-linecap:round;}
+.ev-theme-volta-ao-mundo .vm-route-glow{fill:none;stroke:var(--vm-gold);stroke-width:10;stroke-linecap:round;opacity:0.2;}
+.ev-theme-volta-ao-mundo .vm-plane-g{fill:var(--tera-cyan);}
+.ev-theme-volta-ao-mundo .vm-plane-g .halo{fill:var(--tera-cyan);opacity:0.22;}
+.ev-theme-volta-ao-mundo .vm-plane-g.landed .halo{animation:vmPlaneGlow 2.4s ease-in-out infinite;}
+@keyframes vmPlaneGlow{0%,100%{opacity:0.22;}50%{opacity:0.07;}}
 .ev-theme-volta-ao-mundo .vm-s{--accent:var(--vm-gold);}
 .ev-theme-volta-ao-mundo .vm-s .ring1{fill:var(--bg-card);stroke:var(--accent);stroke-width:3;}
 .ev-theme-volta-ao-mundo .vm-s .ring2{fill:none;stroke:var(--accent);stroke-width:1.3;stroke-dasharray:2 3;}
@@ -145,11 +147,17 @@ body.light-theme .ev-theme-volta-ao-mundo [data-region="sinnoh"]{--accent:#7c4dc
 .ev-theme-volta-ao-mundo .vm-s .cap .dex{font-size:10.5px;opacity:0.6;font-weight:400;}
 .ev-theme-volta-ao-mundo .vm-s .state{font-family:'Special Elite',monospace;font-size:11.5px;fill:var(--accent);}
 .ev-theme-volta-ao-mundo .vm-s .strike{stroke:var(--accent);stroke-width:3.4;opacity:0.75;}
-.ev-theme-volta-ao-mundo .vm-s.done .vm-s-ink{filter:url(#vmInk);}
-.ev-theme-volta-ao-mundo .vm-s.done .ring1{fill:color-mix(in srgb,var(--accent) 17%,var(--bg-card));}
-.ev-theme-volta-ao-mundo .vm-s.upcoming{opacity:0.5;filter:grayscale(0.9);}
+.ev-theme-volta-ao-mundo .vm-s .grain{stroke:none;fill-opacity:0;}
+.ev-theme-volta-ao-mundo #vmGrain circle{fill:var(--text-main);}
+/* carimbado: tinta densa com grão e anel exterior "gasto" (tracejado irregular) — tudo vetorial, nítido ao ampliar */
+.ev-theme-volta-ao-mundo .vm-s.done .ring1{fill:color-mix(in srgb,var(--accent) 17%,var(--bg-card));stroke-width:3.4;stroke-dasharray:196 5 52 3 24 2;}
+.ev-theme-volta-ao-mundo .vm-s.done .grain{fill-opacity:0.35;}
+.ev-theme-volta-ao-mundo .vm-s.done .grain{fill:url(#vmGrain);}
+/* por vir / sem carimbo: cor neutra (sem filtros, que ficavam pixelados) */
+.ev-theme-volta-ao-mundo .vm-s.upcoming,.ev-theme-volta-ao-mundo .vm-s.missed{--accent:var(--text-faint);}
+.ev-theme-volta-ao-mundo .vm-s.upcoming .emoji,.ev-theme-volta-ao-mundo .vm-s.missed .emoji{opacity:0.4;}
+.ev-theme-volta-ao-mundo .vm-s.upcoming .cap,.ev-theme-volta-ao-mundo .vm-s.missed .cap{fill:var(--text-dim);}
 .ev-theme-volta-ao-mundo .vm-s.upcoming .ring1{stroke-dasharray:6 5;}
-.ev-theme-volta-ao-mundo .vm-s.missed{opacity:0.62;filter:grayscale(0.8);}
 .ev-theme-volta-ao-mundo .vm-s.current .ring1{animation:vmStampPulse 2.2s ease-in-out infinite;}
 @keyframes vmStampPulse{0%,100%{stroke-width:3;}50%{stroke-width:6.5;}}
 
