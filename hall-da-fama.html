@@ -263,7 +263,7 @@ async function init(){
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
-    mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY);
+    if(typeof mountEventCornerIcon === 'function') mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY); // guarda: showdown-utils.js ainda pode estar em cache numa versão antiga
     populateHofTierFilter(rows);
     onHofFilterChange(); // respeita a pesquisa/filtro de tier já escolhidos (importa quando isto corre de novo sozinho, via polling)
     renderMvpList(rows);

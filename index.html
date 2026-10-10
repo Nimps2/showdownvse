@@ -118,7 +118,7 @@ async function loadCornerBadge(){
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, savedName).then(available=>{
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
-    mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY);
+    if(typeof mountEventCornerIcon === 'function') mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY); // guarda: showdown-utils.js ainda pode estar em cache numa versão antiga
   } catch(e){
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(null, null);
   }

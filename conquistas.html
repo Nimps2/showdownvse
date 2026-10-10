@@ -210,7 +210,7 @@ async function init(){
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
-    mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY);
+    if(typeof mountEventCornerIcon === 'function') mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY); // guarda: showdown-utils.js ainda pode estar em cache numa versão antiga
 
     const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
     const sel = document.getElementById('playerSelect');

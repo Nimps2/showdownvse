@@ -188,6 +188,13 @@ async function refreshMyCoins(){
 async function init(){
   EventCore.init(SUPABASE_URL, SUPABASE_ANON_KEY);
   const root = document.getElementById('eventRoot');
+  // Depois de uma atualização do site, o browser pode ainda ter em cache o showdown-utils.js antigo
+  // (sem as funções do evento). Em vez de um erro genérico, diz o que fazer.
+  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function'){
+    setStatus(false, 'Ficheiros antigos em cache.');
+    root.innerHTML = '<div class="card"><div class="empty-state">O teu browser ainda tem ficheiros antigos do site em cache. Faz <b>Ctrl+F5</b> para atualizar e abre esta página outra vez.</div></div>';
+    return;
+  }
   try{
     const [profiles, ev] = await Promise.all([
       fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY),
