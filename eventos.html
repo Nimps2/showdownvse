@@ -6,16 +6,19 @@
 <title>Eventos — Torneio Showdown - VSE</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@600;700&family=Special+Elite&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@600;700&family=Special+Elite&family=Caveat:wght@500;600&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <style>
-/* Só estrutura da casca. O VISUAL de cada evento vive em eventos/<slug>.css. */
-#eventRoot .ev-section{margin-top:6px;}
-#eventRoot .ev-soon{margin-top:16px;font-size:12.5px;color:var(--text-dim);}
-#eventRoot .card{margin-top:16px;}
+/* O visual de cada evento vive em eventos/<slug>.css (carregado dinamicamente). */
+#eventRoot{min-height:240px;}
 </style>
 </head>
 <body>
+<div class="ev-sky" id="evSky" aria-hidden="true">
+  <div class="ev-stars"></div><div class="ev-stars s2"></div>
+  <div class="ev-cloud c1"></div><div class="ev-cloud c2"></div><div class="ev-cloud c3"></div>
+  <div class="ev-glow"></div>
+</div>
 <div id="playerCornerContainer"></div>
 <div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
   <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
@@ -42,7 +45,6 @@
     <a href="loja.html">Loja</a>
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
-    <a href="eventos.html" class="current">Eventos</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
 </div>
@@ -62,7 +64,7 @@
 </div>
 
 <script src="showdown-utils.js"></script>
-<script src="eventos-core.js"></script>
+<script src="eventos-core.js?v=20261010c"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -161,16 +163,23 @@ let ctx = null;           // dados do jogador neste evento (EventCore.load)
 let myProfile = {};
 let activeTab = 'passaporte';
 const X1_ENABLED = false; // os desafios x1 chegam na fase seguinte
+// Estado só de interface (sobrevive aos re-desenhos): sanfonas abertas, rascunho do postal, animações já feitas.
+const ui = { open: {}, draft: '', justClaimed: null, routeAnimated: false, intro: true };
+const evApi = () => ({ ui, x1On: X1_ENABLED });
+
+// Versão dos ficheiros do evento (eventos-core.js e eventos/<slug>.*): MUDAR sempre que algum deles mudar,
+// para o browser não misturar ficheiros novos com versões antigas em cache.
+const EV_ASSET_VERSION = '20261010c';
 
 // Carrega o CSS e o JS do evento ativo (cada evento tem o seu par). O slug só pode ter a-z, 0-9 e "-".
 function loadEventAssets(slug){
   return new Promise((resolve, reject) => {
     if(!/^[a-z0-9-]+$/.test(slug)){ reject(new Error('slug inválido')); return; }
     const css = document.createElement('link');
-    css.rel = 'stylesheet'; css.href = `eventos/${slug}.css`;
+    css.rel = 'stylesheet'; css.href = `eventos/${slug}.css?v=${EV_ASSET_VERSION}`;
     document.head.appendChild(css);
     const js = document.createElement('script');
-    js.src = `eventos/${slug}.js`;
+    js.src = `eventos/${slug}.js?v=${EV_ASSET_VERSION}`;
     js.onload = () => resolve();
     js.onerror = () => reject(new Error('módulo do evento não encontrado'));
     document.head.appendChild(js);
@@ -190,7 +199,7 @@ async function init(){
   const root = document.getElementById('eventRoot');
   // Depois de uma atualização do site, o browser pode ainda ter em cache o showdown-utils.js antigo
   // (sem as funções do evento). Em vez de um erro genérico, diz o que fazer.
-  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function'){
+  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board){
     setStatus(false, 'Ficheiros antigos em cache.');
     root.innerHTML = '<div class="card"><div class="empty-state">O teu browser ainda tem ficheiros antigos do site em cache. Faz <b>Ctrl+F5</b> para atualizar e abre esta página outra vez.</div></div>';
     return;
@@ -217,11 +226,12 @@ async function init(){
     mod = (window.EVENT_MODULES || {})[ev.slug];
     if(!mod) throw new Error('módulo do evento em falta');
     root.className = 'ev-theme-' + ev.slug;
+    document.body.classList.add('ev-body-' + ev.slug);   // céu e cores do evento (CSS do módulo)
 
     ctx = await EventCore.load(ev, loggedInPlayerName);
     setStatus(true, `Ligado — ${ev.name}: semana ${ev.current_week} de ${ev.total_weeks}.`);
     renderAll();
-    await syncRewards(null);
+    await syncRewards();
   } catch(e){
     console.error(e);
     setStatus(false, 'Não foi possível carregar o evento.');
@@ -230,101 +240,39 @@ async function init(){
 }
 
 // ---------- Renderização ----------
+// Os separadores e o seu conteúdo vêm do módulo do evento (mod.tabs).
 function renderAll(){
+  captureDraft();
   const root = document.getElementById('eventRoot');
-  root.innerHTML = `
-    <div class="tabs">
-      <button class="tab-btn" onclick="switchEventTab('passaporte')">🧭 Passaporte</button>
-      <button class="tab-btn" onclick="switchEventTab('missoes')">🎯 Missões</button>
-    </div>
-    <div id="panel-passaporte" class="shop-panel">
-      ${mod.renderHero(ctx)}
-      <div class="ev-section">${mod.renderLevels(ctx)}</div>
-      <div class="card"><h2>🏆 Ranking do evento</h2>${rankingHtml()}</div>
-      ${X1_ENABLED ? '' : '<div class="ev-soon">⚔️ Os desafios x1 (até 3 por semana) chegam em breve — vão trazer mais missões.</div>'}
-    </div>
-    <div id="panel-missoes" class="shop-panel">${missionsHtml()}</div>`;
-  switchEventTab(activeTab);
+  const a = evApi();
+  const tabsHtml = `<div class="ev-tabs" role="tablist">` + mod.tabs.map(t => {
+    const badge = t.badge ? t.badge(ctx, a) : 0;
+    return `<button class="ev-tab${t.key === activeTab ? ' active' : ''}" role="tab" onclick="switchEventTab('${t.key}')"><span class="ico">${t.icon}</span>${t.label}${badge ? `<span class="badge">${badge}</span>` : ''}</button>`;
+  }).join('') + `</div>`;
+  root.innerHTML = tabsHtml + mod.tabs.map(t => `<div id="panel-${t.key}" class="shop-panel${t.key === activeTab ? ' active' : ''}">${t.render(ctx, a)}</div>`).join('');
+  document.body.dataset.evRegion = mod.currentRegion(ctx);
+  if(mod.afterRender) mod.afterRender(activeTab, root, ctx, ui);
+  ui.intro = false;
 }
 
 function switchEventTab(tab){
   activeTab = tab;
-  const map = { passaporte:0, missoes:1 };
-  document.querySelectorAll('#eventRoot .tab-btn').forEach((b,i) => b.classList.toggle('active', i === map[tab]));
+  document.querySelectorAll('#eventRoot .ev-tab').forEach((b, i) => b.classList.toggle('active', mod.tabs[i].key === tab));
   document.querySelectorAll('#eventRoot .shop-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+  if(mod.afterRender) mod.afterRender(tab, document.getElementById('eventRoot'), ctx, ui);
 }
 
-function rankingHtml(){
-  const rows = EventCore.ranking(ctx).slice(0, 10);
-  if(!rows.length) return '<div class="empty-state">Ainda ninguém reclamou missões. Sê o primeiro!</div>';
-  return rows.map((r, i) => {
-    const lv = EventCore.levelFor(mod, r.xp).level;
-    const medal = ['🥇','🥈','🥉'][i] || (i + 1);
-    return `<div class="ev-rank-row${r.name === loggedInPlayerName ? ' me' : ''}">
-      <span class="ev-rank-pos">${medal}</span>
-      <span class="ev-rank-name">${escapeHtml(r.name)}</span>
-      <span class="ev-rank-lvl">Nível ${lv}</span>
-      <span class="ev-rank-xp">${r.xp} XP</span>
-    </div>`;
-  }).join('');
-}
-
-function missionRowHtml(m){
-  const st = EventCore.evaluate(ctx, m);
-  const pct = st.target ? Math.round((st.value / st.target) * 100) : 0;
-  let action;
-  if(m.locked) action = '<span class="ev-m-state">🔒 por abrir</span>';
-  else if(st.claimed) action = '<span class="ev-m-state ok">✔ Reclamada</span>';
-  else if(st.done) action = `<button class="ev-m-btn" onclick="doClaim('${m.id}', this)">Reclamar</button>`;
-  else action = `<span class="ev-m-state">${st.value}/${st.target}</span>`;
-  const showBar = !m.locked && !st.claimed;
-  return `<div class="ev-mission${st.claimed ? ' claimed' : ''}">
-    <div>
-      <div class="ev-m-title">${escapeHtml(m.title)}</div>
-      <div class="ev-m-desc">${escapeHtml(m.desc)}</div>
-      ${showBar ? `<div class="ev-m-bar"><div style="width:${pct}%"></div></div>` : ''}
-      <div class="ev-m-rewards">
-        <span class="ev-chip">+${m.xp} XP</span>
-        <span class="ev-chip">${mod.currency.emoji} ${m.miles}</span>
-        ${m.coins ? `<span class="ev-chip">🪙 ${m.coins}</span>` : ''}
-      </div>
-    </div>
-    <div class="ev-m-action">${action}</div>
-  </div>`;
-}
-
-function missionsHtml(){
-  const all = EventCore.expandMissions(mod, activeEvent, { x1: X1_ENABLED });
-  let html = '';
-  mod.weeks.forEach((w, i) => {
-    const week = i + 1;
-    const r = EVENT_REGIONS[w.region];
-    const list = all.filter(m => m.scope === 'week' && m.week === week);
-    if(!list.length) return;
-    const locked = week > activeEvent.current_week;
-    html += `<div class="ev-week${locked ? ' locked' : ''}" data-region="${w.region}">
-      <div class="ev-week-head">
-        <span class="ev-wh-emoji">${mod.regionEmoji[w.region]}</span>
-        <div><div class="ev-wh-title">Semana ${week} — ${r.label}</div><div class="ev-wh-sub">${r.dex}</div></div>
-        <span class="ev-wh-pill">${locked ? '🔒 abre com o torneio da semana' : (week === activeEvent.current_week ? '✈️ semana atual' : 'encerrada')}</span>
-      </div>
-      ${list.map(missionRowHtml).join('')}
-    </div>`;
-  });
-  const globalList = all.filter(m => m.scope === 'event');
-  html += `<div class="ev-week">
-    <div class="ev-week-head">
-      <span class="ev-wh-emoji">🌍</span>
-      <div><div class="ev-wh-title">Missões do evento</div><div class="ev-wh-sub">valem durante todo o evento</div></div>
-    </div>
-    ${globalList.map(missionRowHtml).join('')}
-  </div>`;
-  return html;
+function evToggle(key, open){ ui.open[key] = open; }
+function captureDraft(){ const t = document.getElementById('evDraft'); if(t) ui.draft = t.value; }
+function evDraftInput(el){
+  ui.draft = el.value;
+  const c = document.getElementById('evCount');
+  if(c) c.textContent = `${el.value.length}/${EventCore.board.MAX_LEN}`;
 }
 
 // ---------- Ações ----------
 async function doClaim(missionId, btn){
-  const mission = EventCore.expandMissions(mod, activeEvent, { x1: X1_ENABLED }).find(m => m.id === missionId);
+  const mission = EventCore.expandMissions(mod, activeEvent, { x1: X1_ENABLED }, ctx).find(m => m.id === missionId);
   if(!mission) return;
   if(btn) btn.disabled = true;
   const levelBefore = EventCore.levelFor(mod, EventCore.totals(ctx, loggedInPlayerName).xp).level;
@@ -332,12 +280,18 @@ async function doClaim(missionId, btn){
   if(r.ok){
     showCelebrationToast(`🎫 Missão cumprida: <b>${escapeHtml(mission.title)}</b><br><span style="font-size:11px;opacity:0.9;">+${r.rewards.xp} XP · ${mod.currency.emoji} ${r.rewards.miles}${r.rewards.coins ? ' · 🪙 ' + r.rewards.coins : ''}</span>`, 5500);
     refreshMyCoins();
+    ui.justClaimed = missionId;
     renderAll();
+    ui.justClaimed = null;
+    if(mod.celebrate) mod.celebrate(document.querySelector(`.vm-pass[data-mid="${missionId}"] .vm-claimed`), 'claim');
     const levelAfter = EventCore.levelFor(mod, EventCore.totals(ctx, loggedInPlayerName).xp).level;
     if(levelAfter > levelBefore){
-      setTimeout(() => showCelebrationToast(`⬆️ Subiste para o <b>nível ${levelAfter}</b>!`, 5500), 700);
+      setTimeout(() => {
+        showCelebrationToast(`⬆️ Subiste para o <b>nível ${levelAfter}</b>!`, 5500);
+        if(mod.celebrate) mod.celebrate({ getBoundingClientRect: () => ({ left: window.innerWidth / 2, top: window.innerHeight / 3, width: 0, height: 0 }) }, 'level');
+      }, 700);
     }
-    await syncRewards(levelBefore);
+    await syncRewards();
   } else {
     const msg = r.reason === 'already' ? 'Esta missão já tinha sido reclamada.'
       : r.reason === 'notdone' ? 'Ainda não cumpriste esta missão.'
@@ -346,6 +300,32 @@ async function doClaim(missionId, btn){
     if(msg) alert(msg);
     renderAll();
   }
+}
+
+async function doPostCard(btn){
+  captureDraft();
+  if(btn) btn.disabled = true;
+  const r = await EventCore.board.post(ctx, ui.draft);
+  if(r.ok){
+    ui.draft = '';
+    showCelebrationToast('📮 Postal enviado! Já está no quadro do evento.', 4500);
+    renderAll();
+    return;
+  }
+  const msg = r.reason === 'empty' ? 'Escreve alguma coisa antes de enviar.'
+    : r.reason === 'toolong' ? `O postal só pode ter ${EventCore.board.MAX_LEN} caracteres.`
+    : r.reason === 'already' ? 'Já deixaste o teu postal de hoje — volta amanhã!'
+    : r.reason === 'unavailable' ? 'O quadro ainda não está disponível.'
+    : 'Não foi possível enviar agora. Tenta outra vez.';
+  alert(msg);
+  if(r.reason === 'already') renderAll(); else if(btn) btn.disabled = false;
+}
+
+async function doReact(messageId, emojiIdx){
+  const emoji = mod.board.emojis[emojiIdx];
+  if(!emoji) return;
+  await EventCore.board.react(ctx, messageId, emoji);
+  renderAll();
 }
 
 // Garante os cosméticos de todos os níveis já atingidos e avisa dos novos.
