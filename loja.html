@@ -6,8 +6,9 @@
 <title>Loja — Torneio Showdown - VSE</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=20261012a">
 </head>
 <body>
 <div id="playerCornerContainer"></div>
@@ -67,14 +68,14 @@
 
     <div class="card">
       <h2>🎁 Caixa Surpresa</h2>
-      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">🪙<span id="lootBoxPriceLabel">?</span> por um item totalmente aleatório — pode ser qualquer fundo, cor, moldura, efeito, título ou emblema que você ainda não tenha. Você não escolhe o quê, só a sorte decide.</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">🪙<span id="lootBoxPriceLabel">?</span> por um item totalmente aleatório — pode ser qualquer cor de moldura, cor de destaque, moldura, efeito de nome, título ou emblema que você ainda não tenha. Você não escolhe o quê, só a sorte decide.</div>
       <button class="btn-primary" onclick="doOpenLootBox()">Abrir caixa</button>
       <div id="lootBoxResult" style="margin-top:12px;font-size:13px;"></div>
     </div>
 
     <div class="card">
       <h2>🛍️ Comprar diretamente</h2>
-      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Fundos do avatar</div>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Cor da moldura</div>
       <div class="shop-grid" id="shopBackgrounds"></div>
       <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Cor de destaque</div>
       <div class="shop-grid" id="shopAccents"></div>
@@ -236,7 +237,7 @@
   <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="showdown-utils.js"></script>
+<script src="showdown-utils.js?v=20261012a"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -353,22 +354,32 @@ function switchShopTab(tab){
 
 async function init(){
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    allRows = await res.json();
+    // Tudo o que a página precisa ao mesmo tempo (eram 7 pedidos em fila). Torneios SEM os sorteios: aqui só contam resultados.
+    const [rows, profiles, ev, standings, generosity, rHistory, rRanking] = await Promise.all([
+      typeof fetchTournamentRowsLite === 'function'
+        ? fetchTournamentRowsLite(SUPABASE_URL, SUPABASE_ANON_KEY)
+        : fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }),
+      fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY),
+      fetchActiveEvent(SUPABASE_URL, SUPABASE_ANON_KEY),
+      fetchTierVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY),
+      fetchGenerosityRanking(SUPABASE_URL, SUPABASE_ANON_KEY),
+      fetchRouletteTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 20),
+      fetchRouletteRanking(SUPABASE_URL, SUPABASE_ANON_KEY)
+    ]);
+    allRows = rows;
     setStatus(true, `Ligado — ${allRows.length} torneio(s) encontrados.`);
-    playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    playerProfiles = profiles;
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, playerProfiles[loggedInPlayerName]);
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
     if(typeof mountEventCornerIcon === 'function') mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY); // guarda: showdown-utils.js ainda pode estar em cache numa versão antiga
     remainingTiers = computeRemainingTiersInCycle(allRows);
-    activeEvent = await fetchActiveEvent(SUPABASE_URL, SUPABASE_ANON_KEY);
-    tierVoteStandings = await fetchTierVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY);
-    generosityRanking = await fetchGenerosityRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
-    rouletteHistory = await fetchRouletteTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 20);
-    rouletteRanking = await fetchRouletteRanking(SUPABASE_URL, SUPABASE_ANON_KEY);
+    activeEvent = ev;
+    tierVoteStandings = standings;
+    generosityRanking = generosity;
+    rouletteHistory = rHistory;
+    rouletteRanking = rRanking;
     renderAll();
     renderAuction();
     renderPastAuctions();
@@ -643,8 +654,8 @@ function shopItemHtml(item, type, profile){
   let swatchHtml;
   if(type === 'background') swatchHtml = `<div class="shop-swatch" style="background:${item.css};"></div>`;
   else if(type === 'accent') swatchHtml = `<div class="shop-swatch" style="background:${item.color};"></div>`;
-  else if(type === 'frame') swatchHtml = frameEffectPreviewHtml(item.effect);
-  else if(type === 'nameEffect') swatchHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;font-weight:700;${item.css}">Abc</div>`;
+  else if(type === 'frame') swatchHtml = frameEffectPreviewHtml(item.effect, profile);
+  else if(type === 'nameEffect') swatchHtml = nameEffectPreviewHtml(item, profile);
   else if(type === 'title') swatchHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:11px;padding:4px;">${item.text ? escapeHtml(item.text) : '—'}</div>`;
 
   let actionBtn;
@@ -709,13 +720,13 @@ function renderWeeklyFeatured(profile){
   if(!item){ el.innerHTML = '<div class="empty-state">Sem itens disponíveis de momento.</div>'; return; }
 
   const owned = (profile.ownedCosmetics || []).includes(item.id);
-  const categoryLabels = { backgrounds:'Fundo', accents:'Cor de destaque', frames:'Moldura', nameEffects:'Efeito no nome', titles:'Título', badges:'Emblema' };
+  const categoryLabels = { backgrounds:'Cor da moldura', accents:'Cor de destaque', frames:'Moldura', nameEffects:'Efeito no nome', titles:'Título', badges:'Emblema' };
 
   let previewHtml;
   if(item.category === 'backgrounds') previewHtml = `<div class="shop-swatch" style="background:${item.css};"></div>`;
   else if(item.category === 'accents') previewHtml = `<div class="shop-swatch" style="background:${item.color};"></div>`;
-  else if(item.category === 'frames') previewHtml = frameEffectPreviewHtml(item.effect);
-  else if(item.category === 'nameEffects') previewHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;font-weight:700;${item.css}">Abc</div>`;
+  else if(item.category === 'frames') previewHtml = frameEffectPreviewHtml(item.effect, profile);
+  else if(item.category === 'nameEffects') previewHtml = nameEffectPreviewHtml(item, profile);
   else if(item.category === 'titles') previewHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:11px;padding:4px;">${item.text ? escapeHtml(item.text) : '—'}</div>`;
   else previewHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:20px;">${item.emoji||''}</div>`;
 

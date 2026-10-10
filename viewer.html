@@ -6,8 +6,9 @@
 <title>Torneio Showdown — Bracket & Sorteio</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=20261012a">
 <style>
 :root{ --bg-code:#0d0f18; }
 body.light-theme{ --bg-code:#e4e7f0; }
@@ -75,6 +76,36 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
 .set-details[open] summary::before{content:'▾ ';}
 .hint{font-size:11px;color:var(--text-faint);margin-bottom:4px;}
 .locked-note{font-size:11.5px;color:var(--text-faint);margin-top:8px;padding:6px 0;}
+/* Seletor de escolha livre */
+.fp-btn{background:linear-gradient(135deg,rgba(240,182,79,0.16),rgba(165,107,240,0.14));border:1px solid rgba(240,182,79,0.45);color:var(--tera-amber);padding:6px 12px;border-radius:8px;
+  font-family:'Chakra Petch',sans-serif;font-size:12px;font-weight:600;cursor:pointer;margin:6px 0 2px;}
+.fp-btn:hover{border-color:var(--tera-amber);background:rgba(240,182,79,0.22);}
+.fp-overlay{position:fixed;inset:0;z-index:2000;background:rgba(5,7,14,0.72);display:flex;align-items:center;justify-content:center;padding:16px;}
+.fp-modal{background:var(--bg-panel);border:1px solid var(--line);border-radius:14px;width:min(640px,100%);max-height:min(86vh,720px);display:flex;flex-direction:column;box-shadow:0 18px 60px rgba(0,0,0,0.6);}
+.fp-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px 8px;}
+.fp-head h3{margin:0;font-family:'Chakra Petch',sans-serif;font-size:15px;color:var(--tera-amber);}
+.fp-x{background:none;border:1px solid var(--line);color:var(--text-dim);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:14px;}
+.fp-x:hover{color:var(--danger);border-color:var(--danger);}
+.fp-note{padding:0 16px 8px;font-size:12px;color:var(--text-dim);line-height:1.5;}
+.fp-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:0 16px 10px;}
+.fp-tools input[type=text]{flex:1;min-width:160px;margin:0;}
+.fp-tools label{font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;}
+.fp-count{padding:0 16px 8px;font-size:11.5px;color:var(--text-faint);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+.fp-live{color:#5ed890;}
+.fp-live::before{content:'● ';}
+.fp-list{overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--line) transparent;padding:4px 12px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:6px;align-content:start;}
+.fp-item{text-align:left;background:var(--bg-card);border:1px solid var(--line);border-radius:8px;padding:7px 10px;cursor:pointer;color:var(--text-main);font-family:'Inter',sans-serif;font-size:12.5px;display:flex;flex-direction:column;gap:2px;min-height:34px;}
+.fp-item b{font-weight:600;font-family:'Chakra Petch',sans-serif;}
+.fp-item small{font-size:10.5px;line-height:1.3;}
+.fp-item.ok:hover{border-color:var(--tera-cyan);background:color-mix(in srgb,var(--tera-cyan) 10%,var(--bg-card));}
+.fp-item.ok small{color:var(--success);}
+.fp-item.taken,.fp-item.own{cursor:not-allowed;opacity:0.5;border-style:dashed;background:transparent;}
+.fp-item.taken b,.fp-item.own b{text-decoration:line-through;text-decoration-color:rgba(224,96,122,0.6);}
+.fp-item.taken small{color:var(--danger);}
+.fp-item.own small{color:var(--tera-amber);}
+.fp-status{padding:0 16px 12px;font-size:12px;min-height:16px;}
+.fp-status.err{color:var(--danger);}
+.fp-empty{grid-column:1/-1;text-align:center;color:var(--text-faint);padding:24px 8px;font-size:12.5px;}
 .locked-banner{
   background:color-mix(in srgb, var(--danger) 8%, transparent);
   border:1px solid color-mix(in srgb, var(--danger) 30%, transparent);border-radius:8px;
@@ -143,7 +174,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
 
 <div class="hover-card" id="hoverCard"></div>
 
-<script src="showdown-utils.js"></script>
+<script src="showdown-utils.js?v=20261012a"></script>
 <script>
 initTheme();
 // SUPABASE_URL e SUPABASE_ANON_KEY são definidos no próximo bloco de script,
@@ -584,6 +615,7 @@ function renderMyDraw(){
     if(!f.name){
       html += `<div class="mon-block free">
         <div class="mon-head"><span class="mon-name free-label">Escolha livre ${i+1}: (ainda não escolhida)</span></div>
+        ${freePickButton(i, false)}
         ${importSection(pasteId, `<button class="copy-btn" onclick="importMyMon(${pIdx},${i},'free', this)">Importar e salvar</button><span class="save-msg"></span>`, `Pokémon @ Item&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2`)}
       </div>`;
       return;
@@ -597,6 +629,7 @@ function renderMyDraw(){
       </div>
       <div class="import-box" id="${boxId}">${escapeHtml(f.text || f.name)}</div>
       ${f.text ? `<button class="copy-btn" style="margin-top:6px;" onclick="doFavoriteSet('${boxId}','${f.name.replace(/'/g,"\\'")}')">⭐ Favoritar este set</button>` : ''}
+      ${freePickButton(i, true)}
       ${importSection(pasteId, `<button class="copy-btn" onclick="importMyMon(${pIdx},${i},'free', this)">Importar e salvar</button><span class="save-msg"></span>`, `${f.name} @ Leftovers&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2`)}
     </div>`;
   });
@@ -774,6 +807,157 @@ function showSaveFeedback(btn, text, isError){
   msg.style.color = isError ? 'var(--danger)' : 'var(--success)';
   msg.classList.add('show');
   setTimeout(()=>msg.classList.remove('show'), 3000);
+}
+
+// ---------- Escolha livre pela lista ----------
+// Em vez de colar um import do Showdown, o jogador escolhe numa lista dos Pokémon legais do tier do torneio (nos
+// torneios de evento: os da região da semana, forma original). Os que já não estão disponíveis ficam riscados e
+// dizem porquê (já escolhido/sorteado por outro jogador, ou já tens a espécie). A lista atualiza sozinha enquanto
+// está aberta (outros jogadores escolhem ao mesmo tempo). As regras são as do gestor (freePickAvailability).
+const fp = { open:false, slot:0, names:null, draws:null, q:'', hideBlocked:false, timer:null, busy:false, why:'' };
+
+function freePickSupported(){
+  return typeof freePickCandidates === 'function' && typeof freePickAvailability === 'function' && typeof fetchTierPools === 'function';
+}
+function freePickButton(i, filled){
+  if(!freePickSupported() || (currentData && currentData.champion)) return '';
+  return `<button class="fp-btn" onclick="openFreePick(${i})">🔎 ${filled ? 'Trocar por outro Pokémon da lista' : 'Escolher da lista'}</button>`;
+}
+
+// Só a parte "draws" do torneio (muito mais leve do que o torneio inteiro). null = não deu para ler.
+async function fetchFreshDraws(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}&select=draws:data->draws`, { headers: sbHeaders() });
+    if(!res.ok) return null;
+    const rows = await res.json();
+    return rows && rows[0] ? (rows[0].draws || {}) : null;
+  } catch(e){ return null; }
+}
+
+function fpReason(a){
+  if(a.state === 'taken') return a.how === 'random' ? `🎲 Sorteado para ${a.by}` : `🔒 Escolhido por ${a.by}`;
+  if(a.state === 'own') return a.species ? '⚠ Já tens esta espécie no time' : '✔ Já está no teu time';
+  return '';
+}
+function fpMyIndex(){ return loggedInPlayerName && currentData ? currentData.players.indexOf(loggedInPlayerName) : -1; }
+
+async function openFreePick(slot){
+  const pIdx = fpMyIndex();
+  if(pIdx === -1){ alert('Sessão inválida — entre novamente.'); return; }
+  if(currentData.champion){ alert('Torneio concluído — bloqueado.'); return; }
+  if(!(currentData.draws && currentData.draws[pIdx])){ alert('O sorteio ainda não foi feito.'); return; }
+  closeFreePick();
+  Object.assign(fp, { open:true, slot, names:null, draws:null, q:'', hideBlocked:false, busy:false, why:'' });
+  const ev = currentData.event, regionInfo = ev && EVENT_REGIONS[ev.region] ? EVENT_REGIONS[ev.region] : null;
+  const note = regionInfo
+    ? `🌍 <b>${escapeHtml(ev.name || 'Evento')}</b> — Semana ${ev.week}: só Pokémon de <b>${regionInfo.label}</b> (${regionInfo.dex}), na forma original.`
+    : `Tier <b>${escapeHtml(currentData.tier || '')}</b>: só Pokémon legais neste tier.`;
+  const wrap = document.createElement('div');
+  wrap.className = 'fp-overlay'; wrap.id = 'fpOverlay';
+  wrap.addEventListener('mousedown', e => { if(e.target === wrap) closeFreePick(); });
+  wrap.innerHTML = `<div class="fp-modal" role="dialog" aria-label="Escolher Pokémon">
+    <div class="fp-head"><h3>Escolha livre ${slot + 1} — escolhe o teu Pokémon</h3><button class="fp-x" onclick="closeFreePick()" title="Fechar">✕</button></div>
+    <div class="fp-note">${note} Cada Pokémon só pode estar num time: os já <b>sorteados ou escolhidos</b> aparecem riscados, e não podes ter duas formas da mesma espécie.</div>
+    <div class="fp-tools"><input type="text" id="fpSearch" placeholder="Procurar Pokémon…" autocomplete="off" oninput="fpSearchInput(this.value)">
+      <label><input type="checkbox" id="fpHide" onchange="fpHideInput(this.checked)"> Esconder indisponíveis</label></div>
+    <div class="fp-count"><span id="fpCount">A carregar a lista…</span><span class="fp-live">atualiza sozinha</span></div>
+    <div class="fp-list" id="fpList"><div class="fp-empty">A carregar…</div></div>
+    <div class="fp-status" id="fpStatus"></div>
+  </div>`;
+  document.body.appendChild(wrap);
+  document.getElementById('fpList').addEventListener('click', e => {
+    const b = e.target.closest('.fp-item'); if(!b || !fp.names) return;
+    const name = fp.names[+b.dataset.i];
+    if(b.classList.contains('ok')) chooseFreeMon(name);
+    else setFpStatus(`${name}: ${fpReason(freePickAvailability(fp.draws, currentData.players, fpMyIndex(), fp.slot, [name])[name]).replace(/^[^\p{L}]+/u, '')}.`, true);
+  });
+  setTimeout(() => { const s = document.getElementById('fpSearch'); if(s) s.focus(); }, 50);
+
+  const pools = ev ? null : await fetchTierPools();
+  fp.names = freePickCandidates(pools, currentData.tier, ev);
+  if(!fp.names) fp.why = 'A lista de Pokémon deste tier não está disponível agora. Usa o import do Showdown (caixa mais abaixo).';
+  fp.draws = (await fetchFreshDraws()) || currentData.draws;
+  if(!fp.open) return;
+  renderFpList();
+  fp.timer = setInterval(async () => {
+    if(document.hidden || fp.busy || !fp.open) return;
+    const d = await fetchFreshDraws();
+    if(d && fp.open){ fp.draws = d; renderFpList(); }
+  }, 10000);
+}
+
+function closeFreePick(){
+  if(fp.timer){ clearInterval(fp.timer); fp.timer = null; }
+  fp.open = false;
+  const o = document.getElementById('fpOverlay'); if(o) o.remove();
+}
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && fp.open) closeFreePick(); });
+
+function fpSearchInput(v){ fp.q = v; renderFpList(); }
+function fpHideInput(on){ fp.hideBlocked = !!on; renderFpList(); }
+function setFpStatus(text, isError){
+  const el = document.getElementById('fpStatus'); if(!el) return;
+  el.textContent = text || ''; el.className = 'fp-status' + (isError ? ' err' : '');
+}
+
+function renderFpList(){
+  const list = document.getElementById('fpList'), count = document.getElementById('fpCount');
+  if(!list || !count) return;
+  if(!fp.names){ count.textContent = ''; list.innerHTML = `<div class="fp-empty">${escapeHtml(fp.why || 'A carregar a lista…')}</div>`; return; }
+  const av = freePickAvailability(fp.draws, currentData.players, fpMyIndex(), fp.slot, fp.names);
+  const q = fp.q.trim().toLowerCase();
+  const nOk = fp.names.filter(n => av[n].state === 'ok').length;
+  count.textContent = `${nOk} disponíveis · ${fp.names.length - nOk} indisponíveis · ${fp.names.length} na lista`;
+  const rows = fp.names.map((n, i) => ({ n, i, a: av[n] })).filter(x => (!q || x.n.toLowerCase().includes(q)) && (!fp.hideBlocked || x.a.state === 'ok'));
+  list.innerHTML = rows.length
+    ? rows.map(x => `<button class="fp-item ${x.a.state === 'ok' ? 'ok' : x.a.state}" data-i="${x.i}"><b>${escapeHtml(x.n)}</b>${x.a.state === 'ok' ? '' : `<small>${escapeHtml(fpReason(x.a))}</small>`}</button>`).join('')
+    : `<div class="fp-empty">Nenhum Pokémon com esse nome${fp.hideBlocked ? ' disponível' : ''}.</div>`;
+}
+
+// Escolhe um Pokémon: confirma com dados frescos que ainda está livre, grava, e confirma depois de gravar (dois
+// jogadores a escolher o mesmo Pokémon ao mesmo tempo: fica quem tem o índice mais baixo no torneio).
+async function chooseFreeMon(name){
+  if(fp.busy) return;
+  const pIdx = fpMyIndex();
+  if(pIdx === -1 || currentData.champion) return;
+  const slot = fp.slot;
+  const previous = JSON.parse(JSON.stringify(((currentData.draws || {})[pIdx] || {}).free || []))[slot] || { name:'', text:'' };
+  if(previous.name && !confirm(`Trocar ${previous.name} por ${name}? O set que importaste para ${previous.name} (se houver) é apagado.`)) return;
+  fp.busy = true; setFpStatus('A guardar…', false);
+  try{
+    const draws = await fetchFreshDraws();
+    if(!draws){ setFpStatus('Não consegui ler os dados agora — tenta outra vez.', true); return; }
+    fp.draws = draws;
+    const now = freePickAvailability(draws, currentData.players, pIdx, slot, [name])[name];
+    if(now.state !== 'ok'){ renderFpList(); setFpStatus(`${name} acabou de ficar indisponível (${fpReason(now).replace(/^[^\p{L}]+/u, '')}). Escolhe outro.`, true); return; }
+
+    const base = JSON.parse(JSON.stringify(draws[pIdx] || currentData.draws[pIdx]));
+    if(!base.free) base.free = [{ name:'', text:'' }, { name:'', text:'' }];
+    base.free[slot] = { name, text: name, src: 'lista' };
+    let saved = false;
+    for(let attempt = 0; attempt < 3 && !saved; attempt++){
+      currentData.draws = Object.assign({}, currentData.draws, { [pIdx]: base });
+      if(!(await saveMyDraws(pIdx, null, name, `Escolheu pela lista a escolha livre ${slot + 1}`))) { setFpStatus('Não foi possível guardar — tenta outra vez.', true); return; }
+      const after = await fetchFreshDraws();   // outro jogador pode ter gravado ao mesmo tempo e sobrescrito o meu pedido
+      const mine = after && after[pIdx] && after[pIdx].free && after[pIdx].free[slot];
+      if(after && !(mine && mine.name === name)) continue;
+      saved = true;
+      const clash = after ? Object.keys(after).find(k => String(k) !== String(pIdx) && (((after[k] || {}).random || []).some(r => r && r.mon && r.mon.toLowerCase() === name.toLowerCase()) || ((after[k] || {}).free || []).some(f => f && f.name && f.name.toLowerCase() === name.toLowerCase()))) : undefined;
+      if(clash !== undefined && +clash < pIdx){
+        base.free[slot] = previous;   // o outro jogador ganhou o desempate: devolvo a minha escolha ao que estava
+        currentData.draws = Object.assign({}, currentData.draws, { [pIdx]: base });
+        await saveMyDraws(pIdx, null, null);
+        fp.draws = (await fetchFreshDraws()) || fp.draws; renderFpList();
+        setFpStatus(`${name} foi escolhido por ${currentData.players[+clash]} ao mesmo tempo que tu (ficou com ele). Escolhe outro.`, true);
+        return;
+      }
+    }
+    if(!saved){ setFpStatus('Outro pedido sobrescreveu o teu — tenta outra vez.', true); return; }
+    closeFreePick();
+    if(typeof showCelebrationToast === 'function') showCelebrationToast(`✔ Escolha livre ${slot + 1}: <b>${escapeHtml(name)}</b>`, 4000);
+  } finally {
+    fp.busy = false;
+  }
 }
 
 pageBoot();

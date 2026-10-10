@@ -6,8 +6,9 @@
 <title>Estatísticas — Torneio Showdown - VSE</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=20261012a">
 <style>
 .highlight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
 .highlight-box{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
@@ -177,7 +178,7 @@
 
 <div class="hover-card" id="hoverCard"></div>
 
-<script src="showdown-utils.js"></script>
+<script src="showdown-utils.js?v=20261012a"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -304,6 +305,8 @@ let allNicknames = [];
 
 async function init(){
   try{
+    // Torneios (com sorteios: aqui contam os Pokémon usados) e perfis ao mesmo tempo.
+    const profilesPromise = fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows = await res.json();
@@ -314,7 +317,7 @@ async function init(){
     allNicknames = aggregateNicknames(rows);
     populateSeasonFilter(rows);
     recomputePlayerData(rows);
-    playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    playerProfiles = await profilesPromise;
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, playerProfiles[loggedInPlayerName]);
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));

@@ -6,8 +6,9 @@
 <title>Perfil do Jogador — Torneio Showdown - VSE</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=20261012a">
 <style>
 .customize-toggle-btn{
   background:var(--bg-card);border:1px solid var(--line);color:var(--tera-cyan);padding:9px 16px;
@@ -52,13 +53,24 @@
 .fav-set-text{background:var(--bg-panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;
   font-family:monospace;font-size:11.5px;white-space:pre-wrap;color:var(--text-dim);max-height:140px;overflow-y:auto;}
 
-@keyframes vsePulseName{
-  0%,100%{ opacity:1; }
-  50%{ opacity:0.55; }
-}
 .history-row .res{font-family:'Chakra Petch',sans-serif;font-weight:700;flex-shrink:0;}
 .history-row .res.champ{color:var(--tera-amber);}
 .history-row .res.elim{color:var(--text-faint);}
+/* Mural de comentários */
+.tab-count{display:inline-block;min-width:18px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--bg-card);border:1px solid var(--line);font-size:10.5px;line-height:17px;color:var(--text-dim);}
+.mural-compose textarea{width:100%;min-height:70px;margin:0 0 6px;font-family:'Inter',sans-serif;font-size:13px;resize:vertical;}
+.mural-compose .row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.mural-compose .cnt{font-size:11px;color:var(--text-faint);}
+.mural-item{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--line);}
+.mural-item:first-child{border-top:none;}
+.mural-main{flex:1;min-width:0;}
+.mural-meta{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--text-faint);}
+.mural-meta a{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:13px;text-decoration:none;}
+.mural-meta .del{margin-left:auto;background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:11px;}
+.mural-meta .del:hover{color:var(--danger);}
+.mural-body{margin-top:3px;font-size:13.5px;line-height:1.5;color:var(--text-main);white-space:pre-wrap;word-break:break-word;}
+.mural-live{font-size:10.5px;color:#5ed890;margin-left:8px;font-weight:600;}
+.mural-live::before{content:'● ';}
 </style>
 </head>
 <body>
@@ -105,7 +117,7 @@
   <div class="footer-note">Estatísticas calculadas a partir de todos os torneios guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="showdown-utils.js"></script>
+<script src="showdown-utils.js?v=20261012a"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -210,15 +222,19 @@ let myCoinTransactions = [];
 
 async function init(){
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    allRows = await res.json();
+    // Os 3 pedidos ao mesmo tempo (eram um a seguir ao outro). Os torneios vêm completos: o perfil mostra os Pokémon mais usados.
+    const [rows, profiles, coinTx] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }),
+      fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY),
+      fetchCoinTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 30)
+    ]);
+    allRows = rows;
     setStatus(true, `Ligado — ${allRows.length} torneio(s) encontrados.`);
     playerStats = aggregatePlayers(allRows);
-    playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    playerProfiles = profiles;
     currentTrophies = computeCurrentTrophies(allRows);
     eloRatings = computeEloRatings(allRows);
-    myCoinTransactions = await fetchCoinTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 30);
+    myCoinTransactions = coinTx;
     renderProfile();
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
@@ -257,8 +273,15 @@ async function renderProfile(){
   const seasonComparison = computeSeasonComparison(allRows, name);
   const winrateByTier = computeWinrateByTier(allRows, name);
   const iconicTeam = computeIconicTeam(allRows, name);
-  const achievements = await computeAllAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, st, myStreak, allRows, playerProfiles[name] || {});
-  const favoriteSets = await fetchFavoriteSets(SUPABASE_URL, SUPABASE_ANON_KEY, name);
+  // Conquistas, sets favoritos e comentários do mural pedem-se ao mesmo tempo (eram um a seguir ao outro).
+  // Mural: se showdown-utils.js ainda estiver em cache numa versão antiga, o separador some.
+  const muralOn = typeof fetchProfileComments === 'function';
+  const [achievements, favoriteSets, mural] = await Promise.all([
+    computeAllAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, st, myStreak, allRows, playerProfiles[name] || {}),
+    fetchFavoriteSets(SUPABASE_URL, SUPABASE_ANON_KEY, name),
+    muralOn ? fetchProfileComments(SUPABASE_URL, SUPABASE_ANON_KEY, name) : Promise.resolve({ available:false, rows:[] })
+  ]);
+  muralState = { name, available: mural.available, rows: mural.rows };
 
   if(isOwnProfile){
     checkNewAchievements(SUPABASE_URL, SUPABASE_ANON_KEY, name, achievements).then(newOnes=>{
@@ -333,7 +356,7 @@ async function renderProfile(){
       <div class="profile-head">
         ${avatar}
         <div>
-          <div class="profile-name" style="color:${accentColor};${nameEffectCosmetic ? nameEffectCosmetic.css : ''}">${trophyEmojiFor(name, currentTrophies)} ${escapeHtml(displayName)} ${equippedBadges.map(b=>b.emoji).join(' ')}</div>
+          <div class="profile-name ${nameFxClass(nameEffectCosmetic)}" style="color:${accentColor};">${trophyEmojiFor(name, currentTrophies)} ${escapeHtml(displayName)} ${equippedBadges.map(b=>b.emoji).join(' ')}</div>
           ${profile.nickname ? `<div style="font-size:11.5px;color:var(--text-faint);">${escapeHtml(name)}</div>` : ''}
           ${titleCosmetic && titleCosmetic.text ? `<div style="font-size:12px;color:var(--text-dim);margin-top:2px;">${escapeHtml(titleCosmetic.text)}</div>` : ''}
           ${(profile.specialTags||[]).length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">${(profile.specialTags||[]).map(t=>`<span class="special-tag-chip">${t.emoji} ${escapeHtml(t.text)}</span>`).join('')}</div>` : ''}
@@ -355,10 +378,11 @@ async function renderProfile(){
     </div>
 
     <div class="tabs">
-      <button class="tab-btn active" onclick="switchProfileTab('estatisticas')">Estatísticas</button>
-      <button class="tab-btn" onclick="switchProfileTab('colecao')">Coleção</button>
-      <button class="tab-btn" onclick="switchProfileTab('conquistas')">Conquistas</button>
-      ${isOwnProfile ? `<button class="tab-btn" onclick="switchProfileTab('conta')">Conta</button>` : ''}
+      <button class="tab-btn active" data-tab="estatisticas" onclick="switchProfileTab('estatisticas')">Estatísticas</button>
+      <button class="tab-btn" data-tab="colecao" onclick="switchProfileTab('colecao')">Coleção</button>
+      <button class="tab-btn" data-tab="conquistas" onclick="switchProfileTab('conquistas')">Conquistas</button>
+      ${muralOn ? `<button class="tab-btn" data-tab="mural" onclick="switchProfileTab('mural')">Mural${mural.available ? `<span class="tab-count" id="muralCount">${mural.rows.length}</span>` : ''}</button>` : ''}
+      ${isOwnProfile ? `<button class="tab-btn" data-tab="conta" onclick="switchProfileTab('conta')">Conta</button>` : ''}
     </div>
 
     <div class="shop-panel active" id="panel-estatisticas">
@@ -522,11 +546,13 @@ async function renderProfile(){
     </div>
     </div>
 
+    ${muralOn ? `<div class="shop-panel" id="panel-mural">${muralPanelHtml(name, isOwnProfile, displayName)}</div>` : ''}
+
     ${isOwnProfile ? `
     <div class="shop-panel" id="panel-conta">
     <div class="card" id="customizePanel" style="display:none;">
       <h2>🎨 Customizar</h2>
-      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Fundos do avatar</div>
+      <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Cor da moldura</div>
       <div class="shop-grid">${COSMETIC_CATALOG.backgrounds.map(item => customizeItemHtml(item, 'background', profile)).join('')}</div>
       <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Cor de destaque</div>
       <div class="shop-grid">${COSMETIC_CATALOG.accents.map(item => customizeItemHtml(item, 'accent', profile)).join('')}</div>
@@ -581,13 +607,116 @@ async function renderProfile(){
 }
 
 function switchProfileTab(tab){
-  document.querySelectorAll('#profileContent .tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('#profileContent .tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('#profileContent .shop-panel').forEach(p=>p.classList.remove('active'));
-  const btnMap = {estatisticas:0, colecao:1, conquistas:2, conta:3};
-  const btns = document.querySelectorAll('#profileContent .tab-btn');
-  if(btns[btnMap[tab]]) btns[btnMap[tab]].classList.add('active');
   const panel = document.getElementById('panel-'+tab);
   if(panel) panel.classList.add('active');
+  if(tab === 'mural') refreshMural(true);
+}
+
+// ---------- Mural de comentários ----------
+// Um comentário por dia em cada perfil de outro jogador (200 caracteres). O autor e o dono do perfil apagam.
+// Atualiza sozinho de 15 em 15 s enquanto o separador está aberto (e nunca por cima do que estás a escrever).
+let muralState = { name:null, available:false, rows:[] };
+
+function muralTimeAgo(iso){
+  const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+  if(s < 60) return 'agora mesmo';
+  if(s < 3600) return `há ${Math.floor(s / 60)} min`;
+  if(s < 86400) return `há ${Math.floor(s / 3600)} h`;
+  if(s < 86400 * 14) return `há ${Math.floor(s / 86400)} dia${Math.floor(s / 86400) === 1 ? '' : 's'}`;
+  return new Date(iso).toLocaleDateString('pt-PT');
+}
+function muralListHtml(isOwnProfile){
+  if(!muralState.rows.length) return `<div class="empty-state">${isOwnProfile ? 'Ainda ninguém deixou um comentário no teu mural.' : 'Ainda não há comentários — sê o primeiro!'}</div>`;
+  return muralState.rows.map(c => {
+    const p = playerProfiles[c.author_name] || {};
+    const accent = p.equippedAccent ? getCosmeticById(p.equippedAccent) : null;
+    const shown = p.nickname || c.author_name;
+    const canDelete = loggedInPlayerName && (c.author_name === loggedInPlayerName || muralState.name === loggedInPlayerName) && /^[0-9a-f-]{36}$/i.test(c.id);
+    return `<div class="mural-item">
+      ${avatarHtml(c.author_name, p.photo_url, 34, null, null, false)}
+      <div class="mural-main">
+        <div class="mural-meta"><a href="perfil.html?jogador=${encodeURIComponent(c.author_name)}" style="color:${accent ? accent.color : 'var(--tera-cyan)'};">${escapeHtml(shown)}</a><span title="${escapeHtml(new Date(c.created_at).toLocaleString('pt-PT'))}">${muralTimeAgo(c.created_at)}</span>
+          ${canDelete ? `<button class="del" onclick="doDeleteComment('${c.id}')" title="Apagar este comentário">✖ apagar</button>` : ''}</div>
+        <div class="mural-body">${escapeHtml(c.body)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function muralPanelHtml(name, isOwnProfile, displayName){
+  if(!muralState.available) return `<div class="card"><div class="empty-state">💬 O mural de comentários abre em breve.</div></div>`;
+  const today = profileCommentDay();
+  const already = !!(loggedInPlayerName && muralState.rows.some(c => c.author_name === loggedInPlayerName && c.day === today));
+  muralState.composeAlready = already;   // para o refresh saber se a caixa precisa de mudar
+  let compose;
+  if(isOwnProfile) compose = `<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">Isto é o teu mural: os outros jogadores deixam aqui os comentários deles. Podes apagar os que não quiseres.</div>`;
+  else if(already) compose = `<div style="font-size:12.5px;color:var(--text-dim);margin-bottom:8px;">✔ Já deixaste o teu comentário de hoje no perfil de ${escapeHtml(displayName)}. Volta amanhã (o dia muda à meia-noite UTC, como o bónus diário).</div>`;
+  else compose = `<div class="mural-compose">
+      <textarea id="muralDraft" maxlength="${PROFILE_COMMENT_MAX}" placeholder="Deixa um comentário no perfil de ${escapeHtml(displayName)}…" oninput="muralDraftInput(this)"></textarea>
+      <div class="row"><span class="cnt" id="muralCnt">0/${PROFILE_COMMENT_MAX} · 1 por dia em cada perfil</span><button class="btn-primary" style="width:auto;margin:0;padding:8px 16px;" onclick="doPostComment(this)">💬 Comentar</button></div>
+    </div>`;
+  return `<div class="card"><h2>💬 Mural de ${escapeHtml(displayName)}<span class="mural-live">ao vivo</span></h2>${compose}</div>
+    <div class="card"><div id="muralList">${muralListHtml(isOwnProfile)}</div></div>`;
+}
+function muralDraftInput(el){ const c = document.getElementById('muralCnt'); if(c) c.textContent = `${el.value.length}/${PROFILE_COMMENT_MAX} · 1 por dia em cada perfil`; }
+
+// Recarrega os comentários e só redesenha se algo mudou (força = pedido explícito, p.ex. ao abrir o separador).
+async function refreshMural(force){
+  if(!muralState.name || typeof fetchProfileComments !== 'function') return;
+  const draft = document.getElementById('muralDraft');
+  const typing = draft && document.activeElement === draft;
+  const r = await fetchProfileComments(SUPABASE_URL, SUPABASE_ANON_KEY, muralState.name);
+  if(!r.available) return;
+  const sig = rows => rows.map(c => c.id).join(',');
+  const changed = sig(r.rows) !== sig(muralState.rows);
+  muralState.available = true; muralState.rows = r.rows;
+  const cnt = document.getElementById('muralCount'); if(cnt) cnt.textContent = r.rows.length;
+  const panel = document.getElementById('panel-mural');
+  if(!panel) return;
+  if(changed || force){
+    const list = document.getElementById('muralList');
+    if(list) list.innerHTML = muralListHtml(muralState.name === loggedInPlayerName);
+    // a caixa de comentar depende de já teres comentado hoje (comentaste noutro sítio, ou apagaste o teu): refaz o painel
+    const already = !!(loggedInPlayerName && r.rows.some(c => c.author_name === loggedInPlayerName && c.day === profileCommentDay()));
+    if(already !== muralState.composeAlready && muralState.name !== loggedInPlayerName && !typing){
+      const p = playerProfiles[muralState.name] || {};
+      panel.innerHTML = muralPanelHtml(muralState.name, false, p.nickname || muralState.name);
+    }
+  }
+}
+setInterval(() => {
+  const panel = document.getElementById('panel-mural');
+  if(document.hidden || !panel || !panel.classList.contains('active')) return;
+  refreshMural(false);
+}, 15000);
+
+async function doPostComment(btn){
+  const ta = document.getElementById('muralDraft');
+  if(!ta || !loggedInPlayerName) return;
+  if(btn) btn.disabled = true;
+  const r = await postProfileComment(SUPABASE_URL, SUPABASE_ANON_KEY, muralState.name, loggedInPlayerName, ta.value);
+  if(r.ok){
+    showCelebrationToast('💬 Comentário deixado!', 3000);
+    await refreshMural(true);
+    return;
+  }
+  const msg = r.reason === 'empty' ? 'Escreve alguma coisa antes de enviar.'
+    : r.reason === 'toolong' ? `O comentário só pode ter ${PROFILE_COMMENT_MAX} caracteres.`
+    : r.reason === 'already' ? 'Já comentaste neste perfil hoje — volta amanhã!'
+    : r.reason === 'self' ? 'Não podes comentar no teu próprio perfil.'
+    : r.reason === 'unavailable' ? 'O mural ainda não está disponível.' : 'Não foi possível enviar agora. Tenta outra vez.';
+  alert(msg);
+  if(r.reason === 'already') await refreshMural(true); else if(btn) btn.disabled = false;
+}
+
+async function doDeleteComment(id){
+  const c = muralState.rows.find(x => x.id === id);
+  if(!c) return;
+  if(!confirm(`Apagar este comentário de ${c.author_name}?`)) return;
+  const ok = await deleteProfileComment(SUPABASE_URL, SUPABASE_ANON_KEY, id);
+  if(!ok){ alert('Não foi possível apagar. Tenta outra vez.'); return; }
+  await refreshMural(true);
 }
 
 async function saveMyProfile(){
@@ -636,8 +765,8 @@ function customizeItemHtml(item, type, profile){
   let swatchHtml;
   if(type === 'background') swatchHtml = `<div class="shop-swatch" style="background:${item.css};"></div>`;
   else if(type === 'accent') swatchHtml = `<div class="shop-swatch" style="background:${item.color};"></div>`;
-  else if(type === 'frame') swatchHtml = frameEffectPreviewHtml(item.effect);
-  else if(type === 'nameEffect') swatchHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);color:var(--tera-cyan);font-family:'Chakra Petch',sans-serif;font-weight:700;${item.css}">Abc</div>`;
+  else if(type === 'frame') swatchHtml = frameEffectPreviewHtml(item.effect, profile);
+  else if(type === 'nameEffect') swatchHtml = nameEffectPreviewHtml(item, profile);
   else if(type === 'title') swatchHtml = `<div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:11px;padding:4px;">${item.text ? escapeHtml(item.text) : '—'}</div>`;
 
   const actionBtn = equipped

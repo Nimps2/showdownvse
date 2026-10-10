@@ -292,6 +292,14 @@ body.light-theme .ev-theme-volta-ao-mundo [data-region="sinnoh"]{--accent:#7c4dc
   box-shadow:0 8px 18px rgba(0,0,0,0.32),inset 0 0 0 1px rgba(120,90,40,0.12);transition:transform .2s;}
 .ev-theme-volta-ao-mundo .vm-postcard:hover{transform:rotate(0deg) translateY(-3px);}
 .ev-theme-volta-ao-mundo .vm-postcard.mine{outline:2px solid color-mix(in srgb,var(--vm-gold) 55%,transparent);outline-offset:2px;}
+/* Atualização ao vivo: bolinha a pulsar no título do quadro e destaque dos postais que acabaram de chegar. */
+.ev-theme-volta-ao-mundo .vm-live{display:inline-flex;align-items:center;gap:5px;margin-left:8px;padding:2px 8px;border-radius:999px;font:600 10px/1.4 'Inter',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#7fe0a4;background:rgba(94,216,144,0.12);border:1px solid rgba(94,216,144,0.35);vertical-align:middle;}
+.ev-theme-volta-ao-mundo .vm-live i{width:6px;height:6px;border-radius:50%;background:#5ed890;box-shadow:0 0 0 0 rgba(94,216,144,0.7);animation:vmLiveDot 1.8s ease-out infinite;}
+@keyframes vmLiveDot{0%{box-shadow:0 0 0 0 rgba(94,216,144,0.7);}80%,100%{box-shadow:0 0 0 7px rgba(94,216,144,0);}}
+.ev-theme-volta-ao-mundo .vm-postcard.vm-new{animation:vmNewCard 2.6s ease-out 1;}
+@keyframes vmNewCard{0%{opacity:0;transform:translateY(-14px) rotate(var(--rot,0deg)) scale(.96);box-shadow:0 0 0 0 rgba(240,182,79,0.9),0 8px 18px rgba(0,0,0,0.32);}
+  25%{opacity:1;transform:translateY(0) rotate(var(--rot,0deg)) scale(1.02);box-shadow:0 0 0 6px rgba(240,182,79,0.55),0 8px 18px rgba(0,0,0,0.32);}
+  100%{transform:rotate(var(--rot,0deg));box-shadow:0 0 0 0 rgba(240,182,79,0),0 8px 18px rgba(0,0,0,0.32);}}
 .ev-theme-volta-ao-mundo .vm-tape{position:absolute;top:-10px;left:50%;width:74px;height:20px;transform:translateX(-50%) rotate(-3deg);background:rgba(255,226,140,0.7);box-shadow:0 1px 2px rgba(0,0,0,0.15);}
 .ev-theme-volta-ao-mundo .vm-tape.b{left:28%;transform:translateX(-50%) rotate(4deg);background:rgba(160,220,255,0.65);}
 .ev-theme-volta-ao-mundo .vm-pc-stamp{position:absolute;top:12px;right:12px;width:50px;height:58px;display:flex;align-items:center;justify-content:center;

@@ -6,8 +6,9 @@
 <title>Conquistas — Torneio Showdown - VSE</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=20261012a">
 <style>
 .progress-bar{width:100%;height:8px;background:var(--bg-card);border-radius:4px;overflow:hidden;margin:10px 0;}
 .progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--tera-cyan),var(--tera-violet));border-radius:4px;transition:width .3s;}
@@ -94,7 +95,7 @@
   <div class="footer-note">As conquistas desbloqueiam-se sozinhas por mérito, sem custar moedas — diferente dos emblemas da loja. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="showdown-utils.js"></script>
+<script src="showdown-utils.js?v=20261012a"></script>
 <script>
 initTheme();
 document.getElementById('maxFeaturedLabel').textContent = MAX_FEATURED_ACHIEVEMENTS;
@@ -198,12 +199,16 @@ function getRequestedPlayerName(){
 
 async function init(){
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    allRows = await res.json();
+    // Os 3 pedidos ao mesmo tempo (eram um a seguir ao outro). Os torneios vêm COMPLETOS: a conquista "Nomeador Criativo"
+    // conta apelidos, que estão nos sorteios (testado: com a leitura leve ela deixava de aparecer).
+    const [rows, profiles, names] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }),
+      fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY),
+      fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY)
+    ]);
+    allRows = rows;
     setStatus(true, `Ligado — ${allRows.length} torneio(s) encontrados.`);
     playerStats = aggregatePlayers(allRows);
-    const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     playerProfiles = profiles;
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
@@ -211,7 +216,6 @@ async function init(){
     });
     if(typeof mountEventCornerIcon === 'function') mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY); // guarda: showdown-utils.js ainda pode estar em cache numa versão antiga
 
-    const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
     const sel = document.getElementById('playerSelect');
     sel.innerHTML = names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
     const requested = getRequestedPlayerName();

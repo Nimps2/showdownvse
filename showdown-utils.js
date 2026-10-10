@@ -248,7 +248,7 @@ async function updatePlayerProfile(supabaseUrl, supabaseAnonKey, name, nickname,
 
 // ---------- Loja de personalização ----------
 const COSMETIC_CATALOG = {
-  // "Fundo do Avatar" já não preenche o círculo — agora é a COR usada pelo
+  // "Cor da moldura" (antes "Fundo do Avatar"; ids bg_* e campo equipped_background mantêm-se) é a COR usada pelo
   // efeito animado equipado na Moldura (ver frames abaixo). O campo "css"
   // fica só para a pré-visualização na loja (mostra o gradiente do tema).
   backgrounds: [
@@ -271,8 +271,8 @@ const COSMETIC_CATALOG = {
     { id:'accent_emerald', name:'Esmeralda',      price:50, color:'#5ed890' }
   ],
   // "Moldura do Avatar" já não é uma borda estática — agora é um EFEITO
-  // ANIMADO à volta do avatar, colorido com a cor escolhida em "Fundo do
-  // Avatar" (ver backgrounds acima). Os IDs mantêm-se os mesmos de antes
+  // ANIMADO à volta do avatar, colorido com a cor escolhida em "Cor da
+  // moldura" (ver backgrounds acima). Os IDs mantêm-se os mesmos de antes
   // para quem já os tinha comprado não perder nada.
   frames: [
     { id:'frame_none',  name:'Sem moldura',   price:0,   effect:'none' },
@@ -285,10 +285,12 @@ const COSMETIC_CATALOG = {
   ],
   nameEffects: [
     { id:'effect_none',  name:'Nenhum',  price:0,  css:'' },
-    { id:'effect_glow',  name:'Brilho',  price:70, css:'text-shadow:0 0 8px currentColor;' },
-    { id:'effect_pulse', name:'Pulsar',  price:90, css:'animation:vsePulseName 1.5s ease-in-out infinite;' },
-    { id:'effect_vm_rasto', name:'Rasto de Avião', price:0, css:'text-shadow:-5px 0 6px rgba(79,216,208,0.55),-11px 0 8px rgba(79,216,208,0.28);', eventOnly:'volta-ao-mundo' },
-    { id:'effect_vm_aurora', name:'Aurora de Cabine', price:0, css:'background:linear-gradient(90deg,#4fa8f0,#a56bf0,#f0b64f);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;', eventOnly:'volta-ao-mundo' }
+    // `fx` = identidade visual (classe .name-fx-<fx>, definida em ensureNameFxStyles); `css` ficou vazio de propósito
+    // (antes eram strings de CSS inline, o que fazia o "Pulsar" não animar fora do perfil e os efeitos parecerem iguais).
+    { id:'effect_glow',  name:'Brilho',  price:70, fx:'glow', css:'' },
+    { id:'effect_pulse', name:'Pulsar',  price:90, fx:'pulse', css:'' },
+    { id:'effect_vm_rasto', name:'Rasto de Avião', price:0, fx:'contrail', css:'', eventOnly:'volta-ao-mundo' },
+    { id:'effect_vm_aurora', name:'Aurora de Cabine', price:0, fx:'aurora', css:'', eventOnly:'volta-ao-mundo' }
   ],
   titles: [
     { id:'title_none',         name:'Nenhum',              price:0,  text:'' },
@@ -426,8 +428,7 @@ async function setSiteBackgroundUrl(supabaseUrl, supabaseAnonKey, name, url){
 // Devolve HTML de um avatar: <img> se houver photo_url, senão um círculo com
 // as iniciais, usando o fundo e a moldura personalizados equipados (se existirem).
 // ---------- Decorações Animadas do Avatar ----------
-// A "Moldura" é o tipo de efeito animado à volta do avatar; o "Fundo" deixou
-// de preencher o círculo e passou a ser só a COR usada por esse efeito —
+// A "Moldura" é o tipo de efeito animado à volta do avatar; a "Cor da moldura" (antes "Fundo do avatar") é só a COR usada por esse efeito —
 // assim as duas personalizações nunca competem visualmente uma com a outra.
 function ensureAvatarFxStyles(){
   if(document.getElementById('vseAvatarFxStyles')) return;
@@ -438,23 +439,43 @@ function ensureAvatarFxStyles(){
     .avatar-fx-layer{position:absolute;inset:0;pointer-events:none;}
     .avatar-fx-layer span{position:absolute;top:50%;left:50%;}
 
-    @keyframes vseSparkFlicker{0%,100%{opacity:0;transform:translate(-50%,-50%) scale(0.4);}50%{opacity:1;transform:translate(-50%,-50%) scale(1.3);}}
-    .avatar-fx-sparks span{width:3px;height:3px;border-radius:50%;background:var(--fx-color);
-      box-shadow:0 0 4px var(--fx-color);animation:vseSparkFlicker 1.6s ease-in-out infinite;}
+    /* Molduras redesenhadas. Todas usam --fx-color (a "Cor da moldura") e as variáveis --fx-gem (tamanho das peças),
+       --fx-wrap (lado total) e --fx-pad (folga à volta do avatar), definidas em avatarHtml. Cada uma tem uma
+       linguagem de movimento própria: Faíscas = disparos radiais; Estrelado = estrelas de 4 pontas em órbita a
+       cintilar; Florescer = pétalas em órbita lenta que respiram. Um anel suave comum dá presença à cor mesmo a meio
+       do ciclo. Sem filtros SVG (rasterizavam mal): só gradientes, clip-path, sombras e drop-shadow de HTML. */
+    @keyframes vseRingBreath{0%,100%{opacity:0.55;transform:scale(1);}50%{opacity:1;transform:scale(1.035);}}
+    .avatar-fx-sparks::before,.avatar-fx-starry::before,.avatar-fx-blossom::before{content:'';position:absolute;inset:calc(var(--fx-pad,10px)*0.72);border-radius:calc(var(--fx-wrap,60px)*0.2);
+      box-shadow:0 0 0 1.5px color-mix(in srgb,var(--fx-color) 44%,transparent),0 0 12px color-mix(in srgb,var(--fx-color) 36%,transparent),inset 0 0 10px color-mix(in srgb,var(--fx-color) 20%,transparent);
+      animation:vseRingBreath 3.2s ease-in-out infinite;}
 
-    @keyframes vseStarTwinkle{0%,100%{opacity:0.15;transform:translate(-50%,-50%) scale(0.5) rotate(0deg);}50%{opacity:1;transform:translate(-50%,-50%) scale(1.15) rotate(20deg);}}
-    .avatar-fx-starry span{width:6px;height:6px;background:var(--fx-color);
-      clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
-      animation:vseStarTwinkle 2.2s ease-in-out infinite;filter:drop-shadow(0 0 2px var(--fx-color));}
+    @keyframes vseSparkShoot{
+      0%{opacity:0;transform:translate(-50%,-50%) rotate(var(--a,0deg)) translateY(calc(var(--fx-wrap,60px)*-0.30)) scaleY(0.2);}
+      22%{opacity:1;transform:translate(-50%,-50%) rotate(var(--a,0deg)) translateY(calc(var(--fx-wrap,60px)*-0.35)) scaleY(1);}
+      100%{opacity:0;transform:translate(-50%,-50%) rotate(var(--a,0deg)) translateY(calc(var(--fx-wrap,60px)*-0.54)) scaleY(0.45);}}
+    .avatar-fx-sparks span{top:50%!important;left:50%!important;width:max(2px,calc(var(--fx-gem,9px)*0.26));height:calc(var(--fx-gem,9px)*1.3);border-radius:2px;
+      background:linear-gradient(to top,transparent,color-mix(in srgb,var(--fx-color) 65%,#fff) 65%,#fff);
+      box-shadow:0 0 5px var(--fx-color);animation:vseSparkShoot 1.4s ease-out infinite;}
 
-    @keyframes vseBlossomBloom{0%,100%{opacity:0;transform:translate(-50%,-50%) scale(0) rotate(0deg);}35%{opacity:0.9;transform:translate(-50%,-50%) scale(1) rotate(50deg);}70%{opacity:0.5;transform:translate(-50%,-50%) scale(0.85) rotate(90deg);}}
-    .avatar-fx-blossom span{width:7px;height:7px;background:var(--fx-color);
-      border-radius:0% 100% 0% 100%;animation:vseBlossomBloom 3s ease-in-out infinite;}
+    @keyframes vseOrbitVar{from{transform:rotate(var(--a0,0deg));}to{transform:rotate(calc(var(--a0,0deg) + 360deg));}}
+    @keyframes vseOrbitVarRev{from{transform:rotate(var(--a0,0deg));}to{transform:rotate(calc(var(--a0,0deg) - 360deg));}}
+    @keyframes vseStarTwinkle{0%,100%{opacity:0.35;transform:translate(-50%,0) scale(0.55) rotate(0deg);}50%{opacity:1;transform:translate(-50%,0) scale(1.2) rotate(45deg);}}
+    .avatar-fx-starry span{top:0!important;left:0!important;width:100%;height:100%;animation:vseOrbitVar 18s linear infinite;animation-delay:0s!important;}
+    .avatar-fx-starry span::before{content:'';position:absolute;top:calc(var(--fx-pad,10px)*0.2);left:50%;width:calc(var(--fx-gem,9px)*1.35);height:calc(var(--fx-gem,9px)*1.35);
+      background:radial-gradient(circle at 50% 50%,#fff 0 18%,color-mix(in srgb,var(--fx-color) 70%,#fff) 19% 46%,var(--fx-color) 47%);
+      clip-path:polygon(50% 0%,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0% 50%,39% 39%);
+      filter:drop-shadow(0 0 3px var(--fx-color));animation:vseStarTwinkle 2.4s ease-in-out infinite;animation-delay:var(--d,0s);}
+
+    @keyframes vsePetalBreath{0%,100%{opacity:0.55;transform:translate(-50%,0) rotate(45deg) scale(0.7);}50%{opacity:1;transform:translate(-50%,calc(var(--fx-pad,10px)*-0.22)) rotate(45deg) scale(1.15);}}
+    .avatar-fx-blossom span{top:0!important;left:0!important;width:100%;height:100%;animation:vseOrbitVarRev 26s linear infinite;animation-delay:0s!important;}
+    .avatar-fx-blossom span::before{content:'';position:absolute;top:calc(var(--fx-pad,10px)*0.25);left:50%;width:calc(var(--fx-gem,9px)*1.25);height:calc(var(--fx-gem,9px)*1.25);
+      background:linear-gradient(135deg,color-mix(in srgb,var(--fx-color) 55%,#fff),var(--fx-color));border-radius:0 100% 0 100%;
+      box-shadow:0 0 6px color-mix(in srgb,var(--fx-color) 60%,transparent);animation:vsePetalBreath 3.6s ease-in-out infinite;animation-delay:var(--d,0s);}
 
     /* Diamante Prismático (exclusivo de leilão): anel prismático que gira à volta
        do avatar, brilho que varre a foto, e 4 gemas nos pontos cardeais que
        piscam em sequência, seguindo o anel. Usa --fx-color + branco, por isso
-       continua a respeitar a cor escolhida em "Fundo do Avatar" (e a Aurora). */
+       continua a respeitar a "Cor da moldura" escolhida (e a Aurora). */
     @property --vse-dia-angle{syntax:'<angle>';inherits:false;initial-value:0deg;}
     @keyframes vseDiaSpin{to{--vse-dia-angle:360deg;}}
     @keyframes vseDiaShine{0%,50%{background-position:160% 0;}100%{background-position:-60% 0;}}
@@ -504,43 +525,87 @@ function ensureAvatarFxStyles(){
   document.head.appendChild(style);
 }
 
-// Pré-visualização em miniatura de um efeito de moldura, usada nos cartões
-// da loja/personalização — mostra a animação de verdade, não só um ícone
-// estático, para dar uma ideia real do que se está a comprar.
-function frameEffectPreviewHtml(effectType){
+// Pré-visualização de uma moldura nos cartões da loja/personalização: um avatar de verdade com a animação e a cor
+// equipada, para se ver o que se está a comprar/usar.
+// O segundo argumento pode ser o perfil do jogador (usa a "Cor da moldura" que tem equipada) ou uma cor (#hex).
+function frameEffectPreviewHtml(effectType, profileOrColor, multiColor){
   if(!effectType || effectType === 'none'){
-    return `<div class="shop-swatch" style="background:var(--bg-panel);border:2px dashed var(--line);"></div>`;
+    return `<div class="shop-swatch" style="height:64px;background:var(--bg-panel);border:2px dashed var(--line);"></div>`;
   }
-  ensureAvatarFxStyles();
-  const particles = avatarFxParticlesHtml(effectType, 40);
-  return `<div class="shop-swatch avatar-fx-wrap" style="--fx-color:#a56bf0;background:var(--bg-panel);position:relative;">
-    <div class="avatar-fx-layer avatar-fx-${effectType}">${particles}</div>
-  </div>`;
+  let color = '#a56bf0', multi = !!multiColor;
+  if(typeof profileOrColor === 'string') color = profileOrColor;
+  else if(profileOrColor && profileOrColor.equippedBackground){
+    const bg = getCosmeticById(profileOrColor.equippedBackground);
+    if(bg){ color = bg.color; multi = !!bg.multiColor; }
+  }
+  return `<div class="shop-swatch" style="height:64px;display:flex;align-items:center;justify-content:center;background:var(--bg-panel);">${avatarHtml('AB', null, 34, color, effectType, multi)}</div>`;
 }
 
-const AVATAR_FX_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
-const AVATAR_FX_COUNTS = { sparks:6, starry:6, blossom:5, diamond:4, plane:1, fleet:3 };
+// ---------- Efeitos de nome ----------
+// Quatro identidades bem diferentes (a cor base é sempre a "cor de destaque" do jogador, via currentColor):
+//  Brilho = halo de néon ESTÁTICO · Pulsar = batimento cardíaco (escala + brilho) · Rasto de Avião = linhas de
+//  velocidade atrás do nome, texto inclinado · Aurora de Cabine = gradiente de várias cores a fluir.
+function ensureNameFxStyles(){
+  if(document.getElementById('vseNameFxStyles')) return;
+  const style = document.createElement('style');
+  style.id = 'vseNameFxStyles';
+  style.textContent = `
+    .name-fx{display:inline-block;max-width:100%;}
+    .name-fx-glow{text-shadow:0 0 3px currentColor,0 0 9px currentColor,0 0 20px color-mix(in srgb,currentColor 60%,transparent);}
+    @keyframes vseNameBeat{
+      0%,45%,100%{transform:scale(1);text-shadow:0 0 0 transparent;}
+      10%{transform:scale(1.08);text-shadow:0 0 10px currentColor;}
+      20%{transform:scale(1);text-shadow:0 0 3px currentColor;}
+      30%{transform:scale(1.05);text-shadow:0 0 8px currentColor;}}
+    .name-fx-pulse{transform-origin:left center;animation:vseNameBeat 1.8s ease-in-out infinite;}
+    @keyframes vseNameTrail{0%,100%{transform:scaleX(0.3);opacity:0;}30%{opacity:0.9;}60%{transform:scaleX(1);opacity:0.9;}88%{opacity:0;}}
+    .name-fx-contrail{position:relative;font-style:italic;text-shadow:-2px 0 0 color-mix(in srgb,currentColor 35%,transparent);}
+    .name-fx-contrail::before,.name-fx-contrail::after{content:'';position:absolute;right:100%;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,currentColor);transform-origin:100% 50%;animation:vseNameTrail 2.4s ease-out infinite;}
+    .name-fx-contrail::before{top:34%;width:0.9em;margin-right:2px;}
+    .name-fx-contrail::after{top:66%;width:1.5em;margin-right:6px;animation-delay:0.35s;}
+    @keyframes vseNameFlow{to{background-position:300% 0;}}
+    .name-fx-aurora{background:linear-gradient(90deg,#4fa8f0,#a56bf0,#f0b64f,#e0607a,#4fa8f0);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;
+      -webkit-text-fill-color:transparent;color:transparent;animation:vseNameFlow 5s linear infinite;filter:drop-shadow(0 0 5px rgba(165,107,240,0.45));}
+  `;
+  document.head.appendChild(style);
+}
+// Classes a pôr no elemento que mostra o nome ('' se o cosmético não tiver efeito).
+function nameFxClass(cosmetic){
+  if(!cosmetic || !cosmetic.fx) return '';
+  ensureNameFxStyles();
+  return `name-fx name-fx-${cosmetic.fx}`;
+}
+// Cartão de pré-visualização ("Abc") do efeito de nome, na cor de destaque que o jogador tem equipada.
+function nameEffectPreviewHtml(item, profile){
+  const acc = profile && profile.equippedAccent ? getCosmeticById(profile.equippedAccent) : null;
+  const color = acc && acc.color ? acc.color : 'var(--tera-cyan)';
+  return `<div class="shop-swatch" style="height:44px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg-panel);color:${color};font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:15px;"><span class="${nameFxClass(item)}">Abc</span></div>`;
+}
+
+const AVATAR_FX_COUNTS = { sparks:10, starry:6, blossom:5, diamond:4, plane:1, fleet:3 };
 // Efeitos que não usam os primeiros N ângulos da lista acima — o Diamante
 // quer as 4 gemas espalhadas pelos pontos cardeais (direita, baixo, esquerda,
 // cima), pela ordem em que o anel as "visita" ao rodar.
 const AVATAR_FX_ANGLE_OVERRIDES = { diamond:[0, 90, 180, 270], plane:[0], fleet:[0, 0, 0] };
 // Duração (s) do ciclo de cada efeito, para espaçar o atraso de cada partícula.
-const AVATAR_FX_PERIODS = { diamond:4 };
+const AVATAR_FX_PERIODS = { sparks:1.4, starry:2.4, blossom:3.6, diamond:4 };
 
 function avatarFxParticlesHtml(effectType, radiusPct){
   const count = AVATAR_FX_COUNTS[effectType] || 6;
-  const angles = AVATAR_FX_ANGLE_OVERRIDES[effectType] || AVATAR_FX_ANGLES.slice(0, count);
+  // Por defeito as peças ficam espaçadas por igual à volta do avatar (antes usava os primeiros N de 8 ângulos fixos, o
+  // que deixava metade da volta vazia nos efeitos de 5-6 peças).
+  const angles = AVATAR_FX_ANGLE_OVERRIDES[effectType] || Array.from({ length: count }, (_, i) => i * 360 / count);
   const period = AVATAR_FX_PERIODS[effectType] || 2.4;
   return angles.map((deg, i)=>{
     const rad = deg * Math.PI / 180;
     const x = 50 + radiusPct * Math.cos(rad);
     const y = 50 + radiusPct * Math.sin(rad);
     const delay = (i * (period / count)).toFixed(2);
-    return `<span style="top:${y.toFixed(1)}%;left:${x.toFixed(1)}%;animation-delay:${delay}s;"></span>`;
+    return `<span style="top:${y.toFixed(1)}%;left:${x.toFixed(1)}%;animation-delay:${delay}s;--a:${deg.toFixed(1)}deg;--a0:${deg.toFixed(1)}deg;--d:${delay}s;"></span>`;
   }).join('');
 }
 
-// effectColor: cor (hex) escolhida em "Fundo do Avatar". effectType: 'none' |
+// effectColor: cor (hex) escolhida em "Cor da moldura". effectType: 'none' |
 // 'sparks' | 'starry' | 'blossom' | 'diamond' | 'plane' | 'fleet'. multiColor: true para a Aurora Animada,
 // faz o efeito ciclar de cor continuamente em vez de ficar fixo.
 function avatarHtml(name, photoUrl, sizePx, effectColor, effectType, multiColor){
@@ -550,7 +615,7 @@ function avatarHtml(name, photoUrl, sizePx, effectColor, effectType, multiColor)
 
   let innerHtml;
   if(photoUrl){
-    innerHtml = `<img src="${photoUrl.replace(/"/g,'&quot;')}" alt="${(name||'').replace(/"/g,'&quot;')}" style="width:${size}px;height:${size}px;border-radius:${contentRadius}px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none';">`;
+    innerHtml = `<img src="${photoUrl.replace(/"/g,'&quot;')}" alt="${(name||'').replace(/"/g,'&quot;')}" width="${size}" height="${size}" loading="lazy" decoding="async" style="width:${size}px;height:${size}px;border-radius:${contentRadius}px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none';">`;
   } else {
     const initials = (name||'?').slice(0,2).toUpperCase();
     innerHtml = `<div style="width:${size}px;height:${size}px;border-radius:${contentRadius}px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-violet),var(--tera-cyan));display:flex;align-items:center;justify-content:center;font-family:'Chakra Petch',sans-serif;font-size:${Math.round(size*0.4)}px;font-weight:700;color:#0a0c14;">${initials}</div>`;
@@ -567,7 +632,7 @@ function avatarHtml(name, photoUrl, sizePx, effectColor, effectType, multiColor)
 
   const gemSize = Math.max(Math.round(size*0.2), 7);
 
-  return `<div class="avatar-fx-wrap" style="--fx-color:${color};--fx-gem:${gemSize}px;width:${wrapSize}px;height:${wrapSize}px;">
+  return `<div class="avatar-fx-wrap" style="--fx-color:${color};--fx-gem:${gemSize}px;--fx-wrap:${wrapSize}px;--fx-pad:${wrapPad}px;width:${wrapSize}px;height:${wrapSize}px;">
     <div class="avatar-fx-layer avatar-fx-${effectType}${multiClass}">${particles}</div>
     ${innerHtml}
   </div>`;
@@ -701,7 +766,7 @@ function buildHoverCardHtml(name, playerStats, playerProfiles, currentTrophies, 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
       ${avatar}
       <div>
-        <div style="font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;color:${accentColor};${nameEffectCosmetic ? nameEffectCosmetic.css : ''}">${trophy} ${escapeHtml(displayName)} ${equippedBadgeEmojis}</div>
+        <div class="${nameFxClass(nameEffectCosmetic)}" style="font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:14px;color:${accentColor};">${trophy} ${escapeHtml(displayName)} ${equippedBadgeEmojis}</div>
         ${profile.nickname ? `<div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml(name)}</div>` : ''}
         ${titleCosmetic && titleCosmetic.text ? `<div style="font-size:10.5px;color:var(--text-dim);">${escapeHtml(titleCosmetic.text)}</div>` : ''}
       </div>
@@ -1788,163 +1853,192 @@ function computeBestParticipationStreak(allRows, name){
 // — precisam de consultas assíncronas extra à base de dados.
 async function computeAsyncAchievements(supabaseUrl, supabaseAnonKey, name, allRows){
   const earned = new Set();
+  // Cada grupo de conquistas faz as suas consultas à BD e só mexe em `earned` (um Set): são independentes, por
+  // isso correm TODAS ao mesmo tempo (antes eram ~15 pedidos um a seguir ao outro — o perfil e as conquistas
+  // esperavam a soma de todas as latências). O resultado é exatamente o mesmo.
+  const tasks = [];
 
-  try{
-    const predRes = await fetch(`${supabaseUrl}/rest/v1/predictions?predictor_name=eq.${encodeURIComponent(name)}&select=correct,created_at&order=created_at.asc`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const predRows = await predRes.json();
-    if(Array.isArray(predRows)){
-      const resolved = predRows.filter(p=>p.correct !== null);
-      if(resolved.filter(p=>p.correct===true).length >= 10) earned.add('sharp_bettor');
-      // Apostador Nato: alguma vez teve 3 palpites certos SEGUIDOS (ordem cronológica).
-      let run = 0, bestRun = 0;
-      resolved.forEach(p=>{ run = p.correct ? run+1 : 0; bestRun = Math.max(bestRun, run); });
-      if(bestRun >= 3) earned.add('lucky_streak_bettor');
-    }
-  } catch(e){ /* ignora silenciosamente */ }
-
-  try{
-    // "ilike" (sem diferenciar maiúsculas/minúsculas) para apanhar tanto o texto
-    // atual ("Jackpot 5x!") como o texto antigo de quando tínhamos o jackpot
-    // progressivo ("JACKPOT PROGRESSIVO", em maiúsculas) — histórico incluído.
-    const jackpotRes = await fetch(`${supabaseUrl}/rest/v1/coin_transactions?player_name=eq.${encodeURIComponent(name)}&reason=ilike.*jackpot*&select=id&limit=1`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const jackpotRows = await jackpotRes.json();
-    if(Array.isArray(jackpotRows) && jackpotRows.length >= 1) earned.add('lucky_strike');
-  } catch(e){ /* ignora silenciosamente */ }
-
-  try{
-    // Voz do Povo: já venceu a votação de Apelido da Semana pelo menos uma vez
-    // (procura no registo de auditoria, onde fica registado quando é apurado).
-    const pattern = encodeURIComponent(`*de ${name} venceu a vota*`);
-    const voiceRes = await fetch(`${supabaseUrl}/rest/v1/activity_log?category=eq.jogadores&action=ilike.${pattern}&select=id&limit=1`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const voiceRows = await voiceRes.json();
-    if(Array.isArray(voiceRows) && voiceRows.length >= 1) earned.add('voice_of_the_people');
-  } catch(e){ /* ignora silenciosamente */ }
-
-  try{
-    const giftsRes = await fetch(`${supabaseUrl}/rest/v1/gifts?from_name=eq.${encodeURIComponent(name)}&select=amount,to_name`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const giftsRows = await giftsRes.json();
-    const recipients = new Set();
-    let coinTotal = 0;
-    if(Array.isArray(giftsRows)){
-      giftsRows.forEach(g=>{
-        coinTotal += (g.amount||0);
-        if(g.to_name) recipients.add(g.to_name);
-      });
-    }
-    if(coinTotal >= 500) earned.add('philanthropist');
-
-    // Generosidade Recorrente: junta destinatários de presentes de moedas
-    // E de Presente Surpresa, para contar quantos jogadores DIFERENTES já
-    // foram presenteados por este jogador, no total.
-    const surpriseRes = await fetch(`${supabaseUrl}/rest/v1/coin_transactions?player_name=eq.${encodeURIComponent(name)}&reason=like.Presente%20Surpresa%20para*&select=reason`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const surpriseRows = await surpriseRes.json();
-    if(Array.isArray(surpriseRows)){
-      surpriseRows.forEach(r=>{
-        const match = (r.reason||'').match(/Presente Surpresa para (.+?):/);
-        if(match) recipients.add(match[1]);
-      });
-    }
-    if(recipients.size >= 5) earned.add('recurring_giver');
-  } catch(e){ /* ignora silenciosamente */ }
-
-  try{
-    const playerRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=max_coins_reached,all_in_count,total_daily_claims,best_daily_streak`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const playerRows = await playerRes.json();
-    if(Array.isArray(playerRows) && playerRows[0]){
-      if((playerRows[0].max_coins_reached||0) >= 1000) earned.add('investor');
-      if((playerRows[0].all_in_count||0) >= 1) earned.add('no_fear');
-      if((playerRows[0].total_daily_claims||0) >= 3) earned.add('daily_starter');
-      if((playerRows[0].total_daily_claims||0) >= 7) earned.add('daily_week');
-      if((playerRows[0].total_daily_claims||0) >= 20) earned.add('early_riser');
-      if((playerRows[0].best_daily_streak||0) >= 31) earned.add('daily_month_streak');
-    }
-  } catch(e){ /* ignora silenciosamente */ }
-
-  try{
-    // Coruja Noturna: reclamou o bónus diário entre meia-noite e as 5h (só uma vez já basta).
-    // Insone: o mesmo, mas em pelo menos 3 dias DIFERENTES (upgrade da anterior).
-    const nightRes = await fetch(`${supabaseUrl}/rest/v1/coin_transactions?player_name=eq.${encodeURIComponent(name)}&reason=like.Bônus%20diário*&select=created_at`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const nightRows = await nightRes.json();
-    if(Array.isArray(nightRows)){
-      const nightDates = new Set();
-      nightRows.forEach(t=>{
-        const dt = new Date(t.created_at);
-        if(dt.getHours() >= 0 && dt.getHours() < 5) nightDates.add(dt.toISOString().slice(0,10));
-      });
-      if(nightDates.size >= 1) earned.add('night_owl');
-      if(nightDates.size >= 3) earned.add('insomniac');
-    }
-  } catch(e){ /* ignora silenciosamente */ }
-
-  try{
-    // Madrugador: importou um set no MESMO DIA em que o torneio foi criado, em 3 torneios diferentes.
-    const importRes = await fetch(`${supabaseUrl}/rest/v1/activity_log?actor_name=eq.${encodeURIComponent(name)}&category=eq.sorteio&action=like.Importou%20um%20set*&select=created_at`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const importRows = await importRes.json();
-    if(Array.isArray(importRows) && importRows.length && allRows){
-      const importDates = new Set(importRows.map(l => new Date(l.created_at).toISOString().slice(0,10)));
-      let sameDayCount = 0;
-      allRows.forEach(r=>{
-        const tDate = new Date(r.created_at).toISOString().slice(0,10);
-        if(importDates.has(tDate)) sameDayCount++;
-      });
-      if(sameDayCount >= 3) earned.add('early_bird');
-    }
-  } catch(e){ /* ignora silenciosamente */ }
-
-  try{
-    // Voz Ativa: os votos de tier são apagados a cada torneio novo, por isso
-    // conta-se a partir do registo de auditoria (permanente) em vez da
-    // tabela de votos em si.
-    const votePattern = encodeURIComponent('Votou*no tier*');
-    const voteRes = await fetch(`${supabaseUrl}/rest/v1/activity_log?actor_name=eq.${encodeURIComponent(name)}&category=eq.loja&action=like.${votePattern}&select=id`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const voteRows = await voteRes.json();
-    if(Array.isArray(voteRows) && voteRows.length >= 5) earned.add('active_voice');
-  } catch(e){ /* ignora silenciosamente */ }
-
-  try{
-    // Popular: recebeu presentes de pelo menos 3 jogadores diferentes.
-    const giftsRecRes = await fetch(`${supabaseUrl}/rest/v1/gifts?to_name=eq.${encodeURIComponent(name)}&select=from_name`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const giftsRecRows = await giftsRecRes.json();
-    if(Array.isArray(giftsRecRows)){
-      const distinctGivers = new Set(giftsRecRows.map(g=>g.from_name));
-      if(distinctGivers.size >= 3) earned.add('popular');
-    }
-  } catch(e){ /* ignora silenciosamente */ }
-
-  try{
-    // Trocador Compulsivo: pediu reroll pelo menos 5 vezes (qualquer status).
-    const rerollRes = await fetch(`${supabaseUrl}/rest/v1/reroll_requests?player_name=eq.${encodeURIComponent(name)}&select=id`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const rerollRows = await rerollRes.json();
-    if(Array.isArray(rerollRows) && rerollRows.length >= 5) earned.add('compulsive_rerolls');
-  } catch(e){ /* ignora silenciosamente */ }
-
-  try{
-    // Leiloeiro: venceu pelo menos um leilão concluído.
-    const auctionPattern = encodeURIComponent(`*${name}*`);
-    const auctionRes = await fetch(`${supabaseUrl}/rest/v1/auctions?status=eq.concluded&winner_name=ilike.${auctionPattern}&select=id&limit=1`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const auctionRows = await auctionRes.json();
-    if(Array.isArray(auctionRows) && auctionRows.length >= 1) earned.add('auctioneer');
-  } catch(e){ /* ignora silenciosamente */ }
-
-  try{
-    // Rei do Pote / Bilhete Dourado: precisa de olhar para as rodadas da
-    // Loteria que este jogador venceu, e para cada uma, quantos bilhetes
-    // tinha nessa rodada específica.
-    const wonPattern = encodeURIComponent(`*${name}*`);
-    const wonRoundsRes = await fetch(`${supabaseUrl}/rest/v1/lottery_rounds?status=eq.concluded&winner_name=ilike.${wonPattern}&select=id,pot`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const wonRounds = await wonRoundsRes.json();
-    if(Array.isArray(wonRounds) && wonRounds.length){
-      if(wonRounds.some(r => (r.pot||0) >= 150)) earned.add('pot_king');
-
-      for(const round of wonRounds){
-        const ticketsRes = await fetch(`${supabaseUrl}/rest/v1/lottery_tickets?round_id=eq.${round.id}&buyer_name=eq.${encodeURIComponent(name)}&select=ticket_count`, {headers: sbAuthHeaders(supabaseAnonKey)});
-        const ticketsRows = await ticketsRes.json();
-        const totalTickets = Array.isArray(ticketsRows) ? ticketsRows.reduce((s,t)=>s+(t.ticket_count||0), 0) : 0;
-        if(totalTickets === 1){ earned.add('golden_ticket'); break; }
+  tasks.push((async () => {
+    try{
+      const predRes = await fetch(`${supabaseUrl}/rest/v1/predictions?predictor_name=eq.${encodeURIComponent(name)}&select=correct,created_at&order=created_at.asc`, {headers: sbAuthHeaders(supabaseAnonKey)});
+      const predRows = await predRes.json();
+      if(Array.isArray(predRows)){
+        const resolved = predRows.filter(p=>p.correct !== null);
+        if(resolved.filter(p=>p.correct===true).length >= 10) earned.add('sharp_bettor');
+        // Apostador Nato: alguma vez teve 3 palpites certos SEGUIDOS (ordem cronológica).
+        let run = 0, bestRun = 0;
+        resolved.forEach(p=>{ run = p.correct ? run+1 : 0; bestRun = Math.max(bestRun, run); });
+        if(bestRun >= 3) earned.add('lucky_streak_bettor');
       }
-    }
-  } catch(e){ /* ignora silenciosamente */ }
+    } catch(e){ /* ignora silenciosamente */ }
+  })());
 
+  tasks.push((async () => {
+    try{
+      // "ilike" (sem diferenciar maiúsculas/minúsculas) para apanhar tanto o texto
+      // atual ("Jackpot 5x!") como o texto antigo de quando tínhamos o jackpot
+      // progressivo ("JACKPOT PROGRESSIVO", em maiúsculas) — histórico incluído.
+      const jackpotRes = await fetch(`${supabaseUrl}/rest/v1/coin_transactions?player_name=eq.${encodeURIComponent(name)}&reason=ilike.*jackpot*&select=id&limit=1`, {headers: sbAuthHeaders(supabaseAnonKey)});
+      const jackpotRows = await jackpotRes.json();
+      if(Array.isArray(jackpotRows) && jackpotRows.length >= 1) earned.add('lucky_strike');
+    } catch(e){ /* ignora silenciosamente */ }
+  })());
+
+  tasks.push((async () => {
+    try{
+      // Voz do Povo: já venceu a votação de Apelido da Semana pelo menos uma vez
+      // (procura no registo de auditoria, onde fica registado quando é apurado).
+      const pattern = encodeURIComponent(`*de ${name} venceu a vota*`);
+      const voiceRes = await fetch(`${supabaseUrl}/rest/v1/activity_log?category=eq.jogadores&action=ilike.${pattern}&select=id&limit=1`, {headers: sbAuthHeaders(supabaseAnonKey)});
+      const voiceRows = await voiceRes.json();
+      if(Array.isArray(voiceRows) && voiceRows.length >= 1) earned.add('voice_of_the_people');
+    } catch(e){ /* ignora silenciosamente */ }
+  })());
+
+  tasks.push((async () => {
+    try{
+      const giftsRes = await fetch(`${supabaseUrl}/rest/v1/gifts?from_name=eq.${encodeURIComponent(name)}&select=amount,to_name`, {headers: sbAuthHeaders(supabaseAnonKey)});
+      const giftsRows = await giftsRes.json();
+      const recipients = new Set();
+      let coinTotal = 0;
+      if(Array.isArray(giftsRows)){
+        giftsRows.forEach(g=>{
+          coinTotal += (g.amount||0);
+          if(g.to_name) recipients.add(g.to_name);
+        });
+      }
+      if(coinTotal >= 500) earned.add('philanthropist');
+
+      // Generosidade Recorrente: junta destinatários de presentes de moedas
+      // E de Presente Surpresa, para contar quantos jogadores DIFERENTES já
+      // foram presenteados por este jogador, no total.
+      const surpriseRes = await fetch(`${supabaseUrl}/rest/v1/coin_transactions?player_name=eq.${encodeURIComponent(name)}&reason=like.Presente%20Surpresa%20para*&select=reason`, {headers: sbAuthHeaders(supabaseAnonKey)});
+      const surpriseRows = await surpriseRes.json();
+      if(Array.isArray(surpriseRows)){
+        surpriseRows.forEach(r=>{
+          const match = (r.reason||'').match(/Presente Surpresa para (.+?):/);
+          if(match) recipients.add(match[1]);
+        });
+      }
+      if(recipients.size >= 5) earned.add('recurring_giver');
+    } catch(e){ /* ignora silenciosamente */ }
+  })());
+
+  tasks.push((async () => {
+    try{
+      const playerRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=max_coins_reached,all_in_count,total_daily_claims,best_daily_streak`, {headers: sbAuthHeaders(supabaseAnonKey)});
+      const playerRows = await playerRes.json();
+      if(Array.isArray(playerRows) && playerRows[0]){
+        if((playerRows[0].max_coins_reached||0) >= 1000) earned.add('investor');
+        if((playerRows[0].all_in_count||0) >= 1) earned.add('no_fear');
+        if((playerRows[0].total_daily_claims||0) >= 3) earned.add('daily_starter');
+        if((playerRows[0].total_daily_claims||0) >= 7) earned.add('daily_week');
+        if((playerRows[0].total_daily_claims||0) >= 20) earned.add('early_riser');
+        if((playerRows[0].best_daily_streak||0) >= 31) earned.add('daily_month_streak');
+      }
+    } catch(e){ /* ignora silenciosamente */ }
+  })());
+
+  tasks.push((async () => {
+    try{
+      // Coruja Noturna: reclamou o bónus diário entre meia-noite e as 5h (só uma vez já basta).
+      // Insone: o mesmo, mas em pelo menos 3 dias DIFERENTES (upgrade da anterior).
+      const nightRes = await fetch(`${supabaseUrl}/rest/v1/coin_transactions?player_name=eq.${encodeURIComponent(name)}&reason=like.Bônus%20diário*&select=created_at`, {headers: sbAuthHeaders(supabaseAnonKey)});
+      const nightRows = await nightRes.json();
+      if(Array.isArray(nightRows)){
+        const nightDates = new Set();
+        nightRows.forEach(t=>{
+          const dt = new Date(t.created_at);
+          if(dt.getHours() >= 0 && dt.getHours() < 5) nightDates.add(dt.toISOString().slice(0,10));
+        });
+        if(nightDates.size >= 1) earned.add('night_owl');
+        if(nightDates.size >= 3) earned.add('insomniac');
+      }
+    } catch(e){ /* ignora silenciosamente */ }
+  })());
+
+  tasks.push((async () => {
+    try{
+      // Madrugador: importou um set no MESMO DIA em que o torneio foi criado, em 3 torneios diferentes.
+      const importRes = await fetch(`${supabaseUrl}/rest/v1/activity_log?actor_name=eq.${encodeURIComponent(name)}&category=eq.sorteio&action=like.Importou%20um%20set*&select=created_at`, {headers: sbAuthHeaders(supabaseAnonKey)});
+      const importRows = await importRes.json();
+      if(Array.isArray(importRows) && importRows.length && allRows){
+        const importDates = new Set(importRows.map(l => new Date(l.created_at).toISOString().slice(0,10)));
+        let sameDayCount = 0;
+        allRows.forEach(r=>{
+          const tDate = new Date(r.created_at).toISOString().slice(0,10);
+          if(importDates.has(tDate)) sameDayCount++;
+        });
+        if(sameDayCount >= 3) earned.add('early_bird');
+      }
+    } catch(e){ /* ignora silenciosamente */ }
+  })());
+
+  tasks.push((async () => {
+    try{
+      // Voz Ativa: os votos de tier são apagados a cada torneio novo, por isso
+      // conta-se a partir do registo de auditoria (permanente) em vez da
+      // tabela de votos em si.
+      const votePattern = encodeURIComponent('Votou*no tier*');
+      const voteRes = await fetch(`${supabaseUrl}/rest/v1/activity_log?actor_name=eq.${encodeURIComponent(name)}&category=eq.loja&action=like.${votePattern}&select=id`, {headers: sbAuthHeaders(supabaseAnonKey)});
+      const voteRows = await voteRes.json();
+      if(Array.isArray(voteRows) && voteRows.length >= 5) earned.add('active_voice');
+    } catch(e){ /* ignora silenciosamente */ }
+  })());
+
+  tasks.push((async () => {
+    try{
+      // Popular: recebeu presentes de pelo menos 3 jogadores diferentes.
+      const giftsRecRes = await fetch(`${supabaseUrl}/rest/v1/gifts?to_name=eq.${encodeURIComponent(name)}&select=from_name`, {headers: sbAuthHeaders(supabaseAnonKey)});
+      const giftsRecRows = await giftsRecRes.json();
+      if(Array.isArray(giftsRecRows)){
+        const distinctGivers = new Set(giftsRecRows.map(g=>g.from_name));
+        if(distinctGivers.size >= 3) earned.add('popular');
+      }
+    } catch(e){ /* ignora silenciosamente */ }
+  })());
+
+  tasks.push((async () => {
+    try{
+      // Trocador Compulsivo: pediu reroll pelo menos 5 vezes (qualquer status).
+      const rerollRes = await fetch(`${supabaseUrl}/rest/v1/reroll_requests?player_name=eq.${encodeURIComponent(name)}&select=id`, {headers: sbAuthHeaders(supabaseAnonKey)});
+      const rerollRows = await rerollRes.json();
+      if(Array.isArray(rerollRows) && rerollRows.length >= 5) earned.add('compulsive_rerolls');
+    } catch(e){ /* ignora silenciosamente */ }
+  })());
+
+  tasks.push((async () => {
+    try{
+      // Leiloeiro: venceu pelo menos um leilão concluído.
+      const auctionPattern = encodeURIComponent(`*${name}*`);
+      const auctionRes = await fetch(`${supabaseUrl}/rest/v1/auctions?status=eq.concluded&winner_name=ilike.${auctionPattern}&select=id&limit=1`, {headers: sbAuthHeaders(supabaseAnonKey)});
+      const auctionRows = await auctionRes.json();
+      if(Array.isArray(auctionRows) && auctionRows.length >= 1) earned.add('auctioneer');
+    } catch(e){ /* ignora silenciosamente */ }
+  })());
+
+  tasks.push((async () => {
+    try{
+      // Rei do Pote / Bilhete Dourado: precisa de olhar para as rodadas da
+      // Loteria que este jogador venceu, e para cada uma, quantos bilhetes
+      // tinha nessa rodada específica.
+      const wonPattern = encodeURIComponent(`*${name}*`);
+      const wonRoundsRes = await fetch(`${supabaseUrl}/rest/v1/lottery_rounds?status=eq.concluded&winner_name=ilike.${wonPattern}&select=id,pot`, {headers: sbAuthHeaders(supabaseAnonKey)});
+      const wonRounds = await wonRoundsRes.json();
+      if(Array.isArray(wonRounds) && wonRounds.length){
+        if(wonRounds.some(r => (r.pot||0) >= 150)) earned.add('pot_king');
+
+        const totals = await Promise.all(wonRounds.map(async round => {
+          const ticketsRes = await fetch(`${supabaseUrl}/rest/v1/lottery_tickets?round_id=eq.${round.id}&buyer_name=eq.${encodeURIComponent(name)}&select=ticket_count`, {headers: sbAuthHeaders(supabaseAnonKey)});
+          const ticketsRows = await ticketsRes.json();
+          return Array.isArray(ticketsRows) ? ticketsRows.reduce((s,t)=>s+(t.ticket_count||0), 0) : 0;
+        }));
+        if(totals.some(t => t === 1)) earned.add('golden_ticket');
+      }
+    } catch(e){ /* ignora silenciosamente */ }
+  })());
+
+  await Promise.all(tasks);
   return earned;
 }
 
@@ -3047,3 +3141,134 @@ async function countEventX1Alerts(supabaseUrl, supabaseAnonKey, eventId, name){
     return rows.filter(r => r.status === 'pending' || (r.status === 'reported' && r.reported_by !== name)).length;
   } catch(e){ return 0; }
 }
+
+// ---------- Escolha livre: lista de Pokémon para os jogadores escolherem (viewer.html) ----------
+// COPIADO À MÃO de torneio_showdown.html (o gestor não carrega este ficheiro): SPECIES_CLAUSE_EXCEPTIONS e
+// getBaseSpecies. A "espécie base" é tudo antes do 1.º hífen (Tauros-Paldea-Blaze -> Tauros), com exceções onde o
+// hífen faz parte do nome. Duas formas da mesma espécie não podem estar no mesmo time.
+const SPECIES_CLAUSE_EXCEPTIONS = {
+  'Porygon-Z': 'Porygon-Z',
+  'Ho-Oh': 'Ho-Oh',
+  'Jangmo-o': 'Jangmo-o',
+  'Hakamo-o': 'Hakamo-o',
+  'Kommo-o': 'Kommo-o'
+};
+function getBaseSpecies(name){
+  if(SPECIES_CLAUSE_EXCEPTIONS[name]) return SPECIES_CLAUSE_EXCEPTIONS[name];
+  const idx = name.indexOf('-');
+  return idx === -1 ? name : name.slice(0, idx);
+}
+
+// Pools de Pokémon por tier (só nomes) — dados/tier-pools.json, gerado a partir do TIER_DATA do gestor.
+// Devolve { pools:{tier:[nomes]}, alias:{tier:outroTier} } ou null se o ficheiro não carregar.
+let _tierPoolsPromise = null;
+function fetchTierPools(){
+  if(!_tierPoolsPromise){
+    _tierPoolsPromise = fetch('dados/tier-pools.json').then(r => r.ok ? r.json() : null).catch(() => null);
+  }
+  return _tierPoolsPromise;
+}
+
+// Nomes entre os quais se pode escolher uma escolha livre. Torneio de evento: espécies da região da semana (só a
+// forma original, como no gestor); torneio normal: a pool legal do tier. null = não há lista (não carregou).
+function freePickCandidates(pools, tier, eventInfo){
+  if(eventInfo && eventInfo.region){
+    return getEventRegionSpeciesNames(eventInfo.region).filter(n => isSpeciesAllowedInEventRegion(n, eventInfo.region));
+  }
+  if(!pools || !pools.pools) return null;
+  const key = (pools.alias && pools.alias[tier]) || tier;
+  return pools.pools[key] || null;
+}
+
+// Para cada nome: {state:'ok'} | {state:'taken', by, how:'random'|'free'} (de OUTRO jogador) |
+// {state:'own', how, species:true|undefined} (já está no time deste jogador, exato ou a mesma espécie).
+// Mesmas regras do gestor (revalidateAllFreePicks): nome exato único em todo o torneio; uma espécie por time.
+// `draws` = data.draws (índice do jogador -> {random:[{mon}], free:[{name}]}); slotIdx = escolha livre a trocar.
+function freePickAvailability(draws, players, pIdx, slotIdx, names){
+  const taken = {}, ownSpecies = {};
+  Object.keys(draws || {}).forEach(k => {
+    const d = draws[k] || {}, who = players[+k], mine = String(k) === String(pIdx);
+    (d.random || []).forEach(r => {
+      if(!r || !r.mon) return;
+      taken[r.mon.toLowerCase()] = { by: who, how: 'random' };
+      if(mine) ownSpecies[getBaseSpecies(r.mon)] = 'random';
+    });
+    (d.free || []).forEach((f, i) => {
+      if(!f || !f.name || (mine && i === slotIdx)) return;   // a escolha que se está a trocar não conta
+      taken[f.name.toLowerCase()] = { by: who, how: 'free' };
+      if(mine) ownSpecies[getBaseSpecies(f.name)] = 'free';
+    });
+  });
+  const me = players[pIdx], out = {};
+  names.forEach(n => {
+    const t = taken[n.toLowerCase()];
+    if(t) out[n] = t.by === me ? { state:'own', how:t.how } : { state:'taken', by:t.by, how:t.how };
+    else if(ownSpecies[getBaseSpecies(n)]) out[n] = { state:'own', how:ownSpecies[getBaseSpecies(n)], species:true };
+    else out[n] = { state:'ok' };
+  });
+  return out;
+}
+
+// ---------- Mural de comentários nos perfis ----------
+// Cada jogador pode deixar UM comentário por dia no perfil de cada outro (unique target+autor+dia na BD). O autor e o
+// dono do perfil apagam; o organizador modera no gestor. Sem moedas nem XP (para não haver farming). Se a tabela
+// ainda não existir (SQL por correr) as funções devolvem {available:false} e o perfil continua a funcionar.
+const PROFILE_COMMENT_MAX = 200;
+function profileCommentDay(){ return new Date().toISOString().slice(0, 10); }   // dia UTC, como o bónus diário e o quadro do evento
+
+async function fetchProfileComments(supabaseUrl, supabaseAnonKey, targetName){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/profile_comments?target_name=eq.${encodeURIComponent(targetName)}&select=id,created_at,author_name,body,day&order=created_at.desc&limit=100`, { headers: sbAuthHeaders(supabaseAnonKey) });
+    if(!res.ok) return { available:false, rows:[] };
+    return { available:true, rows: await res.json() };
+  } catch(e){ return { available:false, rows:[] }; }
+}
+
+// Devolve {ok} ou {ok:false, reason:'empty'|'toolong'|'self'|'already'|'unavailable'|'error'}
+async function postProfileComment(supabaseUrl, supabaseAnonKey, targetName, authorName, text){
+  const body = String(text || '').replace(/\s+/g, ' ').trim();
+  if(!body) return { ok:false, reason:'empty' };
+  if(body.length > PROFILE_COMMENT_MAX) return { ok:false, reason:'toolong' };
+  if(!targetName || !authorName || targetName === authorName) return { ok:false, reason:'self' };
+  let res;
+  try{
+    res = await fetch(`${supabaseUrl}/rest/v1/profile_comments`, {
+      method:'POST',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), { 'Content-Type':'application/json', 'Prefer':'return=minimal' }),
+      body: JSON.stringify([{ target_name: targetName, author_name: authorName, body, day: profileCommentDay() }])
+    });
+  } catch(e){ return { ok:false, reason:'error' }; }
+  if(res.status === 409) return { ok:false, reason:'already' };
+  if(res.status === 404) return { ok:false, reason:'unavailable' };
+  if(!res.ok) return { ok:false, reason:'error' };
+  logActivity(supabaseUrl, supabaseAnonKey, 'jogador', authorName, 'perfil', `Comentou no perfil de ${targetName}`);
+  return { ok:true };
+}
+
+async function deleteProfileComment(supabaseUrl, supabaseAnonKey, id){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/profile_comments?id=eq.${encodeURIComponent(id)}`, { method:'DELETE', headers: sbAuthHeaders(supabaseAnonKey) });
+    return res.ok;
+  } catch(e){ return false; }
+}
+
+// ---------- Leitura leve dos torneios ----------
+// Os torneios guardam os sorteios (`draws`: os sets importados) no mesmo JSON dos resultados, e isso é ~85 % do peso
+// (hoje ~84 KB de 99 KB, a crescer ~14 KB por torneio). As páginas que só precisam de RESULTADOS (conquistas, loja...)
+// leem só os campos pequenos. Devolve linhas no formato de sempre: { id, tier, status, created_at, data:{...} }.
+// NÃO usar onde se precisa dos sorteios — aí `data.draws` não existe. Dependem dos sorteios: aggregatePlayerPokemon,
+// aggregateNicknames, computeMatchPathAchievements ("Nomeador Criativo") e por isso computeAllAchievements,
+// computeGlobalAchievementStats e computeIconicTeam (estatísticas, hall da fama, perfil, conquistas, viewer).
+// Hoje só a loja usa esta leitura (só precisa de tier/estado dos torneios). Testado contra os dados reais.
+async function fetchTournamentRowsLite(supabaseUrl, supabaseAnonKey){
+  const cols = 'id,tier,status,created_at,featured_match_title,featured_match_replay_path,'
+    + 'd_name:data->name,d_tier:data->tier,d_players:data->players,d_matches:data->matches,d_champion:data->champion,d_event:data->event,d_double:data->doubleElim';
+  const res = await fetch(`${supabaseUrl}/rest/v1/tournaments?select=${cols}&order=created_at.desc`, { headers: sbAuthHeaders(supabaseAnonKey) });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  return (await res.json()).map(r => ({
+    id: r.id, tier: r.tier, status: r.status, created_at: r.created_at,
+    featured_match_title: r.featured_match_title, featured_match_replay_path: r.featured_match_replay_path,
+    data: { name: r.d_name, tier: r.d_tier, players: r.d_players || [], matches: r.d_matches || [], champion: r.d_champion || null, event: r.d_event || undefined, doubleElim: r.d_double || undefined }
+  }));
+}
+

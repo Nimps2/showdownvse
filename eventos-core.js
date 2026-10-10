@@ -58,6 +58,20 @@ const EventCore = (function(){
     return ctx;
   }
 
+  // Recarrega tudo o que `load` trouxe, MANTENDO o mesmo objeto ctx (a página guarda coisas nele, ex. playerNames).
+  async function refresh(ctx){
+    const fresh = await load(ctx.ev, ctx.me);
+    Object.keys(fresh).forEach(k => { ctx[k] = fresh[k]; });
+    return ctx;
+  }
+  // "Impressão digital" do que se vê no ecrã: se não mudou, a página nem se redesenha.
+  function signature(ctx){
+    const tour = ctx.tournaments.map(t => t.id + ':' + t.status + ':' + ((t.data && t.data.matches) || []).map(m => m.winner || '').join(',')).join('|');
+    const board = (ctx.board.messages || []).map(m => m.id).join(',') + '/' + (ctx.board.reactions || []).map(r => r.id + r.emoji).join(',');
+    const x1 = (ctx.x1 || []).map(r => [r.id, r.status, r.replay_path || '', r.reported_winner || ''].join(':')).join(',');
+    return [tour, ctx.claims.length, ctx.tx.length, ctx.gifts.length, ctx.lottery.length, ctx.nick.length, ctx.preds.length, board, x1].join('#');
+  }
+
   async function loadBoard(ev){
     const m = await getJsonStatus(`event_messages?event_id=eq.${enc(ev.id)}&select=id,created_at,author_name,body,day&order=created_at.desc&limit=400`);
     if(!m.ok) return { available:false, messages:[], reactions:[] };
@@ -309,7 +323,7 @@ const EventCore = (function(){
   // entretanto, a resposta vem vazia e devolvemos 'changed' (o ecrã recarrega).
   const X1_DEAD = ['declined', 'cancelled'];
   const x1 = {
-    MAX_PER_WEEK: 3,
+    MAX_PER_WEEK: 5,   // desafios enviados por jogador por semana (só do lado do cliente; os textos leem daqui)
     sentThisWeek(ctx){ return ctx.x1.filter(r => r.challenger_name === ctx.me && r.week === ctx.ev.current_week && !X1_DEAD.includes(r.status)); },
     quota(ctx){ const sent = x1.sentThisWeek(ctx); return { used: sent.length, max: x1.MAX_PER_WEEK, left: Math.max(0, x1.MAX_PER_WEEK - sent.length), opponents: new Set(sent.map(r => r.opponent_name)) }; },
     // Devolve null se pode enviar, ou o motivo: 'noweek' | 'self' | 'noname' | 'quota' | 'dup'
@@ -456,6 +470,42 @@ const EventCore = (function(){
       logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', 'Deixou um cartão-postal no quadro do evento');
       return { ok:true };
     },
+    // Atualização "ao vivo" (a cada ~5 s com o quadro aberto): só pede o que é NOVO desde a última vez (mensagens e
+    // reações com created_at >= o mais recente que já temos; repetidos filtram-se pelo id). Apagados (moderação) e
+    // reações retiradas não aparecem assim, por isso de 6 em 6 chamadas faz uma recarga completa.
+    // Devolve { changed, newIds } — newIds = postais novos de OUTROS jogadores (para o destaque no ecrã).
+    async live(ctx){
+      const b = ctx.board;
+      if(!b || !b.available) return { changed:false, newIds:[] };
+      const before = new Set(b.messages.map(m => m.id));
+      const sig = b.messages.length + '/' + b.reactions.length + '/' + b.reactions.map(r => r.id + r.emoji).join(',');
+      const n = (b._n || 0) + 1;
+      if(n % 6 === 0){
+        const full = await loadBoard(ctx.ev);
+        if(!full.available) return { changed:false, newIds:[] };
+        full._n = n; ctx.board = full;
+      } else {
+        // 30 s de margem para trás: apanha linhas gravadas "fora de ordem"; os repetidos filtram-se pelo id.
+        const since = arr => { const t = arr.reduce((mx, x) => Math.max(mx, Date.parse(x.created_at) || 0), 0); return enc(new Date(Math.max(0, (t || 0) - 30000)).toISOString()); };
+        const [m, r] = await Promise.all([
+          getJsonStatus(`event_messages?event_id=eq.${enc(ctx.ev.id)}&created_at=gte.${since(b.messages)}&select=id,created_at,author_name,body,day&order=created_at.desc&limit=100`),
+          getJsonStatus(`event_message_reactions?event_id=eq.${enc(ctx.ev.id)}&created_at=gte.${since(b.reactions)}&select=id,message_id,reactor_name,emoji,created_at&limit=500`)
+        ]);
+        if(!m.ok || !r.ok){ b._n = n; return { changed:false, newIds:[] }; }
+        m.data.forEach(x => { if(!b.messages.some(y => y.id === x.id)) b.messages.unshift(x); });
+        r.data.forEach(x => {
+          if(b.reactions.some(y => y.id === x.id)) return;
+          // trocar de emoji = apagar + inserir: a nova substitui a anterior da mesma pessoa
+          b.reactions = b.reactions.filter(y => !(y.message_id === x.message_id && y.reactor_name === x.reactor_name));
+          b.reactions.push(x);
+        });
+        b._n = n;
+      }
+      const after = ctx.board;
+      const sig2 = after.messages.length + '/' + after.reactions.length + '/' + after.reactions.map(r => r.id + r.emoji).join(',');
+      const newIds = after.messages.filter(m => !before.has(m.id) && m.author_name !== ctx.me).map(m => m.id);
+      return { changed: sig !== sig2, newIds };
+    },
     // Reagir = toggle: mesmo emoji tira a reação; outro emoji troca (apaga e insere).
     async react(ctx, messageId, emoji){
       const msg = ctx.board.messages.find(m => m.id === messageId);
@@ -489,5 +539,5 @@ const EventCore = (function(){
     hasPostedToday(ctx){ return ctx.board.messages.some(m => m.author_name === ctx.me && m.day === utcDay()); }
   };
 
-  return { init, load, computeWeekStats, measure, expandMissions, evaluate, totals, levelFor, ranking, claimMission, syncLevelRewards, board, x1, utcDay };
+  return { init, load, refresh, signature, computeWeekStats, measure, expandMissions, evaluate, totals, levelFor, ranking, claimMission, syncLevelRewards, board, x1, utcDay };
 })();

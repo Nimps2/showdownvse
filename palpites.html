@@ -6,8 +6,9 @@
 <title>Palpiteiro — Torneio Showdown - VSE</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=20261012a">
 <style>
 .match-bet-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;}
 .match-bet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
@@ -105,7 +106,7 @@
   <div class="footer-note">Aposta moedas em quem vai vencer cada partida — acerta e ganha o dobro, erra e perde a aposta. Jogos de sorte como a roleta agora ficam na <a class="nav-link" href="loja.html">loja</a>. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="showdown-utils.js"></script>
+<script src="showdown-utils.js?v=20261012a"></script>
 <script>
 initTheme();
 document.getElementById('nicknamePrizeLabel').textContent = NICKNAME_VOTE_PRIZE;
@@ -206,15 +207,18 @@ let playerCoins = 0;
 
 async function init(){
   try{
+    // Torneios e perfis ao mesmo tempo (eram um a seguir ao outro).
+    const profilesPromise = fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=id,tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows = await res.json();
     setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
 
+    // (estas duas pagam moedas: ficam uma a seguir à outra, para não haver duas escritas de saldo ao mesmo tempo)
     await resolvePendingPredictions(rows);
     await resolvePendingChampionBets(SUPABASE_URL, SUPABASE_ANON_KEY, rows);
 
-    const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const profiles = await profilesPromise;
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
@@ -228,11 +232,8 @@ async function init(){
 
     await loadMyPredictions();
     renderOpenMatches();
-    await renderMyPredictions();
-    await renderRanking();
-    await renderChampionBetCard();
-    await renderChampionBetHistory();
-    await renderNicknameVoteCard();
+    // Cada cartão desenha-se no seu próprio contentor e consulta a BD à parte: em paralelo.
+    await Promise.all([renderMyPredictions(), renderRanking(), renderChampionBetCard(), renderChampionBetHistory(), renderNicknameVoteCard()]);
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
   }

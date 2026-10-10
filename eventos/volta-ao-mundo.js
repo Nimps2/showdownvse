@@ -109,7 +109,7 @@
     if(cat === 'badges')      return `<span class="vm-prev-emoji">${c.emoji}</span>`;
     if(cat === 'titles')      return `<span class="vm-prev-text">${escapeHtml(c.text)}</span>`;
     if(cat === 'frames')      return frameEffectPreviewHtml(c.effect);
-    if(cat === 'nameEffects') return `<span class="vm-prev-name" style="${c.css}">Abc</span>`;
+    if(cat === 'nameEffects') return `<span class="vm-prev-name ${nameFxClass(c)}">Abc</span>`;
     if(cat === 'backgrounds') return `<div class="shop-swatch" style="background:${c.css};"></div>`;
     return '';
   }
@@ -257,7 +257,7 @@
     <section class="vm-route-card">${routeHtml(ctx)}</section>
     <section class="vm-section">${levelsHtml(ctx)}</section>
     <section class="vm-section vm-ranking"><h3 class="vm-h3">🏆 Ranking do evento</h3>${rankingHtml(ctx, api)}</section>
-    ${api.x1On ? '' : '<div class="vm-soon">⚔️ Os desafios x1 (até 3 por semana) chegam em breve — vão trazer mais missões.</div>'}`;
+    ${api.x1On ? '' : `<div class="vm-soon">⚔️ Os desafios x1 (até ${EventCore.x1.MAX_PER_WEEK} por semana) chegam em breve — vão trazer mais missões.</div>`}`;
   }
 
   function rankingHtml(ctx){
@@ -445,7 +445,7 @@
       <div class="vm-x1send-top"><b>Novo desafio</b><span class="vm-x1quota${q.left === 0 ? ' full' : ''}">${q.used}/${q.max} esta semana</span></div>
       <div class="vm-x1send-row"><select id="x1Opponent" ${q.left === 0 ? 'disabled' : ''}>${opts}</select>
         <button class="vm-send" onclick="doX1Send(this)" ${q.left === 0 ? 'disabled' : ''}>⚔️ Desafiar</button></div>
-      ${q.left === 0 ? '<small>Já enviaste os 3 desafios desta semana — voltas a poder na próxima.</small>' : '<small>Máximo 3 desafios enviados por semana, a jogadores diferentes. Recusados e cancelados não contam.</small>'}
+      ${q.left === 0 ? `<small>Já enviaste os ${q.max} desafios desta semana — voltas a poder na próxima.</small>` : `<small>Máximo ${q.max} desafios enviados por semana, a jogadores diferentes. Recusados e cancelados não contam.</small>`}
     </div>`;
     const rows = ctx.x1;
     const forMe = rows.filter(r2 => (r2.status === 'pending' && r2.opponent_name === ctx.me) || (r2.status === 'reported' && r2.reported_by !== ctx.me && (r2.challenger_name === ctx.me || r2.opponent_name === ctx.me)));
@@ -475,7 +475,7 @@
   const fmtDay = day => new Date(day + 'T00:00:00Z').toLocaleDateString('pt-PT', { day:'numeric', month:'short', timeZone:'UTC' });
   const stampDate = day => new Date(day + 'T00:00:00Z').toLocaleDateString('pt-PT', { day:'2-digit', month:'short', timeZone:'UTC' }).replace('.', '').toUpperCase();
 
-  function postcardHtml(m, ctx){
+  function postcardHtml(m, ctx, fresh){
     const mine = m.author_name === ctx.me;
     const h = hashCode(m.id);
     const rot = ((h % 45) / 10 - 2.2).toFixed(1);          // -2.2º .. +2.2º
@@ -486,7 +486,7 @@
     const mineR = (m.reactions || []).find(r => r.reactor_name === ctx.me);
     const reacts = mod.board.emojis.map((e, i) =>
       `<button class="vm-react${mineR && mineR.emoji === e ? ' on' : ''}" ${mine ? 'disabled' : ''} onclick="doReact('${safeId(m.id)}', ${i})" title="${mine ? 'Não podes reagir ao teu postal' : 'Reagir'}">${e}${counts[e] ? `<b>${counts[e]}</b>` : ''}</button>`).join('');
-    return `<article class="vm-postcard${mine ? ' mine' : ''}" data-region="${mod.weeks[wk - 1].region}" style="--rot:${rot}deg">
+    return `<article class="vm-postcard${mine ? ' mine' : ''}${fresh && fresh.has(m.id) ? ' vm-new' : ''}" data-region="${mod.weeks[wk - 1].region}" style="--rot:${rot}deg">
       <span class="vm-tape ${tape}"></span>
       <div class="vm-pc-stamp"><span class="vm-pc-emoji">${emoji}</span><span class="vm-pc-postmark">${stampDate(m.day)}</span></div>
       <p class="vm-pc-text">${escapeHtml(m.body)}</p>
@@ -513,17 +513,17 @@
           <div class="vm-compose-foot"><span class="vm-count" id="evCount">${draft.length}/${EventCore.board.MAX_LEN}</span><button class="vm-send" onclick="doPostCard(this)">📮 Enviar postal</button></div>
         </div></div>`;
     const todayHtml = todayMsgs.length
-      ? `<div class="vm-wall">${todayMsgs.map(m => postcardHtml(m, ctx)).join('')}</div>`
+      ? `<div class="vm-wall">${todayMsgs.map(m => postcardHtml(m, ctx, api.ui.fresh)).join('')}</div>`
       : '<div class="vm-wall-empty">Ainda ninguém escreveu hoje. Sê o primeiro a deixar um postal!</div>';
     const older = days.filter(d => d.day !== today).slice(0, 7);
     const olderHtml = older.length ? `<h3 class="vm-h3">🗂 Dias anteriores</h3>` + older.map(d => {
       const key = 'd' + d.day;
       return `<details class="vm-day" ${api.ui.open[key] ? 'open' : ''} ontoggle="evToggle('${key}', this.open)">
         <summary><b>${fmtDay(d.day)}</b><small>${d.messages.length} postal${d.messages.length === 1 ? '' : 'is'}</small></summary>
-        <div class="vm-wall">${d.messages.map(m => postcardHtml(m, ctx)).join('')}</div>
+        <div class="vm-wall">${d.messages.map(m => postcardHtml(m, ctx, api.ui.fresh)).join('')}</div>
       </details>`;
     }).join('') : '';
-    return `<div class="vm-board-intro"><h3 class="vm-h3">📮 Quadro de postais</h3><p>Um postal por dia para todos os viajantes. Reage aos dos outros — também conta para as missões!</p></div>
+    return `<div class="vm-board-intro"><h3 class="vm-h3">📮 Quadro de postais <span class="vm-live" title="O quadro atualiza sozinho — os postais e reações dos outros aparecem em poucos segundos"><i></i>ao vivo</span></h3><p>Um postal por dia para todos os viajantes. Reage aos dos outros — também conta para as missões!</p></div>
       ${compose}
       <h3 class="vm-h3">☀️ Hoje · ${fmtDay(today)}</h3>
       ${todayHtml}

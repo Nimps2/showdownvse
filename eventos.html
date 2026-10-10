@@ -6,8 +6,9 @@
 <title>Eventos — Torneio Showdown - VSE</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@600;700&family=Special+Elite&family=Caveat:wght@500;600&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=20261012a">
 <style>
 /* O visual de cada evento vive em eventos/<slug>.css (carregado dinamicamente). */
 #eventRoot{min-height:240px;}
@@ -63,8 +64,8 @@
   <div class="footer-note">As missões são calculadas a partir do que já fizeste no site — clica em "Reclamar" para receber os prémios.</div>
 </div>
 
-<script src="showdown-utils.js?v=20261011c"></script>
-<script src="eventos-core.js?v=20261011c"></script>
+<script src="showdown-utils.js?v=20261012a"></script>
+<script src="eventos-core.js?v=20261012a"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -164,7 +165,7 @@ let myProfile = {};
 let activeTab = 'passaporte';
 const X1_ENABLED = true;  // desafios x1 ligados (se a tabela x1_challenges não existir, o separador some sozinho)
 // Estado só de interface (sobrevive aos re-desenhos): sanfonas abertas, rascunho do postal, animações já feitas.
-const ui = { open: {}, draft: '', justClaimed: null, routeAnimated: false, intro: true };
+const ui = { open: {}, draft: '', justClaimed: null, routeAnimated: false, intro: true, fresh: new Set() };
 const evApi = () => ({ ui, x1On: X1_ENABLED && !!ctx && ctx.x1Available !== false });
 // Separadores visíveis: o dos x1 só existe se estiver ligado e a tabela existir.
 const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && evApi().x1On));
@@ -172,7 +173,7 @@ const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && 
 // Versão dos ficheiros do evento (showdown-utils.js, eventos-core.js e eventos/<slug>.*): MUDAR (aqui e nas
 // duas <script src="...?v="> lá em cima) sempre que algum deles mudar, para o browser não misturar ficheiros
 // novos com versões antigas em cache.
-const EV_ASSET_VERSION = '20261011c';
+const EV_ASSET_VERSION = '20261012a';
 
 // Carrega o CSS e o JS do evento ativo (cada evento tem o seu par). O slug só pode ter a-z, 0-9 e "-".
 function loadEventAssets(slug){
@@ -202,7 +203,7 @@ async function init(){
   const root = document.getElementById('eventRoot');
   // Depois de uma atualização do site, o browser pode ainda ter em cache o showdown-utils.js antigo
   // (sem as funções do evento). Em vez de um erro genérico, diz o que fazer.
-  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || !getCosmeticById('frame_vm_esquadrilha')){
+  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || typeof nameFxClass !== 'function' || !getCosmeticById('frame_vm_esquadrilha')){
     setStatus(false, 'Ficheiros antigos em cache.');
     root.innerHTML = '<div class="card"><div class="empty-state">O teu browser ainda tem ficheiros antigos do site em cache. Faz <b>Ctrl+F5</b> para atualizar e abre esta página outra vez.</div></div>';
     return;
@@ -263,6 +264,7 @@ function renderAll(){
 
 function switchEventTab(tab){
   activeTab = tab;
+  liveLast.board = 0; liveLast.x1 = 0;   // ao abrir o separador, atualiza logo (no próximo ciclo)
   const tabs = visibleTabs();
   document.querySelectorAll('#eventRoot .ev-tab').forEach((b, i) => b.classList.toggle('active', tabs[i].key === tab));
   document.querySelectorAll('#eventRoot .shop-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
@@ -345,7 +347,7 @@ async function doX1Send(btn){
   if(r.ok){
     showCelebrationToast(`⚔️ Desafio enviado a <b>${escapeHtml(opp)}</b>! Quando aceitar, combinem o jogo no Showdown.`, 5000);
   } else {
-    const msg = r.reason === 'quota' ? 'Já enviaste os 3 desafios desta semana.'
+    const msg = r.reason === 'quota' ? `Já enviaste os ${EventCore.x1.MAX_PER_WEEK} desafios desta semana.`
       : r.reason === 'dup' ? 'Já desafiaste este jogador esta semana — escolhe outro.'
       : r.reason === 'noweek' ? 'Os desafios abrem com o torneio da Semana 1.'
       : r.reason === 'self' ? 'Não te podes desafiar a ti próprio.'
@@ -399,14 +401,61 @@ async function doX1Replay(id, btn){
   renderAll();
 }
 
-// Enquanto o separador dos x1 está aberto, vai ver de 30 em 30 s se há novidades (sem apagar o que estás a escrever).
-setInterval(async () => {
-  if(document.hidden || !ctx || activeTab !== 'x1' || !evApi().x1On) return;
-  const before = JSON.stringify(ctx.x1.map(r => [r.id, r.status]));
-  await EventCore.x1.refresh(ctx);
-  const focusInside = document.activeElement && document.activeElement.closest && document.activeElement.closest('.vm-x1send');
-  if(!focusInside && JSON.stringify(ctx.x1.map(r => [r.id, r.status])) !== before) renderAll();
-}, 30000);
+// ---------- Atualização ao vivo ----------
+// Quadro: de 5 em 5 s (só com o separador aberto); x1: de 10 em 10 s (idem); o resto do evento (ranking, missões,
+// torneios...): de 45 em 45 s. Só pede dados com a página visível, só desenha se algo mudou e NUNCA enquanto estás
+// a escrever num campo (fica pendente e desenha quando saíres dele).
+const LIVE_EVERY = { board: 5000, x1: 10000, all: 45000 };
+const liveLast = { board: 0, x1: 0, all: Date.now() };
+let liveBusy = false, livePending = false;
+
+function typingInEvent(){
+  const a = document.activeElement;
+  return !!(a && ['TEXTAREA', 'INPUT', 'SELECT'].includes(a.tagName) && document.getElementById('eventRoot').contains(a));
+}
+function liveRender(){
+  if(typingInEvent()){ livePending = true; return; }
+  livePending = false;
+  renderAll();
+}
+document.addEventListener('focusout', () => setTimeout(() => { if(livePending && !typingInEvent()) liveRender(); }, 300));
+function markFresh(ids){
+  ids.forEach(id => { ui.fresh.add(id); setTimeout(() => ui.fresh.delete(id), 7000); });
+}
+
+async function liveTick(){
+  if(document.hidden || !ctx || liveBusy) return;
+  if(livePending && !typingInEvent()) liveRender();   // rede de segurança caso o "focusout" não tenha chegado
+  const now = Date.now();
+  liveBusy = true;
+  try{
+    let changed = false;
+    if(now - liveLast.all >= LIVE_EVERY.all){
+      liveLast.all = liveLast.board = liveLast.x1 = now;
+      const sig = EventCore.signature(ctx), had = new Set(ctx.board.messages.map(m => m.id));
+      await EventCore.refresh(ctx);
+      markFresh(ctx.board.messages.filter(m => !had.has(m.id) && m.author_name !== loggedInPlayerName).map(m => m.id));
+      changed = EventCore.signature(ctx) !== sig;
+    } else {
+      if(activeTab === 'quadro' && now - liveLast.board >= LIVE_EVERY.board){
+        liveLast.board = now;
+        const r = await EventCore.board.live(ctx);
+        markFresh(r.newIds);
+        if(r.changed) changed = true;
+      }
+      if(activeTab === 'x1' && evApi().x1On && now - liveLast.x1 >= LIVE_EVERY.x1){
+        liveLast.x1 = now;
+        const sig = EventCore.signature(ctx);
+        await EventCore.x1.refresh(ctx);
+        if(EventCore.signature(ctx) !== sig) changed = true;
+      }
+    }
+    if(changed) liveRender();
+  } catch(e){ /* sem rede por um momento: tenta outra vez no próximo ciclo */ }
+  finally { liveBusy = false; }
+}
+setInterval(liveTick, 2500);
+document.addEventListener('visibilitychange', () => { if(!document.hidden) liveTick(); });
 
 // Garante os cosméticos de todos os níveis já atingidos e avisa dos novos.
 async function syncRewards(){
