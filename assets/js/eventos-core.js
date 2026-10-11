@@ -41,7 +41,7 @@ const EventCore = (function(){
   async function load(ev, me){
     const tournaments = await fetchEventTournaments(URL_, KEY_, ev.id);
     const since = enc(ev.starts_at || ev.created_at);
-    const [claims, tx, gifts, lottery, nick, preds, board, x1data] = await Promise.all([
+    const [claims, tx, gifts, lottery, nick, preds, board, x1data, shopData] = await Promise.all([
       getJson(`event_claims?event_id=eq.${enc(ev.id)}&select=id,player_name,mission_id,xp,currency,coins`, []),
       getJson(`coin_transactions?player_name=eq.${enc(me)}&created_at=gte.${since}&select=reason,amount,created_at`, []),
       getJson(`gifts?from_name=eq.${enc(me)}&created_at=gte.${since}&select=to_name,amount,created_at`, []),
@@ -49,9 +49,10 @@ const EventCore = (function(){
       getJson(`activity_log?actor_name=eq.${enc(me)}&actor_type=eq.jogador&category=eq.palpite&action=like.${enc('Votou*Apelido da Semana')}&created_at=gte.${since}&select=created_at`, []),
       getJson(`predictions?predictor_name=eq.${enc(me)}&created_at=gte.${since}&select=tournament_id,match_id,predicted_winner,created_at`, []),
       loadBoard(ev),
-      loadX1(ev, me)
+      loadX1(ev, me),
+      loadShop(ev, me)
     ]);
-    const ctx = { ev, me, tournaments, claims, tx, gifts, lottery, nick, preds, board, x1: x1data.rows, x1Available: x1data.available };
+    const ctx = { ev, me, tournaments, claims, tx, gifts, lottery, nick, preds, board, x1: x1data.rows, x1Available: x1data.available, shop: shopData };
     ctx.weekStats = computeWeekStats(ctx);
     ctx.windows = computeWindows(ctx);
     ctx.claimedIds = new Set(claims.filter(c => c.player_name === me).map(c => c.mission_id));
@@ -69,7 +70,19 @@ const EventCore = (function(){
     const tour = ctx.tournaments.map(t => t.id + ':' + t.status + ':' + ((t.data && t.data.matches) || []).map(m => m.winner || '').join(',')).join('|');
     const board = (ctx.board.messages || []).map(m => m.id).join(',') + '/' + (ctx.board.reactions || []).map(r => r.id + r.emoji).join(',');
     const x1 = (ctx.x1 || []).map(r => [r.id, r.status, r.replay_path || '', r.reported_winner || ''].join(':')).join(',');
-    return [tour, ctx.claims.length, ctx.tx.length, ctx.gifts.length, ctx.lottery.length, ctx.nick.length, ctx.preds.length, board, x1].join('#');
+    const shop = ctx.shop ? ctx.shop.purchases.map(p => p.item_id).join(',') : '';
+    return [tour, ctx.claims.length, ctx.tx.length, ctx.gifts.length, ctx.lottery.length, ctx.nick.length, ctx.preds.length, board, x1, shop].join('#');
+  }
+
+  // Loja de Milhas: o que se vende (event_shop_items, com o PREÇO) e as compras deste jogador (event_purchases).
+  // Se as tabelas ainda não existem (SQL por correr) ou não há itens, {available:false} e o separador não aparece.
+  async function loadShop(ev, me){
+    const [items, purchases] = await Promise.all([
+      getJsonStatus(`event_shop_items?event_slug=eq.${enc(ev.slug)}&select=item_id,cost,sort_order&order=sort_order.asc`),
+      getJsonStatus(`event_purchases?event_id=eq.${enc(ev.id)}&player_name=eq.${enc(me)}&select=item_id,cost,created_at`)
+    ]);
+    if(!items.ok || !purchases.ok) return { available:false, items:[], purchases:[] };
+    return { available: items.data.length > 0, items: items.data, purchases: purchases.data };
   }
 
   async function loadBoard(ev){
@@ -226,10 +239,12 @@ const EventCore = (function(){
   }
 
   // ---------- XP, níveis, ranking ----------
+  // `miles` = Milhas GANHAS (é o que conta para o ranking); `balance` = ganhas menos gastas na loja (só se conhecem as compras do próprio jogador).
   function totals(ctx, name){
-    let xp = 0, miles = 0, coins = 0;
+    let xp = 0, miles = 0, coins = 0, spent = 0;
     ctx.claims.forEach(c => { if(c.player_name === name){ xp += c.xp || 0; miles += c.currency || 0; coins += c.coins || 0; } });
-    return { xp, miles, coins };
+    if(name === ctx.me && ctx.shop) ctx.shop.purchases.forEach(p => { spent += p.cost || 0; });
+    return { xp, miles, coins, spent, balance: miles - spent };
   }
 
   // levels = [{level, xp (acumulado), cosmeticId}] por ordem crescente.
@@ -545,5 +560,30 @@ const EventCore = (function(){
     hasPostedToday(ctx){ return ctx.board.messages.some(m => m.author_name === ctx.me && m.day === utcDay()); }
   };
 
-  return { init, load, refresh, signature, computeWeekStats, measure, expandMissions, evaluate, totals, levelFor, ranking, claimMission, syncLevelRewards, board, x1, utcDay };
+  // ---------- Loja de Milhas ----------
+  // A compra é UMA função da base de dados (buy_event_item): bloqueia o jogador, confere o saldo (Milhas ganhas - gastas), regista a
+  // compra e junta o cosmético ao perfil. O preço vem da base (event_shop_items), nunca do site. Exige o bilhete de login do jogador.
+  // Devolve {ok, balance, cost} ou {ok:false, reason: 'insufficient'|'alreadyowned'|'closed'|'noitem'|'auth'|'busy'|'error', balance?}
+  const buysInFlight = new Set();
+  const shop = {
+    async buy(ctx, itemId){
+      if(buysInFlight.has(itemId)) return { ok:false, reason:'busy' };
+      buysInFlight.add(itemId);
+      try{
+        const r = await dbFunction(URL_, KEY_, 'buy_event_item', { p_name: ctx.me, p_event: ctx.ev.id, p_item: itemId, p_token: getPlayerToken(ctx.me) });
+        if(!r.ok || !r.data) return { ok:false, reason:'error' };
+        if(r.data.reason === 'auth'){ handleSessionExpired(); return { ok:false, reason:'auth' }; }
+        if(!r.data.ok) return { ok:false, reason: r.data.reason || 'error', balance: r.data.balance };
+        const c = getCosmeticById(itemId);
+        logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', `Comprou na loja de Milhas: "${c ? c.name : itemId}" (${r.data.cost} milhas)`);
+        const fresh = await loadShop(ctx.ev, ctx.me);
+        ctx.shop = fresh;
+        return { ok:true, balance: r.data.balance, cost: r.data.cost };
+      } finally {
+        buysInFlight.delete(itemId);
+      }
+    }
+  };
+
+  return { init, load, refresh, signature, computeWeekStats, measure, expandMissions, evaluate, totals, levelFor, ranking, claimMission, syncLevelRewards, board, x1, shop, utcDay };
 })();

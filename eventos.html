@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@600;700&family=Special+Elite&family=Caveat:wght@500;600&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012f">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261012g">
 <style>
 /* O visual de cada evento vive em eventos/<slug>.css (carregado dinamicamente). */
 #eventRoot{min-height:240px;}
@@ -64,8 +64,8 @@
   <div class="footer-note">As missões são calculadas a partir do que já fizeste no site — clica em "Reclamar" para receber os prémios.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261012f"></script>
-<script src="assets/js/eventos-core.js?v=20261012f"></script>
+<script src="assets/js/showdown-utils.js?v=20261012g"></script>
+<script src="assets/js/eventos-core.js?v=20261012g"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -169,12 +169,12 @@ const X1_ENABLED = true;  // desafios x1 ligados (se a tabela x1_challenges não
 const ui = { open: {}, draft: '', justClaimed: null, routeAnimated: false, intro: true, fresh: new Set() };
 const evApi = () => ({ ui, x1On: X1_ENABLED && !!ctx && ctx.x1Available !== false });
 // Separadores visíveis: o dos x1 só existe se estiver ligado e a tabela existir.
-const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && evApi().x1On));
+const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && evApi().x1On) || (t.needs === 'shop' && !!ctx && !!ctx.shop && ctx.shop.available));
 
 // Versão dos ficheiros do evento (showdown-utils.js, eventos-core.js e eventos/<slug>.*): MUDAR (aqui e nas
 // duas <script src="...?v="> lá em cima) sempre que algum deles mudar, para o browser não misturar ficheiros
 // novos com versões antigas em cache.
-const EV_ASSET_VERSION = '20261012f';
+const EV_ASSET_VERSION = '20261012g';
 
 // Carrega o CSS e o JS do evento ativo (cada evento tem o seu par). O slug só pode ter a-z, 0-9 e "-".
 function loadEventAssets(slug){
@@ -204,7 +204,7 @@ async function init(){
   const root = document.getElementById('eventRoot');
   // Depois de uma atualização do site, o browser pode ainda ter em cache o showdown-utils.js antigo
   // (sem as funções do evento). Em vez de um erro genérico, diz o que fazer.
-  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || typeof nameFxClass !== 'function' || !getCosmeticById('frame_vm_esquadrilha')){
+  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || !EventCore.shop || typeof nameFxClass !== 'function' || !getCosmeticById('frame_vm_esquadrilha') || !getCosmeticById('badge_vm_bilhete')){
     setStatus(false, 'Ficheiros antigos em cache.');
     root.innerHTML = '<div class="card"><div class="empty-state">O teu browser ainda tem ficheiros antigos do site em cache. Faz <b>Ctrl+F5</b> para atualizar e abre esta página outra vez.</div></div>';
     return;
@@ -335,6 +335,32 @@ async function doReact(messageId, emojiIdx){
   const emoji = mod.board.emojis[emojiIdx];
   if(!emoji) return;
   await EventCore.board.react(ctx, messageId, emoji);
+  renderAll();
+}
+
+// ---------- Loja de Milhas ----------
+async function doShopBuy(itemId, btn){
+  const it = ctx.shop.items.find(x => x.item_id === itemId);
+  const c = getCosmeticById(itemId);
+  if(!it || !c) return;
+  if(!confirm(`Comprar "${c.name}" por ${mod.currency.emoji} ${it.cost} ${mod.currency.name}?\n\nFica no teu perfil para sempre (equipa-o em Perfil → Customizar). As ${mod.currency.name} gastas não voltam.`)) return;
+  if(btn) btn.disabled = true;
+  const r = await EventCore.shop.buy(ctx, itemId);
+  if(r.ok){
+    if(!(myProfile.ownedCosmetics || []).includes(itemId)) myProfile.ownedCosmetics = (myProfile.ownedCosmetics || []).concat([itemId]);
+    showCelebrationToast(`🛍️ Comprado: <b>${escapeHtml(c.name)}</b><br><span style="font-size:11px;opacity:0.9;">Equipa-o em Perfil → Customizar · sobram ${mod.currency.emoji} ${r.balance}</span>`, 6500);
+    renderAll();
+    if(mod.celebrate) mod.celebrate(document.querySelector(`.vm-shop-item[data-item="${itemId}"]`), 'claim');
+    return;
+  }
+  if(r.reason === 'auth' || r.reason === 'busy') return;   // 'auth': a página recarrega sozinha para entrar outra vez
+  const msg = r.reason === 'insufficient' ? `Não tens ${mod.currency.name} suficientes${r.balance != null ? ` (tens ${r.balance})` : ''}.`
+    : r.reason === 'alreadyowned' ? 'Já tens esta lembrança.'
+    : r.reason === 'closed' ? 'A loja fechou: o evento já terminou.'
+    : r.reason === 'noitem' ? 'Esta lembrança já não está à venda.'
+    : 'Não foi possível comprar agora. Tenta outra vez.';
+  alert(msg);
+  try{ await EventCore.refresh(ctx); } catch(e){ /* sem rede: mantém o que já temos */ }
   renderAll();
 }
 

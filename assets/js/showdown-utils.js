@@ -359,14 +359,22 @@ const COSMETIC_CATALOG = {
     { id:'bg_aurora',   name:'Aurora Animada', price:220, css:'linear-gradient(270deg,#4fd8d0,#a56bf0,#f0b64f,#4fd8d0)', color:'#a56bf0', multiColor:['#4fd8d0','#a56bf0','#f0b64f'] },
     // Itens de EVENTO (eventOnly): price 0, nunca à venda — só se ganham ao subir de nível no evento.
     { id:'bg_vm_ceu',   name:'Céu de Viagem', price:0, css:'linear-gradient(135deg,#4fa8f0,#f0b64f)', color:'#4fa8f0', eventOnly:'volta-ao-mundo' },
-    { id:'bg_vm_porsol', name:'Pôr do Sol Mundial', price:0, css:'linear-gradient(270deg,#f0b64f,#e0607a,#a56bf0,#f0b64f)', color:'#e0607a', multiColor:['#f0b64f','#e0607a','#a56bf0'], eventOnly:'volta-ao-mundo' }
+    { id:'bg_vm_porsol', name:'Pôr do Sol Mundial', price:0, css:'linear-gradient(270deg,#f0b64f,#e0607a,#a56bf0,#f0b64f)', color:'#e0607a', multiColor:['#f0b64f','#e0607a','#a56bf0'], eventOnly:'volta-ao-mundo' },
+    // Lembranças da LOJA DE MILHAS do evento (também eventOnly, price 0): o preço em Milhas vive na base de dados (tabela event_shop_items).
+    { id:'bg_vm_kanto',  name:'Neon de Kanto',    price:0, css:'linear-gradient(135deg,#ff4fa3,#5b3df0)', color:'#ff4fa3', eventOnly:'volta-ao-mundo' },
+    { id:'bg_vm_johto',  name:'Dourado de Johto', price:0, css:'linear-gradient(135deg,#f0d36b,#c98a2b)', color:'#f0d36b', eventOnly:'volta-ao-mundo' },
+    { id:'bg_vm_hoenn',  name:'Vulcão de Hoenn',  price:0, css:'linear-gradient(135deg,#ff7a3d,#8f1d1d)', color:'#ff7a3d', eventOnly:'volta-ao-mundo' },
+    { id:'bg_vm_sinnoh', name:'Neve de Sinnoh',   price:0, css:'linear-gradient(135deg,#d7ecff,#6fa8e8)', color:'#9fd0ff', eventOnly:'volta-ao-mundo' }
   ],
   accents: [
     { id:'accent_default', name:'Ciano (padrão)', price:0,  color:'#4fd8d0' },
     { id:'accent_violet',  name:'Violeta',        price:30, color:'#a56bf0' },
     { id:'accent_amber',   name:'Âmbar',          price:30, color:'#f0b64f' },
     { id:'accent_rose',    name:'Rosa',           price:30, color:'#e0607a' },
-    { id:'accent_emerald', name:'Esmeralda',      price:50, color:'#5ed890' }
+    { id:'accent_emerald', name:'Esmeralda',      price:50, color:'#5ed890' },
+    // Lembranças da loja de Milhas (ver backgrounds).
+    { id:'accent_vm_ceu',   name:'Azul-Céu',     price:0, color:'#4fa8f0', eventOnly:'volta-ao-mundo' },
+    { id:'accent_vm_pista', name:'Luz de Pista', price:0, color:'#ffb347', eventOnly:'volta-ao-mundo' }
   ],
   // "Moldura do Avatar" já não é uma borda estática — agora é um EFEITO
   // ANIMADO à volta do avatar, colorido com a cor escolhida em "Cor da
@@ -405,7 +413,12 @@ const COSMETIC_CATALOG = {
     { id:'title_vm_campeao_kanto',  name:'Campeão de Kanto',  price:0, text:'🗼 Campeão de Kanto',  eventOnly:'volta-ao-mundo' },
     { id:'title_vm_campeao_johto',  name:'Campeão de Johto',  price:0, text:'🔔 Campeão de Johto',  eventOnly:'volta-ao-mundo' },
     { id:'title_vm_campeao_hoenn',  name:'Campeão de Hoenn',  price:0, text:'🌋 Campeão de Hoenn',  eventOnly:'volta-ao-mundo' },
-    { id:'title_vm_campeao_sinnoh', name:'Campeão de Sinnoh', price:0, text:'❄️ Campeão de Sinnoh', eventOnly:'volta-ao-mundo' }
+    { id:'title_vm_campeao_sinnoh', name:'Campeão de Sinnoh', price:0, text:'❄️ Campeão de Sinnoh', eventOnly:'volta-ao-mundo' },
+    // Lembranças da loja de Milhas (ver backgrounds).
+    { id:'title_vm_turista',    name:'Turista Profissional', price:0, text:'🗺️ Turista Profissional', eventOnly:'volta-ao-mundo' },
+    { id:'title_vm_carimbos',   name:'Caçador de Carimbos',  price:0, text:'🛂 Caçador de Carimbos',  eventOnly:'volta-ao-mundo' },
+    { id:'title_vm_comissario', name:'Chefe de Cabine',      price:0, text:'🧑‍✈️ Chefe de Cabine',   eventOnly:'volta-ao-mundo' },
+    { id:'title_vm_primeira',   name:'Primeira Classe',      price:0, text:'🥂 Primeira Classe',      eventOnly:'volta-ao-mundo' }
   ],
   badges: [
     { id:'badge_stall',   name:'Fã de Stall',   price:30, emoji:'🐌' },
@@ -419,7 +432,13 @@ const COSMETIC_CATALOG = {
     { id:'badge_vm_kanto',  name:'Selo de Kanto',  price:0, emoji:'🗼', eventOnly:'volta-ao-mundo' },
     { id:'badge_vm_johto',  name:'Selo de Johto',  price:0, emoji:'🔔', eventOnly:'volta-ao-mundo' },
     { id:'badge_vm_hoenn',  name:'Selo de Hoenn',  price:0, emoji:'🌋', eventOnly:'volta-ao-mundo' },
-    { id:'badge_vm_sinnoh', name:'Selo de Sinnoh', price:0, emoji:'❄️', eventOnly:'volta-ao-mundo' }
+    { id:'badge_vm_sinnoh', name:'Selo de Sinnoh', price:0, emoji:'❄️', eventOnly:'volta-ao-mundo' },
+    // Lembranças da loja de Milhas (ver backgrounds).
+    { id:'badge_vm_passaporte', name:'Passaporte Carimbado', price:0, emoji:'🛂', eventOnly:'volta-ao-mundo' },
+    { id:'badge_vm_mapa',       name:'Mapa-múndi',           price:0, emoji:'🗺️', eventOnly:'volta-ao-mundo' },
+    { id:'badge_vm_bussola',    name:'Bússola',              price:0, emoji:'🧭', eventOnly:'volta-ao-mundo' },
+    { id:'badge_vm_camera',     name:'Fotógrafo de Viagem',  price:0, emoji:'📸', eventOnly:'volta-ao-mundo' },
+    { id:'badge_vm_bilhete',    name:'Bilhete Dourado',      price:0, emoji:'🎫', eventOnly:'volta-ao-mundo' }
   ],
   features: [
     { id:'feature_custom_pagebg', name:'Fundo de perfil personalizado (foto)', price:120 },

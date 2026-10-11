@@ -111,6 +111,7 @@
     if(cat === 'frames')      return frameEffectPreviewHtml(c.effect);
     if(cat === 'nameEffects') return `<span class="vm-prev-name ${nameFxClass(c)}">Abc</span>`;
     if(cat === 'backgrounds') return `<div class="shop-swatch" style="background:${c.css};"></div>`;
+    if(cat === 'accents')     return `<div class="shop-swatch" style="background:${c.color};"></div>`;
     return '';
   }
 
@@ -298,7 +299,7 @@
       <div class="vm-xp-top">
         <span class="vm-xp-level">Nível ${lv.level}</span>
         <span class="vm-xp-num">${t.xp} XP${lv.next ? ' / ' + lv.next.xp : ''}</span>
-        <span class="vm-xp-miles">${mod.currency.emoji} ${t.miles} ${mod.currency.name}</span>
+        <span class="vm-xp-miles" title="${t.miles} ganhas${t.spent ? ' · ' + t.spent + ' gastas na loja' : ''}">${mod.currency.emoji} ${t.balance} ${mod.currency.name}</span>
       </div>
       <div class="vm-bar"><div style="width:${lv.pct}%"></div></div>
       <div class="vm-xp-next">${nextTxt}</div>
@@ -530,6 +531,53 @@
       ${olderHtml}`;
   }
 
+  // ---------- Separador: Loja do aeroporto (Milhas -> lembranças) ----------
+  // O que se vende e o PREÇO vêm da base (ctx.shop.items, tabela event_shop_items); aqui só se desenha. A compra é a
+  // função da base buy_event_item (EventCore.shop.buy, chamada por doShopBuy em eventos.html).
+  const SHOP_GROUPS = [
+    { cat:'badges',      label:'Emblemas',        icon:'🏷️' },
+    { cat:'accents',     label:'Cor de destaque', icon:'✨' },
+    { cat:'titles',      label:'Títulos',         icon:'✒️' },
+    { cat:'backgrounds', label:'Cor da moldura',  icon:'🎨' }
+  ];
+  function shopItemHtml(it, c, state, balance){
+    const sid = safeId(it.item_id), cur = mod.currency.emoji;
+    let action;
+    if(state === 'owned') action = '<div class="vm-shop-own">✔ Já tens</div>';
+    else if(state === 'cant') action = `<div class="vm-shop-need">Faltam ${it.cost - balance} ${cur}</div>`;
+    else action = `<button class="vm-shop-buy" onclick="doShopBuy('${sid}', this)">Comprar</button>`;
+    return `<div class="vm-shop-item ${state}" data-item="${sid}">
+      <div class="vm-shop-prev">${cosmeticPreview(it.item_id)}</div>
+      <div class="vm-shop-name">${escapeHtml(c.name)}</div>
+      <div class="vm-shop-cost">${cur} ${it.cost}</div>
+      ${action}
+    </div>`;
+  }
+  function renderShop(ctx, api){
+    const t = EventCore.totals(ctx, ctx.me);
+    const owned = new Set((typeof myProfile !== 'undefined' && myProfile && myProfile.ownedCosmetics) || []);
+    ctx.shop.purchases.forEach(p => owned.add(p.item_id));
+    const items = ctx.shop.items.filter(it => getCosmeticById(it.item_id));
+    const missing = ctx.shop.items.length - items.length;
+    const groups = SHOP_GROUPS.map(g => {
+      const list = items.filter(it => findCosmeticCategory(it.item_id) === g.cat);
+      if(!list.length) return '';
+      return `<section class="vm-section"><h3 class="vm-h3">${g.icon} ${g.label}</h3><div class="vm-shop-grid">${
+        list.map(it => shopItemHtml(it, getCosmeticById(it.item_id), owned.has(it.item_id) ? 'owned' : (t.balance >= it.cost ? 'can' : 'cant'), t.balance)).join('')
+      }</div></section>`;
+    }).join('');
+    return `<section class="vm-shop-head">
+        <div class="txt">
+          <h3 class="vm-h3">🛍️ Loja do aeroporto</h3>
+          <p>Troca as tuas ${mod.currency.name} por lembranças exclusivas da viagem. Só se compram aqui, ficam para sempre no teu perfil (equipa-as em <b>Perfil → Customizar</b>) e não se podem trocar nem pôr em leilão.</p>
+        </div>
+        <div class="vm-shop-bal"><span class="n">${mod.currency.emoji} ${t.balance}</span><span class="l">${mod.currency.name} para gastar</span></div>
+      </section>
+      ${groups}
+      ${missing ? '<div class="vm-soon">Há lembranças novas que só aparecem depois de atualizares a página (<b>Ctrl+F5</b>).</div>' : ''}
+      <div class="vm-soon">Ganhaste ${t.miles} ${mod.currency.name}${t.spent ? ` e gastaste ${t.spent}` : ''}. Quando o evento terminar, as ${mod.currency.name} que sobrarem convertem-se em moedas (2 ${mod.currency.name} = 🪙1).</div>`;
+  }
+
   // ---------- Celebração: confetti de ✈️ / ✨ à volta de um elemento ----------
   function celebrate(anchor, kind){
     if(prefersReducedMotion() || !anchor) return;
@@ -560,6 +608,7 @@
     tabs: [
       { key:'passaporte', icon:'🧭', label:'Passaporte', render: renderPassport },
       { key:'missoes',    icon:'🎯', label:'Missões',    render: renderMissions, badge: readyCount },
+      { key:'loja',       icon:'🛍️', label:'Loja',       render: renderShop, needs:'shop' },
       { key:'quadro',     icon:'📮', label:'Quadro',     render: renderBoard },
       { key:'x1',         icon:'⚔️', label:'x1',         render: renderX1, needs:'x1', badge: ctx => EventCore.x1.waitingOnMe(ctx) }
     ],
