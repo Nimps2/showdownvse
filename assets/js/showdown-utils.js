@@ -206,11 +206,72 @@ async function dbFunction(supabaseUrl, supabaseAnonKey, fn, args){
   }
 }
 
+// ---------- Sessão de login ("bilhete") ----------
+// Ao entrar com a password, a base de dados (função login_player) devolve um bilhete aleatório, válido 60 dias. Fica guardado neste browser
+// (player_token + player_token_name) e é enviado em tudo o que GASTA ou MOVE moedas (adjust_coins negativo, transfer_coins, buy_cosmetic_item):
+// a base só deixa gastar as moedas de um jogador a quem prova que é esse jogador (quando o interruptor security_flags.require_session está ligado).
+function getPlayerToken(name){
+  try{
+    if(!name || localStorage.getItem('player_token_name') !== name) return null;
+    return localStorage.getItem('player_token') || null;
+  } catch(e){ return null; }
+}
+function storePlayerToken(name, token){
+  try{ localStorage.setItem('player_token_name', name); localStorage.setItem('player_token', token || ''); } catch(e){ /* sem armazenamento */ }
+}
+// "Trocar jogador": esquece o bilhete aqui e apaga-o também na base de dados.
+function endPlayerSession(supabaseUrl, supabaseAnonKey){
+  let token = null;
+  try{
+    token = localStorage.getItem('player_token');
+    localStorage.removeItem('player_token'); localStorage.removeItem('player_token_name');
+  } catch(e){ /* sem armazenamento */ }
+  if(token) dbFunction(supabaseUrl, supabaseAnonKey, 'logout_player', { p_token: token });
+}
+// A base recusou por falta de bilhete válido (expirou, ou a password foi mudada): pede para entrar outra vez.
+let _sessionExpiredShown = false;
+function handleSessionExpired(){
+  if(_sessionExpiredShown) return;
+  _sessionExpiredShown = true;
+  try{ ['player_login_name','player_token','player_token_name'].forEach(k=>localStorage.removeItem(k)); } catch(e){ /* sem armazenamento */ }
+  alert('A tua sessão expirou. Vais ter de entrar outra vez com a tua password.');
+  location.reload();
+}
+// Quem já estava "entrado" só com o nome (antes dos bilhetes) tem de entrar uma vez com a password para receber o seu bilhete.
+(function purgeLoginsSemBilhete(){
+  try{
+    const n = localStorage.getItem('player_login_name');
+    if(n && localStorage.getItem('player_token_name') !== n) localStorage.removeItem('player_login_name');
+  } catch(e){ /* sem armazenamento */ }
+})();
+
 // Devolve {ok:true} ou {ok:false, reason:'notfound'|'wrongpass'|'network'}
-// O login é decidido DENTRO da base de dados (função check_login, ver o SQL mestre): as passwords ficam guardadas
-// como hash (bcrypt) numa tabela que a chave pública não consegue ler, por isso o browser nunca as vê.
-// Se a função ainda não existir (SQL por correr -> 404) usa o método antigo, para ninguém ficar de fora.
+// O login é decidido DENTRO da base de dados (função login_player, ver o SQL mestre): as passwords ficam guardadas
+// como hash (bcrypt) numa tabela que a chave pública não consegue ler, por isso o browser nunca as vê. Em caso de sucesso a base devolve o bilhete.
+// Se a função ainda não existir (SQL por correr -> 404) usa o método sem bilhete, para ninguém ficar de fora.
 async function verifyPlayerLogin(supabaseUrl, supabaseAnonKey, name, password){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/login_player`, {
+      method:'POST',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json'}),
+      body: JSON.stringify({ p_name: name, p_password: password })
+    });
+    if(res.status === 404){
+      const old = await verifyPlayerLoginNoSession(supabaseUrl, supabaseAnonKey, name, password);
+      if(old.ok) storePlayerToken(name, '');
+      return old;
+    }
+    if(!res.ok) return {ok:false, reason:'network'};
+    const r = await res.json();
+    if(r && r.status === 'ok' && r.token){ storePlayerToken(name, r.token); return {ok:true}; }
+    if(r && r.status === 'notfound') return {ok:false, reason:'notfound'};
+    return {ok:false, reason:'wrongpass'};
+  } catch(e){
+    return {ok:false, reason:'network'};
+  }
+}
+// Método sem bilhete (check_login, e em último caso a leitura antiga da password): só como reserva enquanto login_player não existe.
+async function verifyPlayerLoginNoSession(supabaseUrl, supabaseAnonKey, name, password){
   try{
     const res = await fetch(`${supabaseUrl}/rest/v1/rpc/check_login`, {
       method:'POST',
@@ -401,9 +462,10 @@ async function buyCosmetic(supabaseUrl, supabaseAnonKey, name, cosmeticId){
 // Compra atómica de um cosmético (função buy_cosmetic_item). Devolve {ok, reason} —
 // reason: 'insufficient' | 'alreadyowned' | 'notfound' | 'error'. O preço (com descontos) é calculado por quem chama.
 async function purchaseCosmeticAtomic(supabaseUrl, supabaseAnonKey, name, itemId, price, reason){
-  const r = await dbFunction(supabaseUrl, supabaseAnonKey, 'buy_cosmetic_item', { p_name:name, p_item:itemId, p_price:price, p_reason:reason });
+  const r = await dbFunction(supabaseUrl, supabaseAnonKey, 'buy_cosmetic_item', { p_name:name, p_item:itemId, p_price:price, p_reason:reason, p_token:getPlayerToken(name) });
   if(!r.ok || !r.data) return {ok:false, reason:'error'};
   if(r.data.ok) return {ok:true, balance:r.data.balance};
+  if(r.data.reason === 'auth'){ handleSessionExpired(); return {ok:false, reason:'error'}; }
   return {ok:false, reason: ['insufficient','alreadyowned','notfound'].includes(r.data.reason) ? r.data.reason : 'error'};
 }
 
@@ -956,9 +1018,10 @@ async function giftCoins(supabaseUrl, supabaseAnonKey, fromName, toName, amount)
   if(fromName === toName) return {ok:false, reason:'invalid'};
 
   // Uma só operação na base de dados: debita um, credita o outro, regista o histórico dos dois e o ranking de generosidade.
-  const r = await dbFunction(supabaseUrl, supabaseAnonKey, 'transfer_coins', { p_from:fromName, p_to:toName, p_amount:Math.round(amount) });
+  const r = await dbFunction(supabaseUrl, supabaseAnonKey, 'transfer_coins', { p_from:fromName, p_to:toName, p_amount:Math.round(amount), p_token:getPlayerToken(fromName) });
   if(!r.ok || !r.data) return {ok:false, reason:'error'};
   if(r.data.ok) return {ok:true};
+  if(r.data.reason === 'auth'){ handleSessionExpired(); return {ok:false, reason:'error'}; }
   return {ok:false, reason: ['insufficient','invalid'].includes(r.data.reason) ? r.data.reason : 'error'};
 }
 
@@ -1179,7 +1242,8 @@ async function fetchCoinTransactions(supabaseUrl, supabaseAnonKey, name, limit){
 // Antes disto o site lia o saldo e escrevia o novo valor: duas ações ao mesmo tempo apagavam-se uma à outra.
 async function adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, amount, reason){
   if(!name || !amount) return false;
-  const r = await dbFunction(supabaseUrl, supabaseAnonKey, 'adjust_coins', { p_name:name, p_delta:Math.round(amount), p_reason:reason || null, p_strict:true });
+  const r = await dbFunction(supabaseUrl, supabaseAnonKey, 'adjust_coins', { p_name:name, p_delta:Math.round(amount), p_reason:reason || null, p_strict:true, p_token:getPlayerToken(name) });
+  if(r.data && r.data.reason === 'auth') handleSessionExpired();
   return !!(r.ok && r.data && r.data.ok);
 }
 
