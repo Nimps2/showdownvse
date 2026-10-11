@@ -409,7 +409,9 @@ const COSMETIC_CATALOG = {
     { id:'frame_royal', name:'Florescer',     price:100, effect:'blossom' },
     { id:'frame_diamond', name:'Diamante Prismático', price:0, effect:'diamond', auctionOnly:true },
     { id:'frame_vm_rota', name:'Rota Aérea', price:0, effect:'plane', eventOnly:'volta-ao-mundo' },
-    { id:'frame_vm_esquadrilha', name:'Esquadrilha', price:0, effect:'fleet', eventOnly:'volta-ao-mundo' }
+    { id:'frame_vm_esquadrilha', name:'Esquadrilha', price:0, effect:'fleet', eventOnly:'volta-ao-mundo' },
+    // Lembrança PREMIUM da loja de Milhas (ver event_shop_items): balão de ar quente a dar a volta ao avatar.
+    { id:'frame_vm_balao', name:'Balão de Ar Quente', price:0, effect:'balloon', eventOnly:'volta-ao-mundo' }
   ],
   nameEffects: [
     { id:'effect_none',  name:'Nenhum',  price:0,  css:'' },
@@ -462,7 +464,10 @@ const COSMETIC_CATALOG = {
     { id:'badge_vm_mapa',       name:'Mapa-múndi',           price:0, emoji:'🗺️', eventOnly:'volta-ao-mundo' },
     { id:'badge_vm_bussola',    name:'Bússola',              price:0, emoji:'🧭', eventOnly:'volta-ao-mundo' },
     { id:'badge_vm_camera',     name:'Fotógrafo de Viagem',  price:0, emoji:'📸', eventOnly:'volta-ao-mundo' },
-    { id:'badge_vm_bilhete',    name:'Bilhete Dourado',      price:0, emoji:'🎫', eventOnly:'volta-ao-mundo' }
+    { id:'badge_vm_bilhete',    name:'Bilhete Dourado',      price:0, emoji:'🎫', eventOnly:'volta-ao-mundo' },
+    // Itens baratos (2.ª ronda da loja de Milhas): para quem tem poucas Milhas.
+    { id:'badge_vm_etiqueta',   name:'Etiqueta de Bagagem',  price:0, emoji:'🏷️', eventOnly:'volta-ao-mundo' },
+    { id:'badge_vm_bone',       name:'Boné de Viajante',     price:0, emoji:'🧢', eventOnly:'volta-ao-mundo' }
   ],
   features: [
     { id:'feature_custom_pagebg', name:'Fundo de perfil personalizado (foto)', price:120 },
@@ -663,6 +668,23 @@ function ensureAvatarFxStyles(){
     .avatar-fx-fleet span:nth-child(2)::before{top:9%;opacity:0.85;transform:translate(-50%,0) rotate(-90deg);}
     .avatar-fx-fleet span:nth-child(3)::before{top:16%;opacity:0.7;}
 
+    /* Balão de Ar Quente (evento Volta ao Mundo, loja de Milhas): um balão que dá a volta ao avatar e sobe e desce devagar. É UMA só peça (clip-path:
+       balão com listas na cor da moldura + pescoço + cesto castanho); o <span> ocupa a camada toda e RODA (como a Rota Aérea) e o balão roda ao
+       contrário à mesma velocidade para ficar sempre na vertical. */
+    @keyframes vseBalloonOrbit{to{transform:rotate(360deg);}}
+    @keyframes vseBalloonUpright{from{transform:translate(-50%,0) rotate(0deg);}to{transform:translate(-50%,0) rotate(-360deg);}}
+    @keyframes vseBalloonBob{0%,100%{top:1%;}50%{top:4%;}}
+    .avatar-fx-balloon span{top:0!important;left:0!important;width:100%;height:100%;animation:vseBalloonOrbit 18s linear infinite;animation-delay:0s!important;
+      filter:drop-shadow(0 0 3px color-mix(in srgb,var(--fx-color) 55%,transparent));}
+    .avatar-fx-balloon span::before{content:'';position:absolute;top:1%;left:50%;width:calc(var(--fx-gem,9px)*1.25);height:calc(var(--fx-gem,9px)*1.62);
+      transform:translate(-50%,0);
+      background:linear-gradient(#7b4f27,#7b4f27) 50% 100%/34% 21% no-repeat,
+        radial-gradient(circle at 34% 26%,rgba(255,255,255,0.55) 0,transparent 30%),
+        repeating-linear-gradient(90deg,var(--fx-color) 0 12%,color-mix(in srgb,var(--fx-color) 38%,#fff) 12% 24%);
+      clip-path:polygon(50.0% 1.5%,58.2% 2.1%,66.1% 3.6%,73.5% 6.1%,80.2% 9.5%,86.0% 13.6%,90.7% 18.5%,94.2% 23.8%,96.3% 29.5%,97.0% 35.4%,95.7% 39.4%,93.2% 43.5%,89.7% 47.5%,85.5% 51.5%,80.5% 55.6%,74.9% 59.6%,68.7% 63.7%,62.0% 67.7%,58.0% 76.9%,64.0% 76.9%,64.0% 96.9%,36.0% 96.9%,36.0% 76.9%,42.0% 76.9%,38.0% 67.7%,31.3% 63.7%,25.1% 59.6%,19.5% 55.6%,14.5% 51.5%,10.3% 47.5%,6.8% 43.5%,4.3% 39.4%,3.0% 35.4%,3.7% 29.5%,5.8% 23.8%,9.3% 18.5%,14.0% 13.6%,19.8% 9.5%,26.5% 6.1%,33.9% 3.6%,41.8% 2.1%);
+      animation:vseBalloonUpright 18s linear infinite,vseBalloonBob 3.4s ease-in-out infinite;}
+    @media (prefers-reduced-motion:reduce){.avatar-fx-balloon span,.avatar-fx-balloon span::before{animation:none!important;}}
+
     @keyframes vseFxHueRotate{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
     .avatar-fx-layer.avatar-fx-multicolor{animation:vseFxHueRotate 5s linear infinite;}
   `;
@@ -726,11 +748,11 @@ function nameEffectPreviewHtml(item, profile){
   return `<div class="shop-swatch" style="height:44px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg-panel);color:${color};font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:15px;"><span class="${nameFxClass(item)}">Abc</span></div>`;
 }
 
-const AVATAR_FX_COUNTS = { sparks:10, starry:6, blossom:5, diamond:4, plane:1, fleet:3 };
+const AVATAR_FX_COUNTS = { sparks:10, starry:6, blossom:5, diamond:4, plane:1, fleet:3, balloon:1 };
 // Efeitos que não usam os primeiros N ângulos da lista acima — o Diamante
 // quer as 4 gemas espalhadas pelos pontos cardeais (direita, baixo, esquerda,
 // cima), pela ordem em que o anel as "visita" ao rodar.
-const AVATAR_FX_ANGLE_OVERRIDES = { diamond:[0, 90, 180, 270], plane:[0], fleet:[0, 0, 0] };
+const AVATAR_FX_ANGLE_OVERRIDES = { diamond:[0, 90, 180, 270], plane:[0], fleet:[0, 0, 0], balloon:[0] };
 // Duração (s) do ciclo de cada efeito, para espaçar o atraso de cada partícula.
 const AVATAR_FX_PERIODS = { sparks:1.4, starry:2.4, blossom:3.6, diamond:4 };
 
@@ -750,7 +772,7 @@ function avatarFxParticlesHtml(effectType, radiusPct){
 }
 
 // effectColor: cor (hex) escolhida em "Cor da moldura". effectType: 'none' |
-// 'sparks' | 'starry' | 'blossom' | 'diamond' | 'plane' | 'fleet'. multiColor: true para a Aurora Animada,
+// 'sparks' | 'starry' | 'blossom' | 'diamond' | 'plane' | 'fleet' | 'balloon'. multiColor: true para a Aurora Animada,
 // faz o efeito ciclar de cor continuamente em vez de ficar fixo.
 function avatarHtml(name, photoUrl, sizePx, effectColor, effectType, multiColor){
   const size = sizePx || 44;

@@ -552,7 +552,8 @@
     { cat:'badges',      label:'Emblemas',        icon:'🏷️' },
     { cat:'accents',     label:'Cor de destaque', icon:'✨' },
     { cat:'titles',      label:'Títulos',         icon:'✒️' },
-    { cat:'backgrounds', label:'Cor da moldura',  icon:'🎨' }
+    { cat:'backgrounds', label:'Cor da moldura',  icon:'🎨' },
+    { cat:'frames',      label:'Molduras animadas', icon:'🖼️' }
   ];
   function shopItemHtml(it, c, state, balance){
     const sid = safeId(it.item_id), cur = mod.currency.emoji;
