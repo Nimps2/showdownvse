@@ -188,10 +188,28 @@ function sbAuthHeaders(supabaseAnonKey){
 }
 
 // Devolve {ok:true} ou {ok:false, reason:'notfound'|'wrongpass'|'network'}
-// Nota: a coluna "password_hash" na tabela players guarda a password em texto
-// simples (decisão deliberada — ver conversa sobre o botão "Revelar password"
-// no gestor). O nome da coluna ficou por compatibilidade, mas já não é um hash.
+// O login é decidido DENTRO da base de dados (função check_login, ver o SQL mestre): as passwords ficam guardadas
+// como hash (bcrypt) numa tabela que a chave pública não consegue ler, por isso o browser nunca as vê.
+// Se a função ainda não existir (SQL por correr -> 404) usa o método antigo, para ninguém ficar de fora.
 async function verifyPlayerLogin(supabaseUrl, supabaseAnonKey, name, password){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/check_login`, {
+      method:'POST',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json'}),
+      body: JSON.stringify({ p_name: name, p_password: password })
+    });
+    if(res.status === 404) return await verifyPlayerLoginLegacy(supabaseUrl, supabaseAnonKey, name, password);
+    if(!res.ok) return {ok:false, reason:'network'};
+    const r = await res.json();
+    if(r === 'ok') return {ok:true};
+    if(r === 'notfound') return {ok:false, reason:'notfound'};
+    return {ok:false, reason:'wrongpass'};
+  } catch(e){
+    return {ok:false, reason:'network'};
+  }
+}
+// Método antigo (password em texto simples em players.password_hash): só como reserva enquanto a função não existe.
+async function verifyPlayerLoginLegacy(supabaseUrl, supabaseAnonKey, name, password){
   try{
     const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=password_hash`, {
       headers: sbAuthHeaders(supabaseAnonKey)
@@ -199,7 +217,7 @@ async function verifyPlayerLogin(supabaseUrl, supabaseAnonKey, name, password){
     if(!res.ok) return {ok:false, reason:'network'};
     const rows = await res.json();
     if(!rows || !rows[0]) return {ok:false, reason:'notfound'};
-    if(password !== rows[0].password_hash) return {ok:false, reason:'wrongpass'};
+    if(!rows[0].password_hash || password !== rows[0].password_hash) return {ok:false, reason:'wrongpass'};
     return {ok:true};
   } catch(e){
     return {ok:false, reason:'network'};
