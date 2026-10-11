@@ -187,6 +187,28 @@ function sbAuthHeaders(supabaseAnonKey){
   return { 'apikey': supabaseAnonKey, 'Authorization': `Bearer ${supabaseAnonKey}` };
 }
 
+// ---------- Sprites dos Pokémon (imagens do próprio Showdown) ----------
+// Sprites "gen5" (pixel art 96x96, ~1 KB cada) servidos pelo Showdown: cobrem 532/532 dos Pokémon que o projeto usa (estudo e decisão em
+// docs/PROPOSTA_SPRITES.txt). Se a imagem não existir ou não carregar, esconde-se sozinha e fica só o texto. O id só tem [a-z0-9-], por isso é
+// seguro em atributos HTML. Usar tamanhos que dividam 96 (48, 32) para o pixel art não ficar esborratado.
+const POKE_SPRITE_BASE = 'https://play.pokemonshowdown.com/sprites/gen5/';
+const POKE_NOMES_COM_HIFEN = new Set(['Porygon-Z', 'Ho-Oh', 'Jangmo-o', 'Hakamo-o', 'Kommo-o', 'Chi-Yu', 'Ting-Lu', 'Wo-Chien', 'Chien-Pao']);
+// "Tauros-Paldea-Blaze" -> "tauros-paldeablaze"; "Oricorio-Pa'u" -> "oricorio-pau"; "Ho-Oh" -> "hooh"; "Mr. Mime" -> "mrmime"
+function pokeSpriteId(name){
+  const toId = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const n = String(name || '').trim();
+  if(!n) return '';
+  if(POKE_NOMES_COM_HIFEN.has(n)) return toId(n);
+  const i = n.indexOf('-');
+  return i === -1 ? toId(n) : (toId(n.slice(0, i)) + '-' + toId(n.slice(i + 1)));
+}
+function pokeSpriteHtml(name, size){
+  const id = pokeSpriteId(name);
+  if(!id) return '';
+  const px = size || 48;
+  return `<img class="poke-sprite" src="${POKE_SPRITE_BASE}${id}.png" width="${px}" height="${px}" loading="lazy" decoding="async" alt="" onerror="this.style.visibility='hidden'">`;
+}
+
 // Chama uma função da base de dados (RPC). Nunca lança: devolve {ok, status, data} (data = JSON da resposta, ou null).
 // As moedas, as compras e as conquistas passam todas por funções SQL "atómicas" (ver o SQL mestre, schema_version 4):
 // a base de dados bloqueia a linha do jogador, confere e escreve tudo de uma vez — acabaram as moedas perdidas por corridas.

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012h">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261012i">
 <style>
 :root{ --bg-code:#0d0f18; }
 body.light-theme{ --bg-code:#e4e7f0; }
@@ -49,7 +49,7 @@ body.light-theme{ --bg-code:#e4e7f0; }
 .mon-block{background:var(--bg-panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;}
 .mon-block.free{border-color:rgba(240,182,79,0.3);}
 .mon-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;flex-wrap:wrap;}
-.mon-name{font-family:'Chakra Petch',sans-serif;font-weight:600;font-size:13.5px;}
+.mon-name{font-family:'Chakra Petch',sans-serif;font-weight:600;font-size:13.5px;display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .mon-name.free-label{color:var(--tera-amber);}
 .import-box{background:var(--bg-code);border:1px solid var(--line);border-radius:6px;padding:9px 11px;
   font-family:'JetBrains Mono',monospace;font-size:12px;color:#c3c9de;white-space:pre-wrap;margin-top:5px;line-height:1.5;}
@@ -94,7 +94,9 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
 .fp-live{color:#5ed890;}
 .fp-live::before{content:'● ';}
 .fp-list{overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--line) transparent;padding:4px 12px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:6px;align-content:start;}
-.fp-item{text-align:left;background:var(--bg-card);border:1px solid var(--line);border-radius:8px;padding:7px 10px;cursor:pointer;color:var(--text-main);font-family:'Inter',sans-serif;font-size:12.5px;display:flex;flex-direction:column;gap:2px;min-height:34px;}
+.fp-item{text-align:left;background:var(--bg-card);border:1px solid var(--line);border-radius:8px;padding:7px 10px;cursor:pointer;color:var(--text-main);font-family:'Inter',sans-serif;font-size:12.5px;display:flex;flex-direction:row;align-items:center;gap:8px;min-height:38px;}
+.fp-item .fp-tx{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.fp-item.taken .poke-sprite,.fp-item.own .poke-sprite{filter:grayscale(1);opacity:0.7;}
 .fp-item b{font-weight:600;font-family:'Chakra Petch',sans-serif;}
 .fp-item small{font-size:10.5px;line-height:1.3;}
 .fp-item.ok:hover{border-color:var(--tera-cyan);background:color-mix(in srgb,var(--tera-cyan) 10%,var(--bg-card));}
@@ -174,7 +176,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
 
 <div class="hover-card" id="hoverCard"></div>
 
-<script src="assets/js/showdown-utils.js?v=20261012h"></script>
+<script src="assets/js/showdown-utils.js?v=20261012i"></script>
 <script>
 initTheme();
 // SUPABASE_URL e SUPABASE_ANON_KEY são definidos no próximo bloco de script,
@@ -601,7 +603,7 @@ function renderMyDraw(){
     const monLabel = nick ? `${escapeHtml(nick)} <span style="color:var(--text-faint);font-weight:400;">(${r.mon})</span>` : r.mon;
     html += `<div class="mon-block">
       <div class="mon-head">
-        <span class="mon-name">${monLabel}</span>
+        <span class="mon-name">${pokeSpriteHtml(r.mon, 48)}<span>${monLabel}</span></span>
         <span><button class="copy-btn" onclick="copyText('${boxId}', this)">Copiar</button><span class="copied-msg">Copiado!</span></span>
       </div>
       <div class="import-box" id="${boxId}">${escapeHtml(r.text || r.mon)}</div>
@@ -625,7 +627,7 @@ function renderMyDraw(){
     const freeLabel = freeNick ? `${escapeHtml(freeNick)} <span style="color:var(--text-faint);font-weight:400;">(${f.name})</span>` : f.name;
     html += `<div class="mon-block free">
       <div class="mon-head">
-        <span class="mon-name free-label">Escolha livre ${i+1}: ${freeLabel}</span>
+        <span class="mon-name free-label"><span>Escolha livre ${i+1}:</span>${pokeSpriteHtml(f.name, 48)}<span>${freeLabel}</span></span>
         <span><button class="copy-btn" onclick="copyText('${boxId}', this)">Copiar</button><span class="copied-msg">Copiado!</span></span>
       </div>
       <div class="import-box" id="${boxId}">${escapeHtml(f.text || f.name)}</div>
@@ -912,7 +914,7 @@ function renderFpList(){
   count.textContent = `${nOk} disponíveis · ${fp.names.length - nOk} indisponíveis · ${fp.names.length} na lista`;
   const rows = fp.names.map((n, i) => ({ n, i, a: av[n] })).filter(x => (!q || x.n.toLowerCase().includes(q)) && (!fp.hideBlocked || x.a.state === 'ok'));
   list.innerHTML = rows.length
-    ? rows.map(x => `<button class="fp-item ${x.a.state === 'ok' ? 'ok' : x.a.state}" data-i="${x.i}"><b>${escapeHtml(x.n)}</b>${x.a.state === 'ok' ? '' : `<small>${escapeHtml(fpReason(x.a))}</small>`}</button>`).join('')
+    ? rows.map(x => `<button class="fp-item ${x.a.state === 'ok' ? 'ok' : x.a.state}" data-i="${x.i}">${pokeSpriteHtml(x.n, 32)}<span class="fp-tx"><b>${escapeHtml(x.n)}</b>${x.a.state === 'ok' ? '' : `<small>${escapeHtml(fpReason(x.a))}</small>`}</span></button>`).join('')
     : `<div class="fp-empty">Nenhum Pokémon com esse nome${fp.hideBlocked ? ' disponível' : ''}.</div>`;
 }
 

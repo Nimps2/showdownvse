@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@600;700&family=Special+Elite&family=Caveat:wght@500;600&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012h">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261012i">
 <style>
 /* O visual de cada evento vive em eventos/<slug>.css (carregado dinamicamente). */
 #eventRoot{min-height:240px;}
@@ -82,8 +82,8 @@
   <div class="footer-note">As missões são calculadas a partir do que já fizeste no site — clica em "Reclamar" para receber os prémios.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261012h"></script>
-<script src="assets/js/eventos-core.js?v=20261012h"></script>
+<script src="assets/js/showdown-utils.js?v=20261012i"></script>
+<script src="assets/js/eventos-core.js?v=20261012i"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -193,7 +193,7 @@ const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && 
 // Versão dos ficheiros do evento (showdown-utils.js, eventos-core.js e eventos/<slug>.*): MUDAR (aqui e nas
 // duas <script src="...?v="> lá em cima) sempre que algum deles mudar, para o browser não misturar ficheiros
 // novos com versões antigas em cache.
-const EV_ASSET_VERSION = '20261012h';
+const EV_ASSET_VERSION = '20261012i';
 
 // Carrega o CSS e o JS do evento ativo (cada evento tem o seu par). O slug só pode ter a-z, 0-9 e "-".
 function loadEventAssets(slug){

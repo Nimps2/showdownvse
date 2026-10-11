@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012h">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261012i">
 <style>
 .highlight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
 .highlight-box{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
@@ -29,7 +29,7 @@
 
 .poke-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
 .poke-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
-.poke-name{font-family:'Chakra Petch',sans-serif;font-size:15px;font-weight:700;margin-bottom:8px;}
+.poke-name{font-family:'Chakra Petch',sans-serif;font-size:15px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
 .poke-stat-row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-dim);margin-bottom:4px;}
 .poke-stat-row b{color:var(--text-main);}
 .poke-moves{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);}
@@ -178,7 +178,7 @@
 
 <div class="hover-card" id="hoverCard"></div>
 
-<script src="assets/js/showdown-utils.js?v=20261012h"></script>
+<script src="assets/js/showdown-utils.js?v=20261012i"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -564,7 +564,7 @@ function renderPokemonList(){
     const nicksForThis = Array.from(new Set(allNicknames.filter(n=>n.species===name).map(n=>n.nickname))).slice(0,5);
 
     return `<div class="poke-card">
-      <div class="poke-name">${escapeHtml(name)}</div>
+      <div class="poke-name">${pokeSpriteHtml(name, 48)}<span>${escapeHtml(name)}</span></div>
       <div class="poke-stat-row"><span>Apareceu</span><b>${st.total}x (${overallPct}% dos sorteios)</b></div>
       <div class="poke-stat-row"><span>Como escolha livre</span><b>${freePct}%</b></div>
       <div class="free-bar"><div class="free-bar-fill" style="width:${freePct}%"></div></div>

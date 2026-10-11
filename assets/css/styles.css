@@ -199,3 +199,6 @@ label{display:block;font-size:11px;color:var(--text-faint);text-transform:upperc
   background:var(--danger);border:2px solid var(--bg-panel);animation:vseAlertPulse 1.6s ease-in-out infinite;}
 @keyframes vseAlertPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.25);}}
 @media (prefers-reduced-motion:reduce){.event-corner-icon.has-alert::after{animation:none;}}
+
+/* Sprites dos Pokémon (pixel art do Showdown, ver pokeSpriteHtml em showdown-utils.js) */
+.poke-sprite{image-rendering:pixelated;object-fit:contain;flex-shrink:0;vertical-align:middle;}
