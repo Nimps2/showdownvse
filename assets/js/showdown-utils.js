@@ -2404,27 +2404,14 @@ async function checkNewAchievements(supabaseUrl, supabaseAnonKey, name, earnedSe
   }
 }
 
-// ---------- Webhook do Discord a partir das páginas hospedadas ----------
-// Espelha o postToDiscord() do gestor, mas o link do webhook vem do
-// Supabase (tabela site_settings) em vez do localStorage — o gestor é
-// local ao computador do organizador, e estas páginas correm no browser
-// de cada jogador, sem acesso a esse localStorage.
+// ---------- Mensagens para o Discord a partir das páginas hospedadas ----------
+// O jogador NÃO vê o link do webhook: pede à base de dados (função discord_notify) para enviar a mensagem. A base só envia texto simples (até 400
+// caracteres, sem menções) e no máximo 6 mensagens por 10 minutos. Devolve true se a base aceitou a mensagem.
 async function postToDiscordFromSite(supabaseUrl, supabaseAnonKey, payload){
-  try{
-    const res = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.1&select=discord_webhook_url`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const rows = await res.json();
-    const url = rows && rows[0] && rows[0].discord_webhook_url;
-    if(!url) return false;
-    const body = typeof payload === 'string' ? { content: payload } : payload;
-    const postRes = await fetch(url, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(body)
-    });
-    return postRes.ok;
-  } catch(e){
-    return false;
-  }
+  const text = typeof payload === 'string' ? payload : (payload && payload.content) || '';
+  if(!text) return false;
+  const r = await dbFunction(supabaseUrl, supabaseAnonKey, 'discord_notify', { p_text: text });
+  return !!(r.ok && r.data && r.data.ok);
 }
 
 // ---------- Cartão exportável de confronto direto entre dois jogadores ----------
