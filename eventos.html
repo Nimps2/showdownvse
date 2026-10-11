@@ -12,6 +12,24 @@
 <style>
 /* O visual de cada evento vive em eventos/<slug>.css (carregado dinamicamente). */
 #eventRoot{min-height:240px;}
+/* Histórico de eventos anteriores (comum a qualquer evento) */
+.evh{display:flex;flex-direction:column;gap:12px;}
+.evh-title{margin:0 0 10px;font:700 15px 'Chakra Petch',sans-serif;color:var(--text-main);}
+.evh-card{padding:14px 16px;border-radius:14px;background:var(--bg-card);border:1px solid var(--line);}
+.evh-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+.evh-name{font:700 16px 'Chakra Petch',sans-serif;color:var(--text-main);}
+.evh-dates{font-size:12px;color:var(--text-dim);}
+.evh-pill{margin-left:auto;padding:2px 10px;border-radius:99px;border:1px solid var(--line);font-size:11.5px;color:var(--text-dim);}
+.evh-sub{margin:10px 0 4px;font-size:12px;color:var(--text-dim);}
+.evh-champs{display:flex;flex-wrap:wrap;gap:6px;}
+.evh-chip{padding:3px 10px;border-radius:99px;background:color-mix(in srgb,var(--tera-amber) 14%,transparent);font-size:12px;}
+.evh-row{display:flex;align-items:center;gap:10px;padding:6px 2px;border-bottom:1px solid var(--line);font-size:13px;}
+.evh-row:last-child{border-bottom:0;}
+.evh-row.me{background:color-mix(in srgb,var(--tera-cyan) 10%,transparent);border-radius:8px;padding-left:8px;padding-right:8px;}
+.evh-pos{width:26px;text-align:center;color:var(--text-faint);}
+.evh-who{flex:1;font-weight:600;}
+.evh-lvl{font-size:12px;color:var(--text-dim);}
+.evh-xp{min-width:70px;text-align:right;font-family:'Chakra Petch',sans-serif;}
 </style>
 </head>
 <body>
@@ -169,7 +187,8 @@ const X1_ENABLED = true;  // desafios x1 ligados (se a tabela x1_challenges não
 const ui = { open: {}, draft: '', justClaimed: null, routeAnimated: false, intro: true, fresh: new Set() };
 const evApi = () => ({ ui, x1On: X1_ENABLED && !!ctx && ctx.x1Available !== false });
 // Separadores visíveis: o dos x1 só existe se estiver ligado e a tabela existir.
-const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && evApi().x1On) || (t.needs === 'shop' && !!ctx && !!ctx.shop && ctx.shop.available));
+const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && evApi().x1On) || (t.needs === 'shop' && !!ctx && !!ctx.shop && ctx.shop.available))
+  .concat(pastEvents.length ? [historyTab] : []);   // o separador "Histórico" é comum a todos os eventos e só aparece se houver eventos anteriores
 
 // Versão dos ficheiros do evento (showdown-utils.js, eventos-core.js e eventos/<slug>.*): MUDAR (aqui e nas
 // duas <script src="...?v="> lá em cima) sempre que algum deles mudar, para o browser não misturar ficheiros
@@ -180,6 +199,7 @@ const EV_ASSET_VERSION = '20261012g';
 function loadEventAssets(slug){
   return new Promise((resolve, reject) => {
     if(!/^[a-z0-9-]+$/.test(slug)){ reject(new Error('slug inválido')); return; }
+    if((window.EVENT_MODULES || {})[slug]){ resolve(); return; }   // já carregado
     const css = document.createElement('link');
     css.rel = 'stylesheet'; css.href = `eventos/${slug}.css?v=${EV_ASSET_VERSION}`;
     document.head.appendChild(css);
@@ -189,6 +209,54 @@ function loadEventAssets(slug){
     js.onerror = () => reject(new Error('módulo do evento não encontrado'));
     document.head.appendChild(js);
   });
+}
+
+// ---------- Histórico: eventos anteriores ----------
+// Só aparecem os eventos terminados que ACONTECERAM (alguém reclamou missões ou há um torneio com campeão): um evento criado por engano não conta.
+let pastEvents = [];   // [{ ev, ranking:[{name,xp,miles}], champs:[{week,region,champion}] }]
+const historyTab = { key:'historico', icon:'📚', label:'Histórico', render: () => `<section class="evh-wrap"><h3 class="evh-title">📚 Eventos anteriores</h3>${renderPastEvents()}</section>` };
+
+async function loadPastEvents(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/events?status=eq.ended&select=*&order=created_at.desc&limit=30`, { headers: sbHeaders() });
+    if(!res.ok) return [];
+    const evs = await res.json();
+    if(!evs.length) return [];
+    const ids = evs.map(e => e.id).join(',');
+    const cres = await fetch(`${SUPABASE_URL}/rest/v1/event_claims?event_id=in.(${ids})&select=event_id,player_name,xp,currency&limit=5000`, { headers: sbHeaders() });
+    const claims = cres.ok ? await cres.json() : [];
+    const tours = await Promise.all(evs.map(e => fetchEventTournaments(SUPABASE_URL, SUPABASE_ANON_KEY, e.id)));
+    return evs.map((ev, i) => {
+      const map = {};
+      claims.filter(c => c.event_id === ev.id).forEach(c => {
+        const r = map[c.player_name] || (map[c.player_name] = { name: c.player_name, xp: 0, miles: 0 });
+        r.xp += c.xp || 0; r.miles += c.currency || 0;
+      });
+      const ranking = Object.values(map).sort((a, b) => b.xp - a.xp || b.miles - a.miles || a.name.localeCompare(b.name));
+      const champs = tours[i].filter(t => t.data.event && t.data.champion)
+        .map(t => ({ week: t.data.event.week, region: t.data.event.region, champion: t.data.champion })).sort((a, b) => a.week - b.week);
+      return { ev, ranking, champs };
+    }).filter(p => p.ranking.length || p.champs.length);
+  } catch(e){ return []; }
+}
+
+function renderPastEvents(){
+  if(!pastEvents.length) return '';
+  const fmt = d => d ? new Date(d).toLocaleDateString('pt-PT', { day:'numeric', month:'short', year:'numeric' }) : '—';
+  const medals = ['🥇', '🥈', '🥉'];
+  return '<div class="evh">' + pastEvents.map(p => {
+    const ev = p.ev, m = (window.EVENT_MODULES || {})[ev.slug];
+    const champs = p.champs.map(c => `<span class="evh-chip">Semana ${c.week} · ${escapeHtml(EVENT_REGIONS[c.region] ? EVENT_REGIONS[c.region].label : c.region)}: <b>${escapeHtml(c.champion)}</b> 🏆</span>`).join('');
+    const rows = p.ranking.slice(0, 5).map((r, i) => `<div class="evh-row${r.name === loggedInPlayerName ? ' me' : ''}">
+        <span class="evh-pos">${medals[i] || (i + 1)}</span><span class="evh-who">${escapeHtml(r.name)}</span>
+        ${m ? `<span class="evh-lvl">Nível ${EventCore.levelFor(m, r.xp).level}</span>` : ''}<span class="evh-xp">${r.xp} XP</span></div>`).join('');
+    return `<div class="evh-card">
+      <div class="evh-head"><span class="evh-name">🌍 ${escapeHtml(ev.name)}</span><span class="evh-dates">${fmt(ev.starts_at || ev.created_at)} → ${fmt(ev.ends_at)}</span>
+        <span class="evh-pill">${ev.current_week}/${ev.total_weeks} semanas · ${p.ranking.length} jogador${p.ranking.length === 1 ? '' : 'es'}</span></div>
+      ${champs ? `<div class="evh-sub">Campeões de cada semana</div><div class="evh-champs">${champs}</div>` : ''}
+      ${rows ? `<div class="evh-sub">Pódio do evento (XP)</div>${rows}` : ''}
+    </div>`;
+  }).join('') + '</div>';
 }
 
 async function refreshMyCoins(){
@@ -210,10 +278,12 @@ async function init(){
     return;
   }
   try{
-    const [profiles, ev] = await Promise.all([
+    const [profiles, ev, past] = await Promise.all([
       fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY),
-      fetchActiveEvent(SUPABASE_URL, SUPABASE_ANON_KEY)
+      fetchActiveEvent(SUPABASE_URL, SUPABASE_ANON_KEY),
+      loadPastEvents()
     ]);
+    pastEvents = past;
     myProfile = profiles[loggedInPlayerName] || {};
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
@@ -223,7 +293,10 @@ async function init(){
 
     if(!ev){
       setStatus(true, 'Ligado — não há nenhum evento ativo.');
-      root.innerHTML = '<div class="card"><h2>🌍 Eventos</h2><div class="empty-state">Não há nenhum evento ativo de momento. Quando houver, aparece aqui — com missões, níveis e prémios exclusivos.</div></div>';
+      // para mostrar o nível de cada jogador nos eventos anteriores é preciso o módulo desse evento (se não carregar, mostra só o XP)
+      await Promise.all([...new Set(pastEvents.map(p => p.ev.slug))].map(s => loadEventAssets(s).catch(() => {})));
+      root.innerHTML = '<div class="card"><h2>🌍 Eventos</h2><div class="empty-state">Não há nenhum evento ativo de momento. Quando houver, aparece aqui — com missões, níveis e prémios exclusivos.</div></div>'
+        + (pastEvents.length ? `<div class="card" style="margin-top:14px;"><h3 class="evh-title">📚 Eventos anteriores</h3>${renderPastEvents()}</div>` : '');
       return;
     }
     activeEvent = ev;
