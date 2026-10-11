@@ -428,3 +428,6 @@ body.light-theme .ev-theme-volta-ao-mundo [data-region="sinnoh"]{--accent:#7c4dc
 @media (max-width:640px){
   .ev-theme-volta-ao-mundo .vm-shop-grid{grid-template-columns:repeat(2,1fr);}
 }
+
+/* Corrida ao Rei dos Duelos (separador x1) */
+.ev-theme-volta-ao-mundo .vm-kings-note{margin:0 0 8px;font-size:12.5px;line-height:1.55;color:var(--text-dim);}

@@ -418,7 +418,9 @@ const COSMETIC_CATALOG = {
     { id:'title_vm_turista',    name:'Turista Profissional', price:0, text:'🗺️ Turista Profissional', eventOnly:'volta-ao-mundo' },
     { id:'title_vm_carimbos',   name:'Caçador de Carimbos',  price:0, text:'🛂 Caçador de Carimbos',  eventOnly:'volta-ao-mundo' },
     { id:'title_vm_comissario', name:'Chefe de Cabine',      price:0, text:'🧑‍✈️ Chefe de Cabine',   eventOnly:'volta-ao-mundo' },
-    { id:'title_vm_primeira',   name:'Primeira Classe',      price:0, text:'🥂 Primeira Classe',      eventOnly:'volta-ao-mundo' }
+    { id:'title_vm_primeira',   name:'Primeira Classe',      price:0, text:'🥂 Primeira Classe',      eventOnly:'volta-ao-mundo' },
+    // Atribuído pelo organizador (gestor) a quem tiver mais vitórias em x1 no evento; não está à venda em lado nenhum.
+    { id:'title_vm_rei_duelos', name:'Rei dos Duelos',       price:0, text:'👑 Rei dos Duelos',       eventOnly:'volta-ao-mundo' }
   ],
   badges: [
     { id:'badge_stall',   name:'Fã de Stall',   price:30, emoji:'🐌' },

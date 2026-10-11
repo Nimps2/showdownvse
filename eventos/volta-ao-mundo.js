@@ -18,7 +18,8 @@
     { level:6, xp:1450, cosmeticId:'badge_vm_hoenn' },
     { level:7, xp:2000, cosmeticId:'badge_vm_sinnoh' },
     { level:8, xp:2600, cosmeticId:'frame_vm_rota' },
-    // 9-12: prestígio de quem também compete (3200 XP > 2860, o máximo de quem nunca ganha nada)
+    // 9-12: prestígio de quem também compete (3200 XP > 3170, o máximo de quem nunca ganha nada). Ao acrescentar missões que NÃO exigem vitórias,
+    // confirmar que o máximo de quem nunca ganha continua abaixo de 3200 (hoje 3170: folga de 29 XP).
     { level:9,  xp:3200, cosmeticId:'title_vm_piloto' },
     { level:10, xp:3900, cosmeticId:'effect_vm_aurora' },
     { level:11, xp:4600, cosmeticId:'bg_vm_porsol' },
@@ -59,7 +60,11 @@
       { key:'x1send',   group:'x1',       title:'Convite de embarque',    desc:'Envia um desafio x1.',                                      check:{type:'x1sent'},   needs:'x1',        xp:40,  miles:8,  coins:0 },
       { key:'x1play',   group:'x1',       title:'Encontro de viajantes',  desc:'Joga um x1 confirmado.',                                    check:{type:'x1played'}, needs:'x1',        xp:70,  miles:12, coins:5 },
       { key:'x1win',    group:'x1',       title:'Duelo no aeroporto',     desc:'Ganha um x1.',                                              check:{type:'x1wins'},   needs:'x1',        xp:100, miles:15, coins:10 },
-      { key:'x1win2',   group:'x1',       title:'Dupla vitória',          desc:'Ganha 2 x1 na mesma semana.',                               check:{type:'x1wins', target:2}, needs:'x1', xp:120, miles:20, coins:12 }
+      { key:'x1win2',   group:'x1',       title:'Dupla vitória',          desc:'Ganha 2 x1 na mesma semana.',                               check:{type:'x1wins', target:2}, needs:'x1', xp:120, miles:20, coins:12 },
+      // "Escadas" de x1: jogar mais continua a compensar (jogar 3 / 5 x1 paga ganhes ou percas; ganhar 3 paga bem mais).
+      { key:'x1play3',  group:'x1',       title:'Maratona de voos',       desc:'Joga 3 x1 confirmados na mesma semana.',                    check:{type:'x1played', target:3}, needs:'x1', xp:25,  miles:6,  coins:5 },
+      { key:'x1play5',  group:'x1',       title:'Voo cheio',              desc:'Joga 5 x1 confirmados na mesma semana.',                    check:{type:'x1played', target:5}, needs:'x1', xp:35,  miles:10, coins:8 },
+      { key:'x1win3',   group:'x1',       title:'Hat-trick',              desc:'Ganha 3 x1 na mesma semana.',                               check:{type:'x1wins', target:3}, needs:'x1', xp:150, miles:25, coins:15 }
     ],
     event: [
       { id:'g_daily7',    title:'Viajante assíduo',        desc:'Reclama 7 bónus diários durante o evento.',                  check:{type:'dailyBonus', target:7},     xp:100, miles:15, coins:10 },
@@ -69,7 +74,10 @@
       { id:'g_generous',  title:'Mala cheia de presentes', desc:'Doa 🪙50 no total a outros jogadores durante o evento.',      check:{type:'giftSum', target:50},       xp:100, miles:15, coins:10 },
       { id:'g_postcards', title:'Álbum de viagem',         desc:'Deixa postais no quadro em 7 dias diferentes.',              check:{type:'postDays', target:7},       xp:100, miles:15, coins:10, needs:'board' },
       { id:'g_loved',     title:'Amigo de todos',          desc:'Recebe 5 reações nos teus postais.',                         check:{type:'reactionsReceived', target:5}, xp:80, miles:12, coins:8, needs:'board' },
-      { id:'g_alltour',   title:'Volta ao mundo completa', desc:'Participa nos 4 torneios do evento.',                        check:{type:'weeksPlayed'},              xp:300, miles:60, coins:50 }
+      { id:'g_alltour',   title:'Volta ao mundo completa', desc:'Participa nos 4 torneios do evento.',                        check:{type:'weeksPlayed'},              xp:300, miles:60, coins:50 },
+      { id:'g_x1opp5',    title:'Rota dos duelos',         desc:'Joga x1 confirmados contra 5 jogadores diferentes durante o evento.', check:{type:'x1opponents', target:5}, needs:'x1', xp:40,  miles:10, coins:8 },
+      { id:'g_x1play10',  title:'Veterano dos x1',         desc:'Joga 10 x1 confirmados durante o evento.',                   check:{type:'x1playedAll', target:10}, needs:'x1', xp:30,  miles:8,  coins:6 },
+      { id:'g_x1win8',    title:'Lenda dos duelos',        desc:'Ganha 8 x1 durante o evento.',                               check:{type:'x1winsAll', target:8},    needs:'x1', xp:200, miles:40, coins:25 }
     ]
   };
 
@@ -438,6 +446,12 @@
     const intro = `<div class="vm-board-intro"><h3 class="vm-h3">⚔️ Duelos no aeroporto</h3>
       <p>Desafia outro viajante para um x1 no Showdown. <b>Só valem Pokémon de ${r.label} (${r.dex}), na forma original.</b> Combinem o jogo, e depois <b>registem o resultado aqui</b> (quem jogou regista, o outro confirma). Ao registar, podes <b>colar o link do replay</b> do Showdown (<i>Upload and share replay</i>) — assim fica guardado e toda a gente o pode ver.</p></div>`;
     if(cur < 1) return intro + '<div class="vm-wall-empty">Os desafios abrem com o torneio da Semana 1.</div>';
+    // Corrida ao título exclusivo "Rei dos Duelos" (mais vitórias em x1 confirmados no evento; o organizador atribui o título no fim).
+    const medals = ['🥇', '🥈', '🥉'], lead = EventCore.x1.leaders(ctx).slice(0, 5);
+    const kings = `<section class="vm-section vm-ranking"><h3 class="vm-h3">👑 Corrida ao Rei dos Duelos</h3>
+      <p class="vm-kings-note">Quem tiver mais vitórias em x1 no fim do evento recebe o título exclusivo <b>👑 Rei dos Duelos</b> (empate: decide o organizador). Contam os x1 confirmados de todas as semanas.</p>
+      ${lead.length ? lead.map((r2, i) => `<div class="vm-rank-row${r2.name === ctx.me ? ' me' : ''}"><span class="vm-rank-pos">${medals[i] || (i + 1)}</span><span class="vm-rank-name">${escapeHtml(r2.name)}</span><span class="vm-rank-lvl">${r2.played} x1</span><span class="vm-rank-xp">${r2.wins} vitória${r2.wins === 1 ? '' : 's'}</span></div>`).join('')
+        : '<div class="vm-wall-empty">Ainda ninguém tem x1 confirmados. Sê o primeiro!</div>'}</section>`;
     const q = EventCore.x1.quota(ctx);
     const names = (ctx.playerNames || []).filter(n => n !== ctx.me).sort((a, b) => a.localeCompare(b));
     const opts = '<option value="">— escolhe o adversário —</option>' + names.map(n =>
@@ -454,7 +468,7 @@
     const ongoing = rows.filter(r2 => !forMeIds.has(r2.id) && ['pending', 'accepted', 'reported', 'disputed'].includes(r2.status));
     const done = rows.filter(r2 => ['confirmed', 'resolved', 'declined', 'cancelled'].includes(r2.status));
     const sect = (title, list, empty) => `<h3 class="vm-h3">${title}</h3>` + (list.length ? `<div class="vm-duels">${list.map(r2 => duelHtml(r2, ctx)).join('')}</div>` : `<div class="vm-wall-empty">${empty}</div>`);
-    return intro + send + sect('📬 Para ti', forMe, 'Nada à tua espera. Quando alguém te desafiar (ou registar um resultado para confirmares), aparece aqui.')
+    return intro + kings + send + sect('📬 Para ti', forMe, 'Nada à tua espera. Quando alguém te desafiar (ou registar um resultado para confirmares), aparece aqui.')
       + sect('✈️ Em curso', ongoing, 'Nenhum desafio em curso.')
       + (done.length ? sect('🗂 Histórico', done, '') : '');
   }

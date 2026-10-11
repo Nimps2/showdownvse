@@ -41,7 +41,7 @@ const EventCore = (function(){
   async function load(ev, me){
     const tournaments = await fetchEventTournaments(URL_, KEY_, ev.id);
     const since = enc(ev.starts_at || ev.created_at);
-    const [claims, tx, gifts, lottery, nick, preds, board, x1data, shopData] = await Promise.all([
+    const [claims, tx, gifts, lottery, nick, preds, board, x1data, shopData, x1Board] = await Promise.all([
       getJson(`event_claims?event_id=eq.${enc(ev.id)}&select=id,player_name,mission_id,xp,currency,coins`, []),
       getJson(`coin_transactions?player_name=eq.${enc(me)}&created_at=gte.${since}&select=reason,amount,created_at`, []),
       getJson(`gifts?from_name=eq.${enc(me)}&created_at=gte.${since}&select=to_name,amount,created_at`, []),
@@ -50,9 +50,10 @@ const EventCore = (function(){
       getJson(`predictions?predictor_name=eq.${enc(me)}&created_at=gte.${since}&select=tournament_id,match_id,predicted_winner,created_at`, []),
       loadBoard(ev),
       loadX1(ev, me),
-      loadShop(ev, me)
+      loadShop(ev, me),
+      loadX1Board(ev)
     ]);
-    const ctx = { ev, me, tournaments, claims, tx, gifts, lottery, nick, preds, board, x1: x1data.rows, x1Available: x1data.available, shop: shopData };
+    const ctx = { ev, me, tournaments, claims, tx, gifts, lottery, nick, preds, board, x1: x1data.rows, x1Available: x1data.available, shop: shopData, x1Board };
     ctx.weekStats = computeWeekStats(ctx);
     ctx.windows = computeWindows(ctx);
     ctx.claimedIds = new Set(claims.filter(c => c.player_name === me).map(c => c.mission_id));
@@ -71,7 +72,14 @@ const EventCore = (function(){
     const board = (ctx.board.messages || []).map(m => m.id).join(',') + '/' + (ctx.board.reactions || []).map(r => r.id + r.emoji).join(',');
     const x1 = (ctx.x1 || []).map(r => [r.id, r.status, r.replay_path || '', r.reported_winner || ''].join(':')).join(',');
     const shop = ctx.shop ? ctx.shop.purchases.map(p => p.item_id).join(',') : '';
-    return [tour, ctx.claims.length, ctx.tx.length, ctx.gifts.length, ctx.lottery.length, ctx.nick.length, ctx.preds.length, board, x1, shop].join('#');
+    const duels = (ctx.x1Board || []).map(x => x.reported_winner + x.challenger_name + x.opponent_name).join(',');
+    return [tour, ctx.claims.length, ctx.tx.length, ctx.gifts.length, ctx.lottery.length, ctx.nick.length, ctx.preds.length, board, x1, shop, duels].join('#');
+  }
+
+  // Todos os x1 CONFIRMADOS do evento (de toda a gente, com vencedor): alimentam a "Corrida ao Rei dos Duelos" (EventCore.x1.leaders).
+  async function loadX1Board(ev){
+    const r = await getJsonStatus(`x1_challenges?event_id=eq.${enc(ev.id)}&status=in.(confirmed,resolved)&select=challenger_name,opponent_name,reported_winner&limit=5000`);
+    return r.ok ? r.data.filter(x => x.reported_winner) : [];
   }
 
   // Loja de Milhas: o que se vende (event_shop_items, com o PREÇO) e as compras deste jogador (event_purchases).
@@ -200,9 +208,14 @@ const EventCore = (function(){
       case 'x1sent':      return { value: x1Count(ctx, week, x => x.challenger_name === ctx.me && !['declined','cancelled'].includes(x.status)), target };
       case 'x1played':    return { value: x1Count(ctx, week, x => isConfirmed(x)), target };
       case 'x1wins':      return { value: x1Count(ctx, week, x => isConfirmed(x) && winnerOf(x) === ctx.me), target };
+      // --- x1 do evento inteiro (todas as semanas) ---
+      case 'x1playedAll': return { value: x1Mine(ctx).filter(isConfirmed).length, target };
+      case 'x1winsAll':   return { value: x1Mine(ctx).filter(x => isConfirmed(x) && winnerOf(x) === ctx.me).length, target };
+      case 'x1opponents': return { value: new Set(x1Mine(ctx).filter(isConfirmed).map(x => x.challenger_name === ctx.me ? x.opponent_name : x.challenger_name)).size, target };
       default:            return { value: 0, target };
     }
   }
+  function x1Mine(ctx){ return (ctx.x1 || []).filter(x => x.challenger_name === ctx.me || x.opponent_name === ctx.me); }
   function isConfirmed(x){ return (x.status === 'confirmed' || x.status === 'resolved') && !!winnerOf(x); }
   function winnerOf(x){ return x.reported_winner || null; }
   function x1Count(ctx, week, pred){
@@ -227,6 +240,7 @@ const EventCore = (function(){
     });
     mod.missions.event.forEach(def => {
       if(def.needs === 'board' && !boardOn) return;
+      if(def.needs === 'x1' && !x1On) return;
       list.push(Object.assign({}, def, { scope: 'event', week: null, locked: ev.current_week < 1 }));
     });
     return list;
@@ -351,7 +365,16 @@ const EventCore = (function(){
       if(q.opponents.has(opponent)) return 'dup';
       return null;
     },
-    async refresh(ctx){ const r = await loadX1(ctx.ev, ctx.me); ctx.x1 = r.rows; ctx.x1Available = r.available; return r; },
+    async refresh(ctx){ const r = await loadX1(ctx.ev, ctx.me); ctx.x1 = r.rows; ctx.x1Available = r.available; ctx.x1Board = await loadX1Board(ctx.ev); return r; },
+    // Corrida ao "Rei dos Duelos": quem tem mais vitórias em x1 confirmados no evento (desempate: mais jogos, depois o nome).
+    leaders(ctx){
+      const map = {};
+      (ctx.x1Board || []).forEach(x => {
+        [x.challenger_name, x.opponent_name].forEach(n => { (map[n] || (map[n] = { name: n, wins: 0, played: 0 })).played++; });
+        if(map[x.reported_winner]) map[x.reported_winner].wins++;
+      });
+      return Object.values(map).sort((a, b) => b.wins - a.wins || b.played - a.played || a.name.localeCompare(b.name));
+    },
     async send(ctx, opponent){
       await x1.refresh(ctx); // quota com dados frescos
       const why = x1.cannotSend(ctx, opponent);
