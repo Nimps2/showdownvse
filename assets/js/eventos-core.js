@@ -70,7 +70,7 @@ const EventCore = (function(){
   function signature(ctx){
     const tour = ctx.tournaments.map(t => t.id + ':' + t.status + ':' + ((t.data && t.data.matches) || []).map(m => m.winner || '').join(',')).join('|');
     const board = (ctx.board.messages || []).map(m => m.id).join(',') + '/' + (ctx.board.reactions || []).map(r => r.id + r.emoji).join(',');
-    const x1 = (ctx.x1 || []).map(r => [r.id, r.status, r.replay_path || '', r.reported_winner || ''].join(':')).join(',');
+    const x1 = (ctx.x1 || []).map(r => [r.id, r.status, r.replay_path || '', r.reported_winner || '', r.best_of || 1, r.score_challenger == null ? '' : r.score_challenger + '-' + r.score_opponent].join(':')).join(',');
     const shop = ctx.shop ? ctx.shop.purchases.map(p => p.item_id).join(',') : '';
     const duels = (ctx.x1Board || []).map(x => x.reported_winner + x.challenger_name + x.opponent_name).join(',');
     return [tour, ctx.claims.length, ctx.tx.length, ctx.gifts.length, ctx.lottery.length, ctx.nick.length, ctx.preds.length, board, x1, shop, duels].join('#');
@@ -375,37 +375,51 @@ const EventCore = (function(){
       });
       return Object.values(map).sort((a, b) => b.wins - a.wins || b.played - a.played || a.name.localeCompare(b.name));
     },
-    async send(ctx, opponent){
+    // ---- Formato (melhor de 1, 3 ou 5): o desafiante escolhe ao enviar; quem ganha chega primeiro a `winsNeeded` vitórias. Conta UMA vez nas missões. ----
+    FORMATS: [1, 3, 5],
+    winsNeeded(bestOf){ return Math.floor((bestOf || 1) / 2) + 1; },
+    formatLabel(bestOf){ return `Md${bestOf || 1}`; },
+    // Placar válido para o formato: o vencedor chega às vitórias necessárias e o outro fica abaixo.
+    validScore(bestOf, a, b){ const n = x1.winsNeeded(bestOf); return Number.isInteger(a) && Number.isInteger(b) && Math.max(a, b) === n && Math.min(a, b) >= 0 && Math.min(a, b) < n; },
+    // Opções de resultado final do ponto de vista de quem regista: [{value:'2-1', mine:2, theirs:1, label:'Ganhei 2-1'}, ...]
+    scoreOptions(r){
+      const n = x1.winsNeeded(r.best_of), out = [];
+      for(let k = 0; k < n; k++) out.push({ value: `${n}-${k}`, mine: n, theirs: k, label: `Ganhei ${n}-${k}` });
+      for(let k = n - 1; k >= 0; k--) out.push({ value: `${k}-${n}`, mine: k, theirs: n, label: `Perdi ${k}-${n}` });
+      return out;
+    },
+    replayLinks(r){ return splitReplayPaths(r.replay_path); },
+    async send(ctx, opponent, bestOf){
       await x1.refresh(ctx); // quota com dados frescos
       const why = x1.cannotSend(ctx, opponent);
       if(why) return { ok:false, reason: why };
+      const fmt = x1.FORMATS.includes(+bestOf) ? +bestOf : 1;
+      const row = { event_id: ctx.ev.id, week: ctx.ev.current_week, challenger_name: ctx.me, opponent_name: opponent, status: 'pending' };
+      if(fmt > 1) row.best_of = fmt;     // melhor de 1 não envia o campo: continua a funcionar mesmo que a base ainda não tenha a coluna
       let res;
       try{
         res = await fetch(`${URL_}/rest/v1/x1_challenges`, {
           method:'POST',
           headers: Object.assign(sbAuthHeaders(KEY_), { 'Content-Type':'application/json', 'Prefer':'return=minimal' }),
-          body: JSON.stringify([{ event_id: ctx.ev.id, week: ctx.ev.current_week, challenger_name: ctx.me, opponent_name: opponent, status: 'pending' }])
+          body: JSON.stringify([row])
         });
       } catch(e){ return { ok:false, reason:'error' }; }
       if(!res.ok){
         // a própria base de dados recusa (gatilho x1_rules): quota cheia, adversário repetido ou auto-desafio
         let txt = ''; try{ txt = await res.text(); } catch(e){}
-        const reason = /x1_quota/.test(txt) ? 'quota' : /x1_dup/.test(txt) ? 'dup' : /x1_self/.test(txt) ? 'self' : 'error';
-        if(reason !== 'error') await x1.refresh(ctx);
+        const reason = /x1_quota/.test(txt) ? 'quota' : /x1_dup/.test(txt) ? 'dup' : /x1_self/.test(txt) ? 'self' : (fmt > 1 && /best_of/.test(txt) ? 'noformat' : 'error');
+        if(reason !== 'error' && reason !== 'noformat') await x1.refresh(ctx);
         return { ok:false, reason };
       }
       await x1.refresh(ctx);
-      logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', `Desafiou ${opponent} para um x1 (semana ${ctx.ev.current_week})`);
-      return { ok:true };
+      logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', `Desafiou ${opponent} para um x1 ${x1.formatLabel(fmt)} (semana ${ctx.ev.current_week})`);
+      return { ok:true, bestOf: fmt };
     },
-    // Só aceita links de replays do Showdown (https://replay.pokemonshowdown.com/<id>): o que um jogador escreve aqui
-    // aparece como link para todos, por isso nada de endereços arbitrários. '' = sem link; null = inválido.
-    cleanReplayUrl(v){
-      v = String(v || '').trim();
-      if(!v) return '';
-      v = v.split('#')[0].split('?')[0];
-      return /^https:\/\/replay\.pokemonshowdown\.com\/[A-Za-z0-9._~\/-]+$/.test(v) ? v : null;
-    },
+    // Só aceita links do Showdown (o do replay, ou o da sala da batalha, que se converte para o do replay): o que um jogador escreve aqui
+    // aparece como link para todos, por isso nada de endereços arbitrários. '' = sem link; null = inválido. (A lógica vive em showdown-utils.js.)
+    cleanReplayUrl(v){ return normalizeShowdownReplayUrl(v); },
+    cleanReplayList(v){ return cleanShowdownReplayList(v); },     // vários links (um por jogo): array, ou null se algum for inválido
+    replayStatus(url){ return showdownReplayStatus(url); },
     async _go(ctx, id, from, patch, logText, extraFilter){
       let res;
       try{
@@ -436,26 +450,43 @@ const EventCore = (function(){
       if(!r || r.challenger_name !== ctx.me) return Promise.resolve({ ok:false, reason:'notyours' });
       return x1._go(ctx, id, 'pending', { status:'cancelled' }, `Cancelou o desafio x1 a ${r.opponent_name}`);
     },
-    // Qualquer um dos dois regista quem ganhou (só depois de aceite)
-    report(ctx, id, winner, replayUrl){
+    // Qualquer um dos dois regista quem ganhou (só depois de aceite). `replayText` = link(s) do replay (um por jogo, no máximo o nº de jogos do formato);
+    // `score` = {mine, theirs} (o placar do ponto de vista de quem regista; em melhor de 1 é implícito). Razões de recusa: notyours | badwinner | badreplay | toomany | badscore.
+    report(ctx, id, winner, replayText, score){
       const r = x1.get(ctx, id);
       if(!r || (r.challenger_name !== ctx.me && r.opponent_name !== ctx.me)) return Promise.resolve({ ok:false, reason:'notyours' });
       if(winner !== r.challenger_name && winner !== r.opponent_name) return Promise.resolve({ ok:false, reason:'badwinner' });
-      const url = x1.cleanReplayUrl(replayUrl);
-      if(url === null) return Promise.resolve({ ok:false, reason:'badreplay' });
+      const bestOf = r.best_of || 1;
+      const links = x1.cleanReplayList(replayText);
+      if(links === null) return Promise.resolve({ ok:false, reason:'badreplay' });
+      if(links.length > bestOf) return Promise.resolve({ ok:false, reason:'toomany' });
       const patch = { status:'reported', reported_winner: winner, reported_by: ctx.me, reported_at: new Date().toISOString() };
-      if(url) patch.replay_path = url;
+      let scoreTxt = '';
+      if(r.best_of !== undefined){          // a base de dados já conhece o formato e o placar
+        const sc = bestOf === 1 ? (winner === ctx.me ? { mine:1, theirs:0 } : { mine:0, theirs:1 }) : score;
+        if(!sc || !x1.validScore(bestOf, sc.mine, sc.theirs) || ((sc.mine > sc.theirs) !== (winner === ctx.me))) return Promise.resolve({ ok:false, reason:'badscore' });
+        const asChallenger = r.challenger_name === ctx.me;
+        patch.score_challenger = asChallenger ? sc.mine : sc.theirs;
+        patch.score_opponent = asChallenger ? sc.theirs : sc.mine;
+        if(bestOf > 1) scoreTxt = ` (${patch.score_challenger}-${patch.score_opponent})`;
+      }
+      if(links.length) patch.replay_path = joinReplayPaths(links);
       return x1._go(ctx, id, 'accepted', patch,
-        `Registou o resultado do x1 ${r.challenger_name} vs ${r.opponent_name}: vitória de ${winner}`);
+        `Registou o resultado do x1 ${r.challenger_name} vs ${r.opponent_name}: vitória de ${winner}${scoreTxt}`);
     },
-    // Quem jogou pode juntar o link do replay depois (só se ainda não houver nenhum; o organizador pode sempre mudar no gestor)
-    addReplay(ctx, id, replayUrl){
+    // Quem jogou pode juntar links de replays depois (até ao nº de jogos do formato; o organizador pode sempre mudar no gestor).
+    // Razões de recusa: notyours | notyet | badreplay | nochange (já estavam juntados) | toomany
+    addReplay(ctx, id, replayText){
       const r = x1.get(ctx, id);
       if(!r || (r.challenger_name !== ctx.me && r.opponent_name !== ctx.me)) return Promise.resolve({ ok:false, reason:'notyours' });
-      if(r.replay_path || !['reported', 'confirmed', 'resolved'].includes(r.status)) return Promise.resolve({ ok:false, reason:'notyet' });
-      const url = x1.cleanReplayUrl(replayUrl);
-      if(!url) return Promise.resolve({ ok:false, reason:'badreplay' });
-      return x1._go(ctx, id, r.status, { replay_path: url }, `Juntou o replay do x1 ${r.challenger_name} vs ${r.opponent_name}`, '&replay_path=is.null');
+      if(!['reported', 'confirmed', 'resolved'].includes(r.status)) return Promise.resolve({ ok:false, reason:'notyet' });
+      const add = x1.cleanReplayList(replayText);
+      if(!add || !add.length) return Promise.resolve({ ok:false, reason:'badreplay' });
+      const have = x1.replayLinks(r), merged = have.concat(add.filter(l => !have.includes(l)));
+      if(merged.length === have.length) return Promise.resolve({ ok:false, reason:'nochange' });
+      if(merged.length > (r.best_of || 1)) return Promise.resolve({ ok:false, reason:'toomany' });
+      const guard = r.replay_path ? `&replay_path=eq.${enc(r.replay_path)}` : '&replay_path=is.null';   // só grava se ninguém mudou os replays entretanto
+      return x1._go(ctx, id, r.status, { replay_path: joinReplayPaths(merged) }, `Juntou o replay do x1 ${r.challenger_name} vs ${r.opponent_name}`, guard);
     },
     // O OUTRO jogador (não quem registou) confirma ou contesta
     confirm(ctx, id){

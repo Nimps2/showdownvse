@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@600;700&family=Special+Elite&family=Caveat:wght@500;600&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012j">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261012k">
 <style>
 /* O visual de cada evento vive em eventos/<slug>.css (carregado dinamicamente). */
 #eventRoot{min-height:240px;}
@@ -82,8 +82,8 @@
   <div class="footer-note">As missões são calculadas a partir do que já fizeste no site — clica em "Reclamar" para receber os prémios.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261012j"></script>
-<script src="assets/js/eventos-core.js?v=20261012j"></script>
+<script src="assets/js/showdown-utils.js?v=20261012k"></script>
+<script src="assets/js/eventos-core.js?v=20261012k"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -193,7 +193,7 @@ const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && 
 // Versão dos ficheiros do evento (showdown-utils.js, eventos-core.js e eventos/<slug>.*): MUDAR (aqui e nas
 // duas <script src="...?v="> lá em cima) sempre que algum deles mudar, para o browser não misturar ficheiros
 // novos com versões antigas em cache.
-const EV_ASSET_VERSION = '20261012j';
+const EV_ASSET_VERSION = '20261012k';
 
 // Carrega o CSS e o JS do evento ativo (cada evento tem o seu par). O slug só pode ter a-z, 0-9 e "-".
 function loadEventAssets(slug){
@@ -272,7 +272,7 @@ async function init(){
   const root = document.getElementById('eventRoot');
   // Depois de uma atualização do site, o browser pode ainda ter em cache o showdown-utils.js antigo
   // (sem as funções do evento). Em vez de um erro genérico, diz o que fazer.
-  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || !EventCore.shop || typeof EventCore.x1.leaders !== 'function' || typeof nameFxClass !== 'function' || !getCosmeticById('frame_vm_esquadrilha') || !getCosmeticById('frame_vm_balao')){
+  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || !EventCore.shop || typeof EventCore.x1.leaders !== 'function' || !EventCore.x1.FORMATS || typeof nameFxClass !== 'function' || !getCosmeticById('frame_vm_esquadrilha') || !getCosmeticById('frame_vm_balao')){
     setStatus(false, 'Ficheiros antigos em cache.');
     root.innerHTML = '<div class="card"><div class="empty-state">O teu browser ainda tem ficheiros antigos do site em cache. Faz <b>Ctrl+F5</b> para atualizar e abre esta página outra vez.</div></div>';
     return;
@@ -442,12 +442,15 @@ async function doX1Send(btn){
   const sel = document.getElementById('x1Opponent');
   const opp = sel ? sel.value : '';
   if(!opp){ alert('Escolhe o adversário.'); return; }
+  const fsel = document.getElementById('x1Format');
+  const bestOf = fsel ? +fsel.value : 1;
   if(btn) btn.disabled = true;
-  const r = await EventCore.x1.send(ctx, opp);
+  const r = await EventCore.x1.send(ctx, opp, bestOf);
   if(r.ok){
-    showCelebrationToast(`⚔️ Desafio enviado a <b>${escapeHtml(opp)}</b>! Quando aceitar, combinem o jogo no Showdown.`, 5000);
+    showCelebrationToast(`⚔️ Desafio ${EventCore.x1.formatLabel(r.bestOf)} enviado a <b>${escapeHtml(opp)}</b>! Quando aceitar, combinem o jogo no Showdown.`, 5000);
   } else {
     const msg = r.reason === 'quota' ? `Já enviaste os ${EventCore.x1.MAX_PER_WEEK} desafios desta semana.`
+      : r.reason === 'noformat' ? 'Os formatos melhor de 3 e melhor de 5 ainda não estão disponíveis (a base de dados vai ser atualizada). Escolhe melhor de 1 por agora.'
       : r.reason === 'dup' ? 'Já desafiaste este jogador esta semana — escolhe outro.'
       : r.reason === 'noweek' ? 'Os desafios abrem com o torneio da Semana 1.'
       : r.reason === 'self' ? 'Não te podes desafiar a ti próprio.'
@@ -457,20 +460,44 @@ async function doX1Send(btn){
   renderAll();
 }
 
+// Replays dos x1: o que se cola tem de ser o link do REPLAY (replay.pokemonshowdown.com/...). O link da sala da batalha (play.pokemonshowdown.com/battle-...)
+// também é aceite e convertido, mas o replay só existe se alguém carregou em "Upload and share replay" no fim do jogo.
+const REPLAY_LINK_HELP = 'Cola o link do REPLAY do Showdown, que começa por https://replay.pokemonshowdown.com/…\n\nComo o obter: no fim do jogo, no Showdown, carrega em "Upload and share replay" (por baixo do jogo) e copia o link que aparece.';
+// true = pode guardar. Se o Showdown disser que o replay não existe, avisa e deixa escolher (pode ser um replay privado que não conseguimos ler).
+async function replayLinkOk(cleaned){
+  if(await EventCore.x1.replayStatus(cleaned) !== 'missing') return true;
+  return confirm(`Não encontrei este replay no Showdown:\n${cleaned}\n\nSe acabaste de jogar, falta carregar em "Upload and share replay" (por baixo do jogo, no Showdown) e copiar o link que aparece (começa por replay.pokemonshowdown.com).\n\nGuardar este link mesmo assim?`);
+}
+
 async function doX1Act(id, act, btn){
   const row = EventCore.x1.get(ctx, id);
   if(!row) return;
   const other = row.challenger_name === loggedInPlayerName ? row.opponent_name : row.challenger_name;
-  let r;
+  let r, regScore = null;
   if(act === 'accept')       r = await EventCore.x1.respond(ctx, id, true);
   else if(act === 'decline'){ if(!confirm(`Recusar o desafio de ${other}?`)) return; r = await EventCore.x1.respond(ctx, id, false); }
   else if(act === 'cancel'){  if(!confirm(`Cancelar o desafio a ${other}?`)) return;  r = await EventCore.x1.cancel(ctx, id); }
-  else if(act === 'win' || act === 'lose'){
+  else if(act === 'win' || act === 'lose' || act === 'score'){
+    const bestOf = row.best_of || 1;
     const rpInput = document.getElementById('x1rp-' + id);
-    const replayUrl = rpInput ? rpInput.value : '';
-    if(EventCore.x1.cleanReplayUrl(replayUrl) === null){ alert('O link do replay tem de ser do Showdown, assim: https://replay.pokemonshowdown.com/…  (ou deixa em branco).'); return; }
-    if(!confirm(act === 'win' ? `Confirmas que GANHASTE contra ${other}?` : `Confirmas que PERDESTE contra ${other}?`)) return;
-    r = await EventCore.x1.report(ctx, id, act === 'win' ? loggedInPlayerName : other, replayUrl);
+    const replayText = rpInput ? rpInput.value : '';
+    const list = EventCore.x1.cleanReplayList(replayText);
+    if(list === null){ alert(REPLAY_LINK_HELP + '\n\n(Podes deixar em branco e juntar o(s) replay(s) depois.)'); return; }
+    if(list.length > bestOf){ alert(`Um melhor de ${bestOf} tem no máximo ${bestOf} replay${bestOf > 1 ? 's' : ''} (um por jogo).`); return; }
+    for(const l of list){ if(!(await replayLinkOk(l))) return; }
+    let iWon;
+    if(act === 'score'){
+      const sel = document.getElementById('x1sc-' + id);
+      if(!sel || !sel.value){ alert('Escolhe primeiro o resultado final do duelo.'); return; }
+      const [mine, theirs] = sel.value.split('-').map(Number);
+      regScore = { mine, theirs }; iWon = mine > theirs;
+      if(!confirm(`Confirmas o resultado ${mine}–${theirs} (${iWon ? 'GANHASTE' : 'PERDESTE'}) contra ${other}?`)) return;
+    } else {
+      iWon = act === 'win';
+      if(!confirm(iWon ? `Confirmas que GANHASTE contra ${other}?` : `Confirmas que PERDESTE contra ${other}?`)) return;
+    }
+    r = await EventCore.x1.report(ctx, id, iWon ? loggedInPlayerName : other, list.join(' '), regScore);
+    if(r.ok) act = iWon ? 'win' : 'lose';       // para a mensagem de sucesso
   }
   else if(act === 'confirm')  r = await EventCore.x1.confirm(ctx, id);
   else if(act === 'dispute'){ const note = prompt(`Porque contestas o resultado de ${row.reported_by}? (opcional — o organizador vai decidir)`); if(note === null) return; r = await EventCore.x1.dispute(ctx, id, note); }
@@ -483,6 +510,8 @@ async function doX1Act(id, act, btn){
     showCelebrationToast(t, 4500);
   } else if(r.reason === 'changed'){
     alert('Este desafio foi alterado entretanto (a outra pessoa foi mais rápida). Atualizei a lista.');
+  } else if(r.reason === 'badscore'){
+    alert('O resultado escolhido não é válido para este formato. Escolhe outro.');
   } else {
     alert('Não foi possível concluir agora. Tenta outra vez.');
   }
@@ -490,13 +519,17 @@ async function doX1Act(id, act, btn){
 }
 
 async function doX1Replay(id, btn){
+  const row = EventCore.x1.get(ctx, id);
   const input = document.getElementById('x1rp-' + id);
-  const url = input ? input.value : '';
-  if(!EventCore.x1.cleanReplayUrl(url)){ alert('Cola um link do Showdown, assim: https://replay.pokemonshowdown.com/…'); return; }
+  const list = EventCore.x1.cleanReplayList(input ? input.value : '');
+  if(!list || !list.length){ alert(REPLAY_LINK_HELP); return; }
+  for(const l of list){ if(!(await replayLinkOk(l))) return; }
   if(btn) btn.disabled = true;
-  const r = await EventCore.x1.addReplay(ctx, id, url);
-  if(r.ok) showCelebrationToast('▶ Replay juntado ao desafio!', 4000);
-  else if(r.reason === 'changed' || r.reason === 'notyet') alert('Este desafio já tem replay ou mudou entretanto. Atualizei a lista.');
+  const r = await EventCore.x1.addReplay(ctx, id, list.join(' '));
+  if(r.ok) showCelebrationToast(list.length > 1 ? '▶ Replays juntados ao desafio!' : '▶ Replay juntado ao desafio!', 4000);
+  else if(r.reason === 'nochange') alert('Esse(s) replay(s) já estavam juntados a este desafio.');
+  else if(r.reason === 'toomany') alert(`Este duelo é um melhor de ${(row && row.best_of) || 1}: não pode ter mais do que ${(row && row.best_of) || 1} replay${((row && row.best_of) || 1) > 1 ? 's' : ''} (um por jogo).`);
+  else if(r.reason === 'changed' || r.reason === 'notyet') alert('Este desafio mudou entretanto. Atualizei a lista.');
   else alert('Não foi possível juntar o replay agora. Tenta outra vez.');
   renderAll();
 }

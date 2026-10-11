@@ -405,7 +405,7 @@
   const STEPS = ['Enviado', 'Aceite', 'Resultado', 'Confirmado'];
   const X1_BTN = {
     accept:  { cls:'go',   text:'✔ Aceitar' },   decline: { cls:'no',   text:'✖ Recusar' },    cancel:  { cls:'no',   text:'Cancelar desafio' },
-    win:     { cls:'go',   text:'🏆 Eu ganhei' }, lose:    { cls:'',     text:'Eu perdi' },
+    win:     { cls:'go',   text:'🏆 Eu ganhei' }, lose:    { cls:'',     text:'Eu perdi' }, score:   { cls:'go',   text:'✔ Registar resultado' },
     confirm: { cls:'go',   text:'✔ Confirmar resultado' }, dispute: { cls:'no', text:'⚠ Contestar' }
   };
 
@@ -414,28 +414,38 @@
     const w = EventCore.x1.winnerOf(r);
     const acts = EventCore.x1.actionsFor(ctx, r);
     const region = r.week >= 1 && r.week <= mod.weeks.length ? EVENT_REGIONS[mod.weeks[r.week - 1].region].label : '';
-    const side = name => `<div class="vm-duel-p${w === name && (r.status === 'confirmed' || r.status === 'resolved') ? ' win' : ''}${name === ctx.me ? ' me' : ''}"><b>${escapeHtml(name)}</b><small>${name === r.challenger_name ? 'desafiante' : 'adversário'}</small></div>`;
+    const bestOf = r.best_of || 1, hasScore = r.score_challenger != null && r.score_opponent != null;
+    const scoreOf = name => hasScore ? (name === r.challenger_name ? r.score_challenger : r.score_opponent) : null;
+    const side = name => `<div class="vm-duel-p${w === name && (r.status === 'confirmed' || r.status === 'resolved') ? ' win' : ''}${name === ctx.me ? ' me' : ''}"><b>${escapeHtml(name)}</b><small>${name === r.challenger_name ? 'desafiante' : 'adversário'}</small>${scoreOf(name) !== null ? `<span class="vm-duel-sc">${scoreOf(name)}</span>` : ''}</div>`;
     const steps = STEPS.map((t, i) => `<li class="${st.step < 0 ? 'x' : (i <= st.step ? 'on' : '')}${i === st.step && st.step >= 0 ? ' cur' : ''}">${t}</li>`).join('');
     const sid = String(r.id).replace(/[^a-zA-Z0-9_-]/g, '');
+    const scoreTxt = hasScore ? ` <span class="vm-duel-score-txt">(${r.score_challenger}–${r.score_opponent})</span>` : '';
     const verdict = (r.status === 'confirmed' || r.status === 'resolved')
-      ? (w ? `<div class="vm-duel-verdict">🏆 Vitória de <b>${escapeHtml(w)}</b></div>` : '<div class="vm-duel-verdict">Anulado pelo organizador</div>')
-      : (r.status === 'reported' && w ? `<div class="vm-duel-verdict soft">${escapeHtml(r.reported_by)} registou: vitória de <b>${escapeHtml(w)}</b></div>` : '');
-    const replay = r.replay_path && ['reported', 'confirmed', 'resolved'].includes(r.status)
-      ? `<a class="vm-duel-replay" href="${encodeURI(r.replay_path).replace(/"/g, '%22')}" target="_blank" rel="noopener">▶ Ver replay</a>` : '';
+      ? (w ? `<div class="vm-duel-verdict">🏆 Vitória de <b>${escapeHtml(w)}</b>${scoreTxt}</div>` : '<div class="vm-duel-verdict">Anulado pelo organizador</div>')
+      : (r.status === 'reported' && w ? `<div class="vm-duel-verdict soft">${escapeHtml(r.reported_by)} registou: vitória de <b>${escapeHtml(w)}</b>${scoreTxt}</div>` : '');
+    const links = EventCore.x1.replayLinks(r), canSee = ['reported', 'confirmed', 'resolved'].includes(r.status);
+    const replay = links.length && canSee
+      ? `<div class="vm-duel-replays">${links.map((l, i) => `<a class="vm-duel-replay" href="${encodeURI(l).replace(/"/g, '%22')}" target="_blank" rel="noopener">▶ ${links.length > 1 ? 'Jogo ' + (i + 1) : 'Ver replay'}</a>`).join('')}</div>` : '';
     const isPlayer = r.challenger_name === ctx.me || r.opponent_name === ctx.me;
-    // Antes de registar o resultado: campo opcional para colar o link do replay do Showdown.
+    // Em melhor de 3/5 o resultado é um placar (em vez de "Eu ganhei"/"Eu perdi"): lista de resultados possíveis do ponto de vista de quem regista.
+    const useScore = bestOf > 1 && acts.includes('win');
+    const shownActs = useScore ? acts.filter(a => a !== 'win' && a !== 'lose').concat(['score']) : acts;
+    const scoreSelect = useScore
+      ? `<select class="vm-x1score" id="x1sc-${sid}"><option value="">— resultado final (melhor de ${bestOf}) —</option>${EventCore.x1.scoreOptions(r).map(o => `<option value="${o.value}">${o.label}</option>`).join('')}</select>` : '';
+    // Antes de registar o resultado: campo opcional para colar o(s) link(s) do replay do Showdown (um por jogo, em melhor de 3/5).
     const replayField = acts.includes('win')
-      ? `<input type="text" class="vm-x1replay" id="x1rp-${sid}" placeholder="Link do replay do Showdown (opcional) — replay.pokemonshowdown.com/…">` : '';
-    // Depois: quem jogou ainda pode juntar o link se faltar.
-    const replayAdd = isPlayer && !r.replay_path && ['reported', 'confirmed', 'resolved'].includes(r.status)
-      ? `<div class="vm-x1replay-row"><input type="text" class="vm-x1replay" id="x1rp-${sid}" placeholder="Juntar o link do replay do Showdown"><button class="vm-x1btn" onclick="doX1Replay('${sid}',this)">Juntar replay</button></div>` : '';
+      ? `<input type="text" class="vm-x1replay" id="x1rp-${sid}" placeholder="${bestOf > 1 ? `Links dos replays (opcional, até ${bestOf}, separados por espaço) — replay.pokemonshowdown.com/…` : 'Link do replay (opcional) — «Upload and share replay» → replay.pokemonshowdown.com/…'}">` : '';
+    // Depois: quem jogou ainda pode juntar links de replays se faltarem (até ao nº de jogos do formato).
+    const replayAdd = isPlayer && links.length < bestOf && canSee
+      ? `<div class="vm-x1replay-row"><input type="text" class="vm-x1replay" id="x1rp-${sid}" placeholder="${bestOf > 1 ? `Juntar link(s) de replay (${links.length}/${bestOf})` : 'Juntar o link do replay (replay.pokemonshowdown.com/…)'}"><button class="vm-x1btn" onclick="doX1Replay('${sid}',this)">Juntar replay</button></div>` : '';
+    const fmt = `<span class="vm-duel-fmt${bestOf > 1 ? ' long' : ''}" title="Melhor de ${bestOf}: ganha quem chegar primeiro a ${EventCore.x1.winsNeeded(bestOf)} vitória${EventCore.x1.winsNeeded(bestOf) > 1 ? 's' : ''}">${EventCore.x1.formatLabel(bestOf)}</span>`;
     return `<div class="vm-duel s-${r.status}${acts.length ? ' mine' : ''}">
-      <div class="vm-duel-top"><span>⚔️ Semana ${r.week}${region ? ' · ' + region : ''}</span><span class="vm-duel-status">${st.label}</span></div>
+      <div class="vm-duel-top"><span>⚔️ Semana ${r.week}${region ? ' · ' + region : ''} ${fmt}</span><span class="vm-duel-status">${st.label}</span></div>
       <div class="vm-duel-vs">${side(r.challenger_name)}<span class="vm-duel-x">VS</span>${side(r.opponent_name)}</div>
       <ol class="vm-steps">${steps}</ol>
       ${verdict}${r.status === 'disputed' && r.note ? `<div class="vm-duel-note">“${escapeHtml(r.note)}”</div>` : ''}
-      ${replayField}
-      ${acts.length ? `<div class="vm-duel-actions">${acts.map(a => `<button class="vm-x1btn ${X1_BTN[a].cls}" onclick="doX1Act('${sid}','${a}',this)">${X1_BTN[a].text}</button>`).join('')}</div>` : ''}
+      ${scoreSelect}${replayField}
+      ${shownActs.length ? `<div class="vm-duel-actions">${shownActs.map(a => `<button class="vm-x1btn ${X1_BTN[a].cls}" onclick="doX1Act('${sid}','${a}',this)">${X1_BTN[a].text}</button>`).join('')}</div>` : ''}
       ${replay}${replayAdd}
     </div>`;
   }
@@ -444,7 +454,7 @@
     const cur = ctx.ev.current_week;
     const regionKey = mod.weeks[Math.max(0, Math.min(cur, mod.weeks.length) - 1)].region, r = EVENT_REGIONS[regionKey];
     const intro = `<div class="vm-board-intro"><h3 class="vm-h3">⚔️ Duelos no aeroporto</h3>
-      <p>Desafia outro viajante para um x1 no Showdown. <b>Só valem Pokémon de ${r.label} (${r.dex}), na forma original.</b> Combinem o jogo, e depois <b>registem o resultado aqui</b> (quem jogou regista, o outro confirma). Ao registar, podes <b>colar o link do replay</b> do Showdown (<i>Upload and share replay</i>) — assim fica guardado e toda a gente o pode ver.</p></div>`;
+      <p>Desafia outro viajante para um x1 no Showdown. <b>Só valem Pokémon de ${r.label} (${r.dex}), na forma original.</b> Quem desafia escolhe o formato (<b>melhor de 1, 3 ou 5</b>). Combinem o jogo, e depois <b>registem o resultado aqui</b> (quem jogou regista, com o placar nos melhores de 3 e 5; o outro confirma). Ao registar, podes <b>colar o link do replay</b> do Showdown (<i>Upload and share replay</i>; um por jogo) — assim fica guardado e toda a gente o pode ver.</p></div>`;
     if(cur < 1) return intro + '<div class="vm-wall-empty">Os desafios abrem com o torneio da Semana 1.</div>';
     // Corrida ao título exclusivo "Rei dos Duelos" (mais vitórias em x1 confirmados no evento; o organizador atribui o título no fim).
     const medals = ['🥇', '🥈', '🥉'], lead = EventCore.x1.leaders(ctx).slice(0, 5);
@@ -459,8 +469,9 @@
     const send = `<div class="vm-x1send">
       <div class="vm-x1send-top"><b>Novo desafio</b><span class="vm-x1quota${q.left === 0 ? ' full' : ''}">${q.used}/${q.max} esta semana</span></div>
       <div class="vm-x1send-row"><select id="x1Opponent" ${q.left === 0 ? 'disabled' : ''}>${opts}</select>
+        <select id="x1Format" class="vm-x1format" title="Formato do duelo" onchange="ui.x1Format=+this.value" ${q.left === 0 ? 'disabled' : ''}>${EventCore.x1.FORMATS.map(b => `<option value="${b}"${(api.ui.x1Format || 1) === b ? ' selected' : ''}>Melhor de ${b} (${EventCore.x1.formatLabel(b)})</option>`).join('')}</select>
         <button class="vm-send" onclick="doX1Send(this)" ${q.left === 0 ? 'disabled' : ''}>⚔️ Desafiar</button></div>
-      ${q.left === 0 ? `<small>Já enviaste os ${q.max} desafios desta semana — voltas a poder na próxima.</small>` : `<small>Máximo ${q.max} desafios enviados por semana, a jogadores diferentes. Recusados e cancelados não contam.</small>`}
+      ${q.left === 0 ? `<small>Já enviaste os ${q.max} desafios desta semana — voltas a poder na próxima.</small>` : `<small>Máximo ${q.max} desafios enviados por semana, a jogadores diferentes. Recusados e cancelados não contam. Tu escolhes o formato (md1, md3 ou md5: ganha quem chegar primeiro a 1, 2 ou 3 vitórias); o adversário pode aceitar ou recusar. Um duelo conta como UM x1 nas missões, seja qual for o formato.</small>`}
     </div>`;
     const rows = ctx.x1;
     const forMe = rows.filter(r2 => (r2.status === 'pending' && r2.opponent_name === ctx.me) || (r2.status === 'reported' && r2.reported_by !== ctx.me && (r2.challenger_name === ctx.me || r2.opponent_name === ctx.me)));

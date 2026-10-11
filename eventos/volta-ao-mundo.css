@@ -431,3 +431,18 @@ body.light-theme .ev-theme-volta-ao-mundo [data-region="sinnoh"]{--accent:#7c4dc
 
 /* Corrida ao Rei dos Duelos (separador x1) */
 .ev-theme-volta-ao-mundo .vm-kings-note{margin:0 0 8px;font-size:12.5px;line-height:1.55;color:var(--text-dim);}
+
+/* x1 em melhor de 1 / 3 / 5: formato no desafio, placar nos jogadores e replays por jogo */
+.ev-theme-volta-ao-mundo .vm-x1send-row .vm-x1format{flex:0 0 auto;width:auto;min-width:150px;}
+.ev-theme-volta-ao-mundo .vm-duel-fmt{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:99px;border:1px solid var(--line);font:700 10.5px 'Chakra Petch',sans-serif;color:var(--text-dim);}
+.ev-theme-volta-ao-mundo .vm-duel-fmt.long{border-color:var(--vm-gold);color:var(--vm-gold);}
+.ev-theme-volta-ao-mundo .vm-duel-p{position:relative;}
+.ev-theme-volta-ao-mundo .vm-duel-sc{display:block;margin-top:2px;font:700 20px 'Chakra Petch',sans-serif;color:var(--text-main);}
+.ev-theme-volta-ao-mundo .vm-duel-p.win .vm-duel-sc{color:var(--success);}
+.ev-theme-volta-ao-mundo .vm-duel-score-txt{font-weight:400;color:var(--text-dim);}
+.ev-theme-volta-ao-mundo .vm-x1score{width:100%;margin:8px 0 0;font-size:12.5px;}
+.ev-theme-volta-ao-mundo .vm-duel-replays{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;}
+.ev-theme-volta-ao-mundo .vm-duel-replays .vm-duel-replay{margin-top:0;}
+@media (max-width:640px){
+  .ev-theme-volta-ao-mundo .vm-x1send-row .vm-x1format{width:100%;}
+}

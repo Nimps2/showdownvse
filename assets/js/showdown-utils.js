@@ -187,6 +187,42 @@ function sbAuthHeaders(supabaseAnonKey){
   return { 'apikey': supabaseAnonKey, 'Authorization': `Bearer ${supabaseAnonKey}` };
 }
 
+// ---------- Links de replays do Showdown ----------
+// Devolve o link do REPLAY (https://replay.pokemonshowdown.com/<id>) a partir do que o jogador colou: aceita o próprio link do replay (http ou https,
+// com "?..."/"#..."/barra no fim) e o link da SALA da batalha (https://play.pokemonshowdown.com/battle-gen9ou-123..., o que se copia do browser durante
+// ou depois do jogo): o replay tem o mesmo id sem o "battle-" (mas só existe se alguém carregou em "Upload and share replay" no fim do jogo).
+// '' = vazio; null = inválido. O que um jogador escreve aparece como link para todos, por isso nada de outros endereços.
+function normalizeShowdownReplayUrl(v){
+  v = String(v || '').trim();
+  if(!v) return '';
+  v = v.split('#')[0].split('?')[0].replace(/\/+$/, '');
+  let m = v.match(/^https?:\/\/replay\.pokemonshowdown\.com\/([A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~-]+)*)$/i);
+  if(m) return 'https://replay.pokemonshowdown.com/' + m[1];
+  m = v.match(/^https?:\/\/(?:play\.pokemonshowdown\.com|[a-z0-9-]+\.psim\.us)\/battle-([A-Za-z0-9._~-]+)$/i);
+  if(m) return 'https://replay.pokemonshowdown.com/' + m[1];
+  return null;
+}
+// Vários replays no mesmo campo (x1 em melhor de 3 ou 5, um por jogo): links/caminhos separados por " | " (os caminhos de ficheiros têm espaços, por isso o separador é o "|").
+function splitReplayPaths(text){ return String(text || '').split('|').map(s => s.trim()).filter(Boolean); }
+function joinReplayPaths(list){ return (list || []).filter(Boolean).join(' | '); }
+// O que um JOGADOR cola (links do Showdown separados por espaço, vírgula, "|" ou linha nova) -> lista de links do replay, sem repetidos. null se algum for inválido.
+function cleanShowdownReplayList(text){
+  const out = [];
+  for(const t of String(text || '').split(/[\s,|]+/).filter(Boolean)){
+    const n = normalizeShowdownReplayUrl(t);
+    if(n === null) return null;
+    if(n && !out.includes(n)) out.push(n);
+  }
+  return out;
+}
+// O replay existe no Showdown? 'ok' | 'missing' (404) | 'unknown' (sem rede ou resposta estranha: não bloquear). O Showdown deixa ler o <replay>.json de qualquer página.
+async function showdownReplayStatus(replayUrl){
+  try{
+    const res = await fetch(replayUrl + '.json');
+    return res.ok ? 'ok' : (res.status === 404 ? 'missing' : 'unknown');
+  } catch(e){ return 'unknown'; }
+}
+
 // ---------- Sprites dos Pokémon (imagens do próprio Showdown) ----------
 // Sprites "gen5" (pixel art 96x96, ~1 KB cada) servidos pelo Showdown: cobrem 532/532 dos Pokémon que o projeto usa (estudo e decisão em
 // docs/PROPOSTA_SPRITES.txt). Se a imagem não existir ou não carregar, esconde-se sozinha e fica só o texto. O id só tem [a-z0-9-], por isso é
