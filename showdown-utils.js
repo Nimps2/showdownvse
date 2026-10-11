@@ -187,6 +187,25 @@ function sbAuthHeaders(supabaseAnonKey){
   return { 'apikey': supabaseAnonKey, 'Authorization': `Bearer ${supabaseAnonKey}` };
 }
 
+// Chama uma função da base de dados (RPC). Nunca lança: devolve {ok, status, data} (data = JSON da resposta, ou null).
+// As moedas, as compras e as conquistas passam todas por funções SQL "atómicas" (ver o SQL mestre, schema_version 4):
+// a base de dados bloqueia a linha do jogador, confere e escreve tudo de uma vez — acabaram as moedas perdidas por corridas.
+async function dbFunction(supabaseUrl, supabaseAnonKey, fn, args){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/${fn}`, {
+      method:'POST',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json'}),
+      body: JSON.stringify(args || {})
+    });
+    let data = null;
+    try{ data = await res.json(); } catch(e){ /* resposta vazia */ }
+    if(res.status === 404) console.error(`A função ${fn} não existe na base de dados — corre primeiro o SQL mestre atualizado.`);
+    return { ok: res.ok, status: res.status, data };
+  } catch(e){
+    return { ok:false, status:0, data:null };
+  }
+}
+
 // Devolve {ok:true} ou {ok:false, reason:'notfound'|'wrongpass'|'network'}
 // O login é decidido DENTRO da base de dados (função check_login, ver o SQL mestre): as passwords ficam guardadas
 // como hash (bcrypt) numa tabela que a chave pública não consegue ler, por isso o browser nunca as vê.
@@ -372,18 +391,20 @@ async function buyCosmetic(supabaseUrl, supabaseAnonKey, name, cosmeticId){
   const finalPrice = applyLoyaltyDiscount(item.price, discountPct);
   if((current.coins||0) < finalPrice) return {ok:false, reason:'insufficient'};
 
-  const newCoins = (current.coins||0) - finalPrice;
-  const newOwned = owned.concat([cosmeticId]);
-  const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
-    method:'PATCH',
-    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-    body: JSON.stringify({ coins: newCoins, owned_cosmetics: newOwned })
-  });
-  if(patchRes.ok && finalPrice > 0){
-    const reason = discountPct > 0 ? `Compra na loja: ${item.name} (${discountPct}% de desconto por fidelidade)` : `Compra na loja: ${item.name}`;
-    await logCoinTransaction(supabaseUrl, supabaseAnonKey, name, -finalPrice, reason);
-  }
-  return {ok: patchRes.ok, finalPrice, discountPct};
+  // Uma só operação na base de dados: confere que ainda não tem o item e que há moedas, debita, junta o item e regista o histórico.
+  const reason = discountPct > 0 ? `Compra na loja: ${item.name} (${discountPct}% de desconto por fidelidade)` : `Compra na loja: ${item.name}`;
+  const r = await purchaseCosmeticAtomic(supabaseUrl, supabaseAnonKey, name, cosmeticId, finalPrice, reason);
+  if(!r.ok) return {ok:false, reason:r.reason};
+  return {ok:true, finalPrice, discountPct};
+}
+
+// Compra atómica de um cosmético (função buy_cosmetic_item). Devolve {ok, reason} —
+// reason: 'insufficient' | 'alreadyowned' | 'notfound' | 'error'. O preço (com descontos) é calculado por quem chama.
+async function purchaseCosmeticAtomic(supabaseUrl, supabaseAnonKey, name, itemId, price, reason){
+  const r = await dbFunction(supabaseUrl, supabaseAnonKey, 'buy_cosmetic_item', { p_name:name, p_item:itemId, p_price:price, p_reason:reason });
+  if(!r.ok || !r.data) return {ok:false, reason:'error'};
+  if(r.data.ok) return {ok:true, balance:r.data.balance};
+  return {ok:false, reason: ['insufficient','alreadyowned','notfound'].includes(r.data.reason) ? r.data.reason : 'error'};
 }
 
 // type: 'background' | 'accent' | 'frame' | 'nameEffect' | 'title'
@@ -929,35 +950,16 @@ function buildEloChartSvg(history){
 }
 
 // ---------- Moedas: presentear outro jogador ----------
-async function logGift(supabaseUrl, supabaseAnonKey, fromName, toName, amount){
-  try{
-    await fetch(`${supabaseUrl}/rest/v1/gifts`, {
-      method:'POST',
-      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-      body: JSON.stringify([{ from_name: fromName, to_name: toName, amount }])
-    });
-  } catch(e){ /* silencioso — a doação em si já foi feita, só o registo do ranking falhou */ }
-}
-
 // Devolve {ok, reason} — 'invalid' | 'insufficient' | 'error' | true
 async function giftCoins(supabaseUrl, supabaseAnonKey, fromName, toName, amount){
   if(!amount || amount <= 0) return {ok:false, reason:'invalid'};
   if(fromName === toName) return {ok:false, reason:'invalid'};
 
-  const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(fromName)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
-  const rows = await res.json();
-  if(!rows || !rows[0]) return {ok:false, reason:'error'};
-  if((rows[0].coins||0) < amount) return {ok:false, reason:'insufficient'};
-
-  const fromOk = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, fromName, -amount, `Presente enviado para ${toName}`);
-  if(!fromOk) return {ok:false, reason:'error'};
-  const toOk = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, toName, amount, `Presente recebido de ${fromName}`);
-  if(!toOk){
-    await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, fromName, amount, 'Estorno de presente (falhou)'); // devolve se o segundo passo falhar
-    return {ok:false, reason:'error'};
-  }
-  await logGift(supabaseUrl, supabaseAnonKey, fromName, toName, amount);
-  return {ok:true};
+  // Uma só operação na base de dados: debita um, credita o outro, regista o histórico dos dois e o ranking de generosidade.
+  const r = await dbFunction(supabaseUrl, supabaseAnonKey, 'transfer_coins', { p_from:fromName, p_to:toName, p_amount:Math.round(amount) });
+  if(!r.ok || !r.data) return {ok:false, reason:'error'};
+  if(r.data.ok) return {ok:true};
+  return {ok:false, reason: ['insufficient','invalid'].includes(r.data.reason) ? r.data.reason : 'error'};
 }
 
 // ---------- Presente Surpresa: compra um cosmético aleatório para OUTRO jogador ----------
@@ -989,13 +991,10 @@ async function giftSurpriseCosmetic(supabaseUrl, supabaseAnonKey, fromName, toNa
   const fromOk = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, fromName, -SURPRISE_GIFT_PRICE, `Presente Surpresa para ${toName}: ${won.name}`);
   if(!fromOk) return {ok:false, reason:'error'};
 
-  const newOwned = toOwned.concat([won.id]);
-  const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(toName)}`, {
-    method:'PATCH',
-    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-    body: JSON.stringify({ owned_cosmetics: newOwned })
-  });
-  if(!patchRes.ok){
+  // O destinatário recebe o item de forma atómica (sem apagar uma compra que ele esteja a fazer ao mesmo tempo).
+  // Se entretanto já tiver esse item (added vazio) ou a operação falhar, o preço é devolvido.
+  const g = await grantCosmeticAtomic(supabaseUrl, supabaseAnonKey, toName, [won.id]);
+  if(!g.ok || !g.added.length){
     await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, fromName, SURPRISE_GIFT_PRICE, 'Estorno de Presente Surpresa (falhou)');
     return {ok:false, reason:'error'};
   }
@@ -1103,6 +1102,15 @@ async function acceptTradeOffer(supabaseUrl, supabaseAnonKey, offer){
       return {ok:false, reason:'invalid'};
     }
 
+    // As moedas primeiro (função atómica, recusa se o saldo já não chegar): assim nunca se trocam os itens sem o pagamento.
+    if(offer.requested_coins){
+      const paid = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, offer.to_name, -offer.requested_coins, `Troca de cosmético com ${offer.from_name}`);
+      if(!paid){
+        await setTradeOfferStatus(supabaseUrl, supabaseAnonKey, offer.id, 'rejected');
+        return {ok:false, reason:'invalid'};
+      }
+    }
+
     let newFromOwned = fromOwned.filter(id=>id!==offer.offered_item_id);
     let newToOwned = toOwned.concat([offer.offered_item_id]);
     if(offer.requested_item_id){
@@ -1121,10 +1129,12 @@ async function acceptTradeOffer(supabaseUrl, supabaseAnonKey, offer){
         method:'PATCH', headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}), body: JSON.stringify(toPatch)
       })
     ]);
-    if(!fromPatchRes.ok || !toPatchRes.ok) return {ok:false, reason:'error'};
+    if(!fromPatchRes.ok || !toPatchRes.ok){
+      if(offer.requested_coins) await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, offer.to_name, offer.requested_coins, 'Estorno de troca de cosmético (falhou)');
+      return {ok:false, reason:'error'};
+    }
 
     if(offer.requested_coins){
-      await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, offer.to_name, -offer.requested_coins, `Troca de cosmético com ${offer.from_name}`);
       await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, offer.from_name, offer.requested_coins, `Troca de cosmético com ${offer.to_name}`);
     }
 
@@ -1164,26 +1174,23 @@ async function fetchCoinTransactions(supabaseUrl, supabaseAnonKey, name, limit){
 
 // amount pode ser negativo (para descontar, ex: ao apostar ou ao presentear).
 // reason (opcional) fica registado no histórico de transações do jogador.
+// ATÓMICO: a base de dados (função adjust_coins) bloqueia a linha do jogador, confere o saldo, altera-o e regista o
+// histórico numa só operação. Se o saldo não chegar para um débito devolve false e NADA muda (antes limitava a 0).
+// Antes disto o site lia o saldo e escrevia o novo valor: duas ações ao mesmo tempo apagavam-se uma à outra.
 async function adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, amount, reason){
   if(!name || !amount) return false;
-  try{
-    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins,max_coins_reached`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    const rows = await res.json();
-    if(!rows || !rows[0]) return false;
-    const newCoins = Math.max(0, (rows[0].coins || 0) + amount);
-    const newMax = Math.max(rows[0].max_coins_reached || 0, newCoins);
-    const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
-      method:'PATCH',
-      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-      body: JSON.stringify({ coins: newCoins, max_coins_reached: newMax })
-    });
-    if(patchRes.ok && reason){
-      await logCoinTransaction(supabaseUrl, supabaseAnonKey, name, amount, reason);
-    }
-    return patchRes.ok;
-  } catch(e){
-    return false;
-  }
+  const r = await dbFunction(supabaseUrl, supabaseAnonKey, 'adjust_coins', { p_name:name, p_delta:Math.round(amount), p_reason:reason || null, p_strict:true });
+  return !!(r.ok && r.data && r.data.ok);
+}
+
+// Dá cosméticos a um jogador SEM duplicar e sem apagar compras feitas ao mesmo tempo (função grant_cosmetics).
+// Devolve {ok, added:[ids realmente novos]}.
+async function grantCosmeticAtomic(supabaseUrl, supabaseAnonKey, name, ids){
+  const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
+  if(!name || !list.length) return {ok:true, added:[]};
+  const r = await dbFunction(supabaseUrl, supabaseAnonKey, 'grant_cosmetics', { p_name:name, p_items:list });
+  if(!r.ok || !r.data || !r.data.ok) return {ok:false, added:[]};
+  return {ok:true, added: r.data.added || []};
 }
 
 // ---------- Bloco 3 (compra): Patrocínio e Garantia de bye ----------
@@ -1201,14 +1208,40 @@ async function buyEloChartUnlock(supabaseUrl, supabaseAnonKey, name){
   if(rows[0].elo_chart_unlocked) return {ok:false, reason:'alreadyunlocked'};
   if((rows[0].coins||0) < ELO_CHART_PRICE) return {ok:false, reason:'insufficient'};
 
+  // Compra única: reclama o desbloqueio ANTES de cobrar (só uma chamada o consegue, mesmo num duplo clique) e desfaz se a cobrança falhar.
+  const claim = await claimPlayerFlag(supabaseUrl, supabaseAnonKey, name, 'elo_chart_unlocked');
+  if(claim === null) return {ok:false, reason:'error'};
+  if(claim === false) return {ok:false, reason:'alreadyunlocked'};
   const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, -ELO_CHART_PRICE, 'Desbloqueio do gráfico de evolução do Elo');
-  if(!ok) return {ok:false, reason:'error'};
-  await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
-    method:'PATCH',
-    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-    body: JSON.stringify({ elo_chart_unlocked: true })
-  });
+  if(!ok){
+    await setPlayerFlag(supabaseUrl, supabaseAnonKey, name, 'elo_chart_unlocked', false);
+    return {ok:false, reason:'error'};
+  }
   return {ok:true};
+}
+
+// Liga uma opção de compra única (coluna boolean de players) SÓ se ainda estiver desligada. Devolve true (esta chamada ligou-a),
+// false (já estava ligada) ou null (erro de rede/servidor).
+async function claimPlayerFlag(supabaseUrl, supabaseAnonKey, name, column){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&or=(${column}.is.null,${column}.eq.false)`, {
+      method:'PATCH',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=representation'}),
+      body: JSON.stringify({ [column]: true })
+    });
+    if(!res.ok) return null;
+    const rows = await res.json();
+    return !!(rows && rows.length);
+  } catch(e){ return null; }
+}
+async function setPlayerFlag(supabaseUrl, supabaseAnonKey, name, column, value){
+  try{
+    await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
+      method:'PATCH',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify({ [column]: value })
+    });
+  } catch(e){ /* sem rede: o organizador acerta à mão */ }
 }
 
 // ---------- Bloco 3 (ajuste): preço do reroll dobra a cada pedido feito pelo
@@ -1250,13 +1283,15 @@ async function buyGuaranteedBye(supabaseUrl, supabaseAnonKey, name){
   if(rows[0].guaranteed_bye) return {ok:false, reason:'alreadyactive'};
   if((rows[0].coins||0) < GUARANTEED_BYE_PRICE) return {ok:false, reason:'insufficient'};
 
+  // Reclama a garantia ANTES de cobrar (só uma chamada a consegue) e desfaz se a cobrança falhar.
+  const claim = await claimPlayerFlag(supabaseUrl, supabaseAnonKey, name, 'guaranteed_bye');
+  if(claim === null) return {ok:false, reason:'error'};
+  if(claim === false) return {ok:false, reason:'alreadyactive'};
   const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, -GUARANTEED_BYE_PRICE, 'Garantia de bye no Play-in');
-  if(!ok) return {ok:false, reason:'error'};
-  await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
-    method:'PATCH',
-    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-    body: JSON.stringify({ guaranteed_bye: true })
-  });
+  if(!ok){
+    await setPlayerFlag(supabaseUrl, supabaseAnonKey, name, 'guaranteed_bye', false);
+    return {ok:false, reason:'error'};
+  }
   return {ok:true};
 }
 
@@ -1339,17 +1374,10 @@ async function openLootBox(supabaseUrl, supabaseAnonKey, name){
   if(!allAvailable.length) return {ok:false, reason:'nooptions'};
 
   const { item: won, category } = allAvailable[Math.floor(Math.random()*allAvailable.length)];
-  const newCoins = (current.coins||0) - LOOT_BOX_PRICE;
-  const newOwned = owned.concat([won.id]);
-  const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
-    method:'PATCH',
-    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-    body: JSON.stringify({ coins: newCoins, owned_cosmetics: newOwned })
-  });
-  if(patchRes.ok){
-    await logCoinTransaction(supabaseUrl, supabaseAnonKey, name, -LOOT_BOX_PRICE, `Caixa surpresa: ganhou ${won.name}`);
-  }
-  return {ok: patchRes.ok, item: won, category};
+  // Uma só operação: debita, junta o item e regista. Se entretanto já o tivesse (outra aba) ou faltassem moedas, não cobra nada.
+  const r = await purchaseCosmeticAtomic(supabaseUrl, supabaseAnonKey, name, won.id, LOOT_BOX_PRICE, `Caixa surpresa: ganhou ${won.name}`);
+  if(!r.ok) return {ok:false, reason: r.reason === 'insufficient' ? 'insufficient' : 'error'};
+  return {ok:true, item: won, category};
 }
 
 // ---------- Bloco 4: Roleta simples ----------
@@ -1402,6 +1430,11 @@ async function spinRoulette(supabaseUrl, supabaseAnonKey, name, betAmount){
   const payout = Math.round(betAmount * outcome.multiplier);
   const net = payout - betAmount;
 
+  if(net === 0){
+    // Empate: o saldo não muda (antes isto dava "erro", porque o ajuste de 0 moedas era recusado) — só fica no histórico.
+    await logCoinTransaction(supabaseUrl, supabaseAnonKey, name, 0, `Roleta: ${outcome.label}`);
+    return {ok:true, outcome, payout};
+  }
   const ok = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, net, `Roleta: ${outcome.label}`);
   if(!ok) return {ok:false, reason:'error'};
   return {ok:true, outcome, payout};
@@ -2180,16 +2213,40 @@ async function resolvePendingChampionBets(supabaseUrl, supabaseAnonKey, allRows)
     if(!data || !data.champion) continue; // torneio ainda não tem campeão definido, deixa pendente
 
     const correct = data.champion === bet.predicted_champion;
-    if(correct){
-      const payout = Math.round(bet.wager * bet.multiplier);
-      await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, bet.predictor_name, payout, `Acertou o campeão da semana: ${bet.predicted_champion} (${bet.multiplier}x)`);
+    // Primeiro reclama a aposta (marca-a como resolvida), só depois paga: dois jogadores a abrir a página ao mesmo
+    // tempo já não pagam o prémio a dobrar — só quem conseguir marcar a aposta é que paga.
+    if(!(await claimBetResolution(supabaseUrl, supabaseAnonKey, 'champion_bets', bet.id, correct))) continue;
+    const payout = Math.round(bet.wager * bet.multiplier);
+    if(correct && payout > 0){
+      const paid = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, bet.predictor_name, payout, `Acertou o campeão da semana: ${bet.predicted_champion} (${bet.multiplier}x)`);
+      if(!paid) await releaseBetResolution(supabaseUrl, supabaseAnonKey, 'champion_bets', bet.id); // volta a ficar pendente, tenta-se de novo
     }
-    await fetch(`${supabaseUrl}/rest/v1/champion_bets?id=eq.${bet.id}`, {
+  }
+}
+
+// Reclama a resolução de uma aposta (tabelas predictions / champion_bets): o PATCH só altera a linha se ainda estiver por
+// resolver e devolve-a; só quem a recebe de volta (true) deve pagar o prémio.
+async function claimBetResolution(supabaseUrl, supabaseAnonKey, table, id, correct){
+  try{
+    const res = await fetch(`${supabaseUrl}/rest/v1/${table}?id=eq.${id}&resolved=eq.false`, {
       method:'PATCH',
-      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=representation'}),
       body: JSON.stringify({ resolved:true, correct })
     });
-  }
+    if(!res.ok) return false;
+    const rows = await res.json();
+    return !!(rows && rows.length);
+  } catch(e){ return false; }
+}
+// Desfaz a reclamação se o pagamento falhou (a aposta volta a ficar pendente).
+async function releaseBetResolution(supabaseUrl, supabaseAnonKey, table, id){
+  try{
+    await fetch(`${supabaseUrl}/rest/v1/${table}?id=eq.${id}`, {
+      method:'PATCH',
+      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
+      body: JSON.stringify({ resolved:false, correct:null })
+    });
+  } catch(e){ /* sem rede: fica por resolver e o organizador pode acertar à mão */ }
 }
 
 async function fetchChampionBetHistory(supabaseUrl, supabaseAnonKey, name, limit){
@@ -2335,20 +2392,13 @@ async function checkNewAchievements(supabaseUrl, supabaseAnonKey, name, earnedSe
     const rows = await res.json();
     if(!rows || !rows[0]) return [];
     const seen = new Set(rows[0].seen_achievements || []);
-    const newOnes = [...earnedSet].filter(id => !seen.has(id));
-    if(newOnes.length){
-      const updatedSeen = Array.from(new Set([...seen, ...newOnes]));
-      await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
-        method:'PATCH',
-        headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-        body: JSON.stringify({ seen_achievements: updatedSeen })
-      });
-      for(const id of newOnes){
-        const a = ACHIEVEMENTS.find(x=>x.id===id);
-        await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, name, ACHIEVEMENT_COIN_BONUS, `Conquista desbloqueada: ${a?a.name:id}`);
-      }
-    }
-    return newOnes;
+    const candidates = [...earnedSet].filter(id => !seen.has(id));
+    if(!candidates.length) return [];
+    // A base de dados regista as conquistas novas E paga o bónus numa só operação: se duas páginas estiverem abertas
+    // ao mesmo tempo, só uma delas "ganha" cada conquista (antes o bónus podia ser pago a dobrar).
+    const items = candidates.map(id => { const a = ACHIEVEMENTS.find(x=>x.id===id); return { id, name: a ? a.name : id }; });
+    const r = await dbFunction(supabaseUrl, supabaseAnonKey, 'claim_new_achievements', { p_name:name, p_items:items, p_bonus:ACHIEVEMENT_COIN_BONUS });
+    return (r.ok && Array.isArray(r.data)) ? r.data : [];
   } catch(e){
     return [];
   }
@@ -2667,17 +2717,10 @@ async function buyFeaturedItem(supabaseUrl, supabaseAnonKey, name, item){
   if(owned.includes(item.id)) return {ok:false, reason:'alreadyowned'};
   if((current.coins||0) < item.discountedPrice) return {ok:false, reason:'insufficient'};
 
-  const newCoins = (current.coins||0) - item.discountedPrice;
-  const newOwned = owned.concat([item.id]);
-  const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
-    method:'PATCH',
-    headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-    body: JSON.stringify({ coins: newCoins, owned_cosmetics: newOwned })
-  });
-  if(patchRes.ok){
-    await logCoinTransaction(supabaseUrl, supabaseAnonKey, name, -item.discountedPrice, `Comprou "${item.name}" na Loja Rotativa (${WEEKLY_FEATURED_DISCOUNT_PCT}% de desconto)`);
-  }
-  return {ok: patchRes.ok};
+  const r = await purchaseCosmeticAtomic(supabaseUrl, supabaseAnonKey, name, item.id, item.discountedPrice,
+    `Comprou "${item.name}" na Loja Rotativa (${WEEKLY_FEATURED_DISCOUNT_PCT}% de desconto)`);
+  if(!r.ok) return {ok:false, reason: ['insufficient','alreadyowned'].includes(r.reason) ? r.reason : 'error'};
+  return {ok:true};
 }
 
 // ---------- Leilão de item raro ----------
@@ -3081,25 +3124,9 @@ function isTierVotingLockedByEvent(ev){
 
 // ---------- Eventos: cosméticos, torneios do evento, botão de canto ----------
 // Dá cosméticos a um jogador SEM os duplicar. Devolve {ok, added:[ids realmente novos]}.
-// Lê e depois escreve (não é atómico — como todos os outros sítios que atribuem cosméticos).
+// Atómico (função grant_cosmetics): não apaga uma compra feita ao mesmo tempo.
 async function grantCosmetic(supabaseUrl, supabaseAnonKey, name, cosmeticIds){
-  const ids = (Array.isArray(cosmeticIds) ? cosmeticIds : [cosmeticIds]).filter(Boolean);
-  if(!name || !ids.length) return {ok:true, added:[]};
-  try{
-    const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=owned_cosmetics`, {headers: sbAuthHeaders(supabaseAnonKey)});
-    if(!res.ok) return {ok:false, added:[]};
-    const rows = await res.json();
-    if(!rows || !rows[0]) return {ok:false, added:[]};
-    const owned = rows[0].owned_cosmetics || [];
-    const added = ids.filter((id, i) => !owned.includes(id) && ids.indexOf(id) === i);
-    if(!added.length) return {ok:true, added:[]};
-    const patchRes = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}`, {
-      method:'PATCH',
-      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-      body: JSON.stringify({ owned_cosmetics: owned.concat(added) })
-    });
-    return {ok: patchRes.ok, added: patchRes.ok ? added : []};
-  } catch(e){ return {ok:false, added:[]}; }
+  return grantCosmeticAtomic(supabaseUrl, supabaseAnonKey, name, cosmeticIds);
 }
 
 // Só os torneios de UM evento (filtro por data->event->>id no servidor), já só com os campos

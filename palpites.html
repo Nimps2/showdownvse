@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20261012b">
+<link rel="stylesheet" href="styles.css?v=20261012c">
 <style>
 .match-bet-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;}
 .match-bet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
@@ -106,7 +106,7 @@
   <div class="footer-note">Aposta moedas em quem vai vencer cada partida — acerta e ganha o dobro, erra e perde a aposta. Jogos de sorte como a roleta agora ficam na <a class="nav-link" href="loja.html">loja</a>. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="showdown-utils.js?v=20261012b"></script>
+<script src="showdown-utils.js?v=20261012c"></script>
 <script>
 initTheme();
 document.getElementById('nicknamePrizeLabel').textContent = NICKNAME_VOTE_PRIZE;
@@ -320,14 +320,12 @@ async function resolvePendingPredictions(allRows){
     if(!match || !match.winner) continue; // ainda não decidido, deixa pendente
 
     const correct = match.winner === pred.predicted_winner;
-    if(correct){
-      await adjustPlayerCoins(SUPABASE_URL, SUPABASE_ANON_KEY, pred.predictor_name, pred.wager * 2, `Palpite correto: ${pred.predicted_winner}`);
+    // Reclama a aposta ANTES de pagar: se dois jogadores abrirem a página ao mesmo tempo, só um consegue (e só esse paga).
+    if(!(await claimBetResolution(SUPABASE_URL, SUPABASE_ANON_KEY, 'predictions', pred.id, correct))) continue;
+    if(correct && pred.wager > 0){
+      const paid = await adjustPlayerCoins(SUPABASE_URL, SUPABASE_ANON_KEY, pred.predictor_name, pred.wager * 2, `Palpite correto: ${pred.predicted_winner}`);
+      if(!paid) await releaseBetResolution(SUPABASE_URL, SUPABASE_ANON_KEY, 'predictions', pred.id); // volta a ficar pendente
     }
-    await fetch(`${SUPABASE_URL}/rest/v1/predictions?id=eq.${pred.id}`, {
-      method:'PATCH',
-      headers: Object.assign(sbHeaders(), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-      body: JSON.stringify({ resolved:true, correct })
-    });
   }
 }
 

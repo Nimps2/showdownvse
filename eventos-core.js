@@ -323,7 +323,7 @@ const EventCore = (function(){
   // entretanto, a resposta vem vazia e devolvemos 'changed' (o ecrã recarrega).
   const X1_DEAD = ['declined', 'cancelled'];
   const x1 = {
-    MAX_PER_WEEK: 5,   // desafios enviados por jogador por semana (só do lado do cliente; os textos leem daqui)
+    MAX_PER_WEEK: 5,   // desafios enviados por jogador por semana (os textos leem daqui; a base de dados também o garante: x1_max_per_week() no SQL mestre — mudar nos dois)
     sentThisWeek(ctx){ return ctx.x1.filter(r => r.challenger_name === ctx.me && r.week === ctx.ev.current_week && !X1_DEAD.includes(r.status)); },
     quota(ctx){ const sent = x1.sentThisWeek(ctx); return { used: sent.length, max: x1.MAX_PER_WEEK, left: Math.max(0, x1.MAX_PER_WEEK - sent.length), opponents: new Set(sent.map(r => r.opponent_name)) }; },
     // Devolve null se pode enviar, ou o motivo: 'noweek' | 'self' | 'noname' | 'quota' | 'dup'
@@ -349,7 +349,13 @@ const EventCore = (function(){
           body: JSON.stringify([{ event_id: ctx.ev.id, week: ctx.ev.current_week, challenger_name: ctx.me, opponent_name: opponent, status: 'pending' }])
         });
       } catch(e){ return { ok:false, reason:'error' }; }
-      if(!res.ok) return { ok:false, reason:'error' };
+      if(!res.ok){
+        // a própria base de dados recusa (gatilho x1_rules): quota cheia, adversário repetido ou auto-desafio
+        let txt = ''; try{ txt = await res.text(); } catch(e){}
+        const reason = /x1_quota/.test(txt) ? 'quota' : /x1_dup/.test(txt) ? 'dup' : /x1_self/.test(txt) ? 'self' : 'error';
+        if(reason !== 'error') await x1.refresh(ctx);
+        return { ok:false, reason };
+      }
       await x1.refresh(ctx);
       logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', `Desafiou ${opponent} para um x1 (semana ${ctx.ev.current_week})`);
       return { ok:true };
