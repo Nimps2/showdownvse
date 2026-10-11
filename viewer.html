@@ -676,7 +676,8 @@ function importMyMon(pIdx, idx, kind, btn){
   } else {
     currentData.draws[pIdx].free[idx] = { name: parsed.name, text: raw, src:'manual', moves: parsed.moves, item: parsed.item, ability: parsed.ability };
   }
-  saveMyDraws(pIdx, btn, raw);
+  // só o slot que mudou vai para a base de dados (não apaga o resto do sorteio nem o que outros gravaram entretanto)
+  saveMyDraws(pIdx, btn, raw, null, kind === 'random' ? { random: { [idx]: currentData.draws[pIdx].random[idx] } } : { free: { [idx]: currentData.draws[pIdx].free[idx] } });
 }
 
 // Import do time inteiro: casa cada bloco do texto colado com um dos
@@ -757,7 +758,7 @@ async function importWholeTeam(btn){
     d.free[i] = { name: e.parsed.name, text: e.raw, src:'manual', moves: e.parsed.moves, item: e.parsed.item, ability: e.parsed.ability };
   });
 
-  const ok = await saveMyDraws(pIdx, btn, raw, 'Importou o time inteiro');
+  const ok = await saveMyDraws(pIdx, btn, raw, 'Importou o time inteiro', { random: Object.assign({}, d.random), free: Object.assign({}, d.free) });
   if(!ok){
     currentData.draws[pIdx] = previous;
     fail('Não foi possível guardar — tente de novo.');
@@ -769,22 +770,22 @@ async function importWholeTeam(btn){
   if(newFeedback){ newFeedback.style.color = 'var(--success)'; newFeedback.textContent = `✓ Time importado — ${entries.length} Pokémon guardados.`; }
 }
 
-async function saveMyDraws(pIdx, btn, importedSetText, logPrefix){
+// Grava os slots do jogador na base de dados. `patch` = {random:{<slot>:set}, free:{<slot>:escolha}} — SÓ o que mudou; a função
+// tournament_set_draw_slots junta isto ao que lá está numa só operação (acabou o "ler o torneio inteiro e escrever tudo de volta",
+// que fazia um jogador apagar o set de outro, ou desfazer um reroll do organizador, quando gravavam quase ao mesmo tempo).
+async function saveMyDraws(pIdx, btn, importedSetText, logPrefix, patch){
   if(!currentTournamentId){ alert('Nenhum torneio carregado.'); return false; }
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}&select=data`, {headers: sbHeaders()});
-    if(!res.ok) throw new Error('Falha ao ler dados atuais (HTTP '+res.status+')');
-    const rows = await res.json();
-    const freshData = (rows && rows[0] && rows[0].data) || {};
-    if(!freshData.draws) freshData.draws = {};
-    freshData.draws[pIdx] = currentData.draws[pIdx];
-
-    const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?id=eq.${currentTournamentId}`, {
-      method:'PATCH',
-      headers: Object.assign(sbHeaders(), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-      body: JSON.stringify({ data: freshData })
+    const mine = currentData.draws[pIdx] || {};
+    const slots = patch || { random: Object.assign({}, mine.random), free: Object.assign({}, mine.free) };   // sem patch: todos os slots
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/tournament_set_draw_slots`, {
+      method:'POST',
+      headers: Object.assign(sbHeaders(), {'Content-Type':'application/json'}),
+      body: JSON.stringify({ p_tournament: currentTournamentId, p_idx: String(pIdx), p_random: slots.random || {}, p_free: slots.free || {} })
     });
-    if(!patchRes.ok) throw new Error('Falha ao gravar (HTTP '+patchRes.status+')');
+    if(!res.ok) throw new Error('Falha ao gravar (HTTP '+res.status+')');
+    const freshData = await res.json();
+    if(!freshData) throw new Error('Torneio não encontrado');
 
     currentData = freshData;
     renderMyDraw();
@@ -937,7 +938,7 @@ async function chooseFreeMon(name){
     let saved = false;
     for(let attempt = 0; attempt < 3 && !saved; attempt++){
       currentData.draws = Object.assign({}, currentData.draws, { [pIdx]: base });
-      if(!(await saveMyDraws(pIdx, null, name, `Escolheu pela lista a escolha livre ${slot + 1}`))) { setFpStatus('Não foi possível guardar — tenta outra vez.', true); return; }
+      if(!(await saveMyDraws(pIdx, null, name, `Escolheu pela lista a escolha livre ${slot + 1}`, { free: { [slot]: base.free[slot] } }))) { setFpStatus('Não foi possível guardar — tenta outra vez.', true); return; }
       const after = await fetchFreshDraws();   // outro jogador pode ter gravado ao mesmo tempo e sobrescrito o meu pedido
       const mine = after && after[pIdx] && after[pIdx].free && after[pIdx].free[slot];
       if(after && !(mine && mine.name === name)) continue;
@@ -946,7 +947,7 @@ async function chooseFreeMon(name){
       if(clash !== undefined && +clash < pIdx){
         base.free[slot] = previous;   // o outro jogador ganhou o desempate: devolvo a minha escolha ao que estava
         currentData.draws = Object.assign({}, currentData.draws, { [pIdx]: base });
-        await saveMyDraws(pIdx, null, null);
+        await saveMyDraws(pIdx, null, null, null, { free: { [slot]: base.free[slot] } });
         fp.draws = (await fetchFreshDraws()) || fp.draws; renderFpList();
         setFpStatus(`${name} foi escolhido por ${currentData.players[+clash]} ao mesmo tempo que tu (ficou com ele). Escolhe outro.`, true);
         return;
