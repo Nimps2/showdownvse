@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012l">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261012m">
 <style>
 .match-bet-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;}
 .match-bet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
@@ -106,7 +106,7 @@
   <div class="footer-note">Aposta moedas em quem vai vencer cada partida — acerta e ganha o dobro, erra e perde a aposta. Jogos de sorte como a roleta agora ficam na <a class="nav-link" href="loja.html">loja</a>. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261012l"></script>
+<script src="assets/js/showdown-utils.js?v=20261012m"></script>
 <script>
 initTheme();
 document.getElementById('nicknamePrizeLabel').textContent = NICKNAME_VOTE_PRIZE;
@@ -380,8 +380,8 @@ function renderOpenMatches(){
         <span class="match-bet-title">${escapeHtml(m.p1)} vs ${escapeHtml(m.p2)}<span class="tag">${escapeHtml(m.label)} · Bo${m.bo}</span></span>
       </div>
       <div class="pick-row">
-        <button class="pick-btn" id="pick-${m.id}-p1" onclick="selectPick('${m.id}','${m.p1.replace(/'/g,"\\'")}')">${escapeHtml(m.p1)}</button>
-        <button class="pick-btn" id="pick-${m.id}-p2" onclick="selectPick('${m.id}','${m.p2.replace(/'/g,"\\'")}')">${escapeHtml(m.p2)}</button>
+        <button class="pick-btn" id="pick-${m.id}-p1" onclick="selectPick('${m.id}',${jsq(m.p1)})">${escapeHtml(m.p1)}</button>
+        <button class="pick-btn" id="pick-${m.id}-p2" onclick="selectPick('${m.id}',${jsq(m.p2)})">${escapeHtml(m.p2)}</button>
       </div>
       <input type="number" id="wager-${m.id}" placeholder="Quantas moedas apostar?" min="1">
       <button class="btn-primary" onclick="placeBet('${m.id}')">Apostar</button>
@@ -509,9 +509,9 @@ async function doCastNicknameVote(){
 
 async function renderRanking(){
   const container = document.getElementById('rankingContainer');
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/predictions?resolved=eq.true&select=predictor_name,correct,wager`, {headers: sbHeaders()});
-  if(!res.ok){ container.innerHTML = '<div class="empty-state">Erro ao calcular ranking.</div>'; return; }
-  const rows = await res.json();
+  let rows;
+  try{ rows = await sbFetchAll(`${SUPABASE_URL}/rest/v1/predictions?resolved=eq.true&select=predictor_name,correct,wager&order=created_at.asc,id.asc`, SUPABASE_ANON_KEY); }   // TODOS os palpites resolvidos (o Supabase corta nas 1000 linhas por pedido)
+  catch(e){ container.innerHTML = '<div class="empty-state">Erro ao calcular ranking.</div>'; return; }
   if(!rows.length){ container.innerHTML = '<div class="empty-state">Ainda não há palpites resolvidos.</div>'; return; }
 
   const MIN_BETS = 3;

@@ -26,6 +26,10 @@ const EventCore = (function(){
       return await res.json();
     } catch(e){ return fallback; }
   }
+  // Lê TODAS as linhas (em páginas de 1000: o Supabase corta aí, mesmo sem `limit`). `path` deve trazer `order=<campo>,id` para a paginação ser estável.
+  async function getAll(path, fallback){
+    try{ return await sbFetchAll(`${URL_}/rest/v1/${path}`, KEY_); } catch(e){ return fallback; }
+  }
   // Igual, mas diz se a tabela existe (404 = ainda não correram o SQL).
   async function getJsonStatus(path){
     try{
@@ -42,7 +46,7 @@ const EventCore = (function(){
     const tournaments = await fetchEventTournaments(URL_, KEY_, ev.id);
     const since = enc(ev.starts_at || ev.created_at);
     const [claims, tx, gifts, lottery, nick, preds, board, x1data, shopData, x1Board] = await Promise.all([
-      getJson(`event_claims?event_id=eq.${enc(ev.id)}&select=id,player_name,mission_id,xp,currency,coins`, []),
+      getAll(`event_claims?event_id=eq.${enc(ev.id)}&select=id,player_name,mission_id,xp,currency,coins&order=created_at.asc,id.asc`, []),
       getJson(`coin_transactions?player_name=eq.${enc(me)}&created_at=gte.${since}&select=reason,amount,created_at`, []),
       getJson(`gifts?from_name=eq.${enc(me)}&created_at=gte.${since}&select=to_name,amount,created_at`, []),
       getJson(`lottery_tickets?buyer_name=eq.${enc(me)}&created_at=gte.${since}&select=ticket_count,created_at`, []),
@@ -78,7 +82,7 @@ const EventCore = (function(){
 
   // Todos os x1 CONFIRMADOS do evento (de toda a gente, com vencedor): alimentam a "Corrida ao Rei dos Duelos" (EventCore.x1.leaders).
   async function loadX1Board(ev){
-    const r = await getJsonStatus(`x1_challenges?event_id=eq.${enc(ev.id)}&status=in.(confirmed,resolved)&select=challenger_name,opponent_name,reported_winner&limit=5000`);
+    const r = await getJsonStatus(`x1_challenges?event_id=eq.${enc(ev.id)}&status=in.(confirmed,resolved)&select=challenger_name,opponent_name,reported_winner&limit=1000`);
     return r.ok ? r.data.filter(x => x.reported_winner) : [];
   }
 
@@ -96,7 +100,7 @@ const EventCore = (function(){
   async function loadBoard(ev){
     const m = await getJsonStatus(`event_messages?event_id=eq.${enc(ev.id)}&select=id,created_at,author_name,body,day&order=created_at.desc&limit=400`);
     if(!m.ok) return { available:false, messages:[], reactions:[] };
-    const r = await getJson(`event_message_reactions?event_id=eq.${enc(ev.id)}&select=id,message_id,reactor_name,emoji,created_at&limit=3000`, []);
+    const r = await getAll(`event_message_reactions?event_id=eq.${enc(ev.id)}&select=id,message_id,reactor_name,emoji,created_at&order=created_at.asc,id.asc`, []);
     return { available:true, messages: m.data, reactions: r };
   }
 

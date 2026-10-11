@@ -10,8 +10,34 @@
 // Showdown, faz a alteração aqui — os dois ficheiros HTML apanham a correção
 // automaticamente, sem teres de duplicar a mudança duas vezes.
 
+// Escapa texto para pôr em HTML: tanto entre tags como DENTRO de um atributo (value="...", title="...") — por isso também trata as aspas.
 function escapeHtml(s){
-  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// Texto seguro para passar como argumento num atributo de evento: onclick="fn(${jsq(nome)})". Devolve um literal de texto JavaScript ("...") já escapado
+// para HTML. NUNCA montar o argumento à mão com '${nome}' — um nome com aspas, barra ou </ parte o atributo e deixa injetar código.
+function jsq(s){
+  return escapeHtml(JSON.stringify(String(s == null ? '' : s)));
+}
+// Endereço de imagem seguro para meter num CSS url('...') / style="...": só http(s), sem espaços, aspas duplas, barras invertidas nem < >; ' ( ) ficam codificados (%27 %28 %29).
+// '' se não servir. (Para pôr dentro de um atributo HTML, passar também por escapeHtml.)
+function safeCssUrl(u){
+  u = String(u || '').trim();
+  if(!/^https?:\/\/[^\s"\\<>]+$/i.test(u)) return '';
+  return u.replace(/'/g, '%27').replace(/\(/g, '%28').replace(/\)/g, '%29');
+}
+// Lê TODAS as linhas de uma consulta REST. O Supabase devolve no máximo 1000 por pedido (mesmo com limit=5000, o excesso é cortado em silêncio),
+// por isso lê em páginas. `url` = consulta completa; para a paginação ser estável deve ter `order=<campo>,id` (desempate pelo id). Lança erro se um pedido falhar.
+async function sbFetchAll(url, anonKey, pageSize){
+  const size = pageSize || 1000, out = [];
+  for(let offset = 0; offset < 200000; offset += size){
+    const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}limit=${size}&offset=${offset}`, { headers: sbAuthHeaders(anonKey) });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    out.push(...rows);
+    if(rows.length < size) break;
+  }
+  return out;
 }
 
 function copyText(id, btn){
@@ -819,7 +845,7 @@ function avatarHtml(name, photoUrl, sizePx, effectColor, effectType, multiColor)
   if(photoUrl){
     innerHtml = `<img src="${photoUrl.replace(/"/g,'&quot;')}" alt="${(name||'').replace(/"/g,'&quot;')}" width="${size}" height="${size}" loading="lazy" decoding="async" style="width:${size}px;height:${size}px;border-radius:${contentRadius}px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none';">`;
   } else {
-    const initials = (name||'?').slice(0,2).toUpperCase();
+    const initials = escapeHtml((name||'?').slice(0,2).toUpperCase());
     innerHtml = `<div style="width:${size}px;height:${size}px;border-radius:${contentRadius}px;flex-shrink:0;background:linear-gradient(135deg,var(--tera-violet),var(--tera-cyan));display:flex;align-items:center;justify-content:center;font-family:'Chakra Petch',sans-serif;font-size:${Math.round(size*0.4)}px;font-weight:700;color:#0a0c14;">${initials}</div>`;
   }
 
@@ -985,8 +1011,9 @@ function buildHoverCardHtml(name, playerStats, playerProfiles, currentTrophies, 
 // — chamado depois de definir o innerHTML, já que o innerHTML não mexe no
 // estilo do contentor.
 function applyHoverCardBackground(cardEl, result){
-  if(result.hasCustomBg && result.bgUrl){
-    cardEl.style.backgroundImage = `linear-gradient(rgba(10,12,20,0.82),rgba(10,12,20,0.82)), url('${result.bgUrl.replace(/'/g,"\\'")}')`;
+  const bgUrl = result.hasCustomBg ? safeCssUrl(result.bgUrl) : '';      // só endereços http(s) sem caracteres perigosos
+  if(bgUrl){
+    cardEl.style.backgroundImage = `linear-gradient(rgba(10,12,20,0.82),rgba(10,12,20,0.82)), url('${bgUrl}')`;
     cardEl.style.backgroundSize = 'cover';
     cardEl.style.backgroundPosition = 'center';
   } else {
@@ -1308,9 +1335,8 @@ async function acceptTradeOffer(supabaseUrl, supabaseAnonKey, offer){
 }
 
 async function fetchGenerosityRanking(supabaseUrl, supabaseAnonKey){
-  const res = await fetch(`${supabaseUrl}/rest/v1/gifts?select=from_name,amount`, {headers: sbAuthHeaders(supabaseAnonKey)});
-  if(!res.ok) return [];
-  const rows = await res.json();
+  let rows;
+  try{ rows = await sbFetchAll(`${supabaseUrl}/rest/v1/gifts?select=from_name,amount&order=created_at.asc,id.asc`, supabaseAnonKey); } catch(e){ return []; }
   const totals = {};
   rows.forEach(r=>{ totals[r.from_name] = (totals[r.from_name]||0) + r.amount; });
   return Object.entries(totals).sort((a,b)=>b[1]-a[1]);
@@ -1504,9 +1530,8 @@ async function castTierVote(supabaseUrl, supabaseAnonKey, name, tier, amount){
 }
 
 async function fetchTierVoteStandings(supabaseUrl, supabaseAnonKey){
-  const res = await fetch(`${supabaseUrl}/rest/v1/tier_votes?select=tier,amount`, {headers: sbAuthHeaders(supabaseAnonKey)});
-  if(!res.ok) return [];
-  const rows = await res.json();
+  let rows;
+  try{ rows = await sbFetchAll(`${supabaseUrl}/rest/v1/tier_votes?select=tier,amount&order=created_at.asc,id.asc`, supabaseAnonKey); } catch(e){ return []; }
   const totals = {};
   rows.forEach(r=>{ totals[r.tier] = (totals[r.tier]||0) + r.amount; });
   return Object.entries(totals).sort((a,b)=>b[1]-a[1]);
@@ -1633,10 +1658,12 @@ function renderPlayerCornerBadge(name, profile){
 // Reaproveita o histórico de transações já existente (cada giro fica lá
 // registado como "Roleta: <resultado>"), sem precisar de tabela nova.
 async function fetchRouletteTransactions(supabaseUrl, supabaseAnonKey, name, limit){
-  let url = `${supabaseUrl}/rest/v1/coin_transactions?reason=like.Roleta:*&select=*&order=created_at.desc`;
+  let url = `${supabaseUrl}/rest/v1/coin_transactions?reason=like.Roleta:*&select=*&order=created_at.desc,id.desc`;
   if(name) url += `&player_name=eq.${encodeURIComponent(name)}`;
-  if(limit) url += `&limit=${limit}`;
-  const res = await fetch(url, {headers: sbAuthHeaders(supabaseAnonKey)});
+  if(!limit){                                    // sem limite = TODOS os giros (o ranking soma-os): lê em páginas, porque o Supabase corta nas 1000 linhas
+    try{ return await sbFetchAll(url, supabaseAnonKey); } catch(e){ return []; }
+  }
+  const res = await fetch(url + `&limit=${limit}`, {headers: sbAuthHeaders(supabaseAnonKey)});
   if(!res.ok) return [];
   return await res.json();
 }

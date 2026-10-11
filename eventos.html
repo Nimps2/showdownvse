@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@600;700&family=Special+Elite&family=Caveat:wght@500;600&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012l">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261012m">
 <style>
 /* O visual de cada evento vive em eventos/<slug>.css (carregado dinamicamente). */
 #eventRoot{min-height:240px;}
@@ -82,8 +82,8 @@
   <div class="footer-note">As missões são calculadas a partir do que já fizeste no site — clica em "Reclamar" para receber os prémios.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261012l"></script>
-<script src="assets/js/eventos-core.js?v=20261012l"></script>
+<script src="assets/js/showdown-utils.js?v=20261012m"></script>
+<script src="assets/js/eventos-core.js?v=20261012m"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -193,7 +193,7 @@ const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && 
 // Versão dos ficheiros do evento (showdown-utils.js, eventos-core.js e eventos/<slug>.*): MUDAR (aqui e nas
 // duas <script src="...?v="> lá em cima) sempre que algum deles mudar, para o browser não misturar ficheiros
 // novos com versões antigas em cache.
-const EV_ASSET_VERSION = '20261012l';
+const EV_ASSET_VERSION = '20261012m';
 
 // Carrega o CSS e o JS do evento ativo (cada evento tem o seu par). O slug só pode ter a-z, 0-9 e "-".
 function loadEventAssets(slug){
@@ -223,8 +223,8 @@ async function loadPastEvents(){
     const evs = await res.json();
     if(!evs.length) return [];
     const ids = evs.map(e => e.id).join(',');
-    const cres = await fetch(`${SUPABASE_URL}/rest/v1/event_claims?event_id=in.(${ids})&select=event_id,player_name,xp,currency&limit=5000`, { headers: sbHeaders() });
-    const claims = cres.ok ? await cres.json() : [];
+    let claims = [];
+    try{ claims = await sbFetchAll(`${SUPABASE_URL}/rest/v1/event_claims?event_id=in.(${ids})&select=event_id,player_name,xp,currency&order=created_at.asc,id.asc`, SUPABASE_ANON_KEY); } catch(e){ claims = []; }
     const tours = await Promise.all(evs.map(e => fetchEventTournaments(SUPABASE_URL, SUPABASE_ANON_KEY, e.id)));
     return evs.map((ev, i) => {
       const map = {};
@@ -272,7 +272,7 @@ async function init(){
   const root = document.getElementById('eventRoot');
   // Depois de uma atualização do site, o browser pode ainda ter em cache o showdown-utils.js antigo
   // (sem as funções do evento). Em vez de um erro genérico, diz o que fazer.
-  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || !EventCore.shop || typeof EventCore.x1.leaders !== 'function' || !EventCore.x1.FORMATS || !EventCore.x1.TEAM_MODES || typeof EventCore.x1.setReplays !== 'function' || typeof nameFxClass !== 'function' || !getCosmeticById('frame_vm_esquadrilha') || !getCosmeticById('frame_vm_balao')){
+  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || !EventCore.shop || typeof EventCore.x1.leaders !== 'function' || !EventCore.x1.FORMATS || !EventCore.x1.TEAM_MODES || typeof EventCore.x1.setReplays !== 'function' || typeof sbFetchAll !== 'function' || typeof nameFxClass !== 'function' || !getCosmeticById('frame_vm_esquadrilha') || !getCosmeticById('frame_vm_balao')){
     setStatus(false, 'Ficheiros antigos em cache.');
     root.innerHTML = '<div class="card"><div class="empty-state">O teu browser ainda tem ficheiros antigos do site em cache. Faz <b>Ctrl+F5</b> para atualizar e abre esta página outra vez.</div></div>';
     return;

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012l">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261012m">
 <style>
 .customize-toggle-btn{
   background:var(--bg-card);border:1px solid var(--line);color:var(--tera-cyan);padding:9px 16px;
@@ -117,7 +117,7 @@
   <div class="footer-note">Estatísticas calculadas a partir de todos os torneios guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261012l"></script>
+<script src="assets/js/showdown-utils.js?v=20261012m"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -328,9 +328,10 @@ async function renderProfile(){
   const titleCosmetic = profile.equippedTitle ? getCosmeticById(profile.equippedTitle) : null;
   const equippedBadges = (profile.equippedBadges || []).map(id=>getCosmeticById(id)).filter(Boolean);
   const avatar = avatarHtml(name, profile.photo_url, 56, bgCosmetic ? bgCosmetic.color : null, frameCosmetic ? frameCosmetic.effect : null, bgCosmetic ? !!bgCosmetic.multiColor : false);
-  const hasCustomPageBg = (profile.ownedCosmetics||[]).includes('feature_custom_pagebg') && profile.profileBackgroundUrl;
+  const pageBgUrl = (profile.ownedCosmetics||[]).includes('feature_custom_pagebg') ? safeCssUrl(profile.profileBackgroundUrl) : '';
+  const hasCustomPageBg = !!pageBgUrl;
   const cardBgStyle = hasCustomPageBg
-    ? `background-image:linear-gradient(rgba(10,12,20,0.72),rgba(10,12,20,0.72)),url('${profile.profileBackgroundUrl.replace(/'/g,"\\'")}');background-size:cover;background-position:center;`
+    ? escapeHtml(`background-image:linear-gradient(rgba(10,12,20,0.72),rgba(10,12,20,0.72)),url('${pageBgUrl}');background-size:cover;background-position:center;`)      // vai dentro de style="..."
     : '';
 
   // Fundo da PÁGINA inteira (diferente do fundo do cartão acima) — cosmético
@@ -338,9 +339,10 @@ async function renderProfile(){
   // sempre que se renderiza este perfil (próprio ou de outro jogador) e
   // remove-se sozinho quando não há nada a mostrar, para não ficar "pegado"
   // ao trocar de perfil.
-  const hasCustomSiteBg = (profile.ownedCosmetics||[]).includes('feature_custom_sitebg') && profile.siteBackgroundUrl;
+  const siteBgUrl = (profile.ownedCosmetics||[]).includes('feature_custom_sitebg') ? safeCssUrl(profile.siteBackgroundUrl) : '';
+  const hasCustomSiteBg = !!siteBgUrl;
   if(hasCustomSiteBg){
-    document.body.style.backgroundImage = `linear-gradient(rgba(10,12,20,0.72),rgba(10,12,20,0.72)),url('${profile.siteBackgroundUrl.replace(/'/g,"\\'")}')`;
+    document.body.style.backgroundImage = `linear-gradient(rgba(10,12,20,0.72),rgba(10,12,20,0.72)),url('${siteBgUrl}')`;
     document.body.style.backgroundSize = 'cover';
     document.body.style.backgroundPosition = 'center';
     document.body.style.backgroundAttachment = 'fixed';
@@ -886,7 +888,7 @@ function renderCompare(){
       <div class="stat-box"><div class="n">${rec.losses}</div><div class="l">Derrotas</div></div>
       <div class="stat-box"><div class="n">${winrate}%</div><div class="l">Winrate</div></div>
     </div>
-    <button class="shop-btn" style="margin-top:10px;width:100%;" onclick="downloadHeadToHeadCard('${myName.replace(/'/g,"\\'")}','${opponent.replace(/'/g,"\\'")}',${rec.wins},${rec.losses})">📸 Gerar cartão para partilhar</button>
+    <button class="shop-btn" style="margin-top:10px;width:100%;" onclick="downloadHeadToHeadCard(${jsq(myName)},${jsq(opponent)},${rec.wins},${rec.losses})">📸 Gerar cartão para partilhar</button>
   `;
 }
 

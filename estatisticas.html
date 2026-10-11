@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012l">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261012m">
 <style>
 .highlight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
 .highlight-box{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
@@ -178,7 +178,7 @@
 
 <div class="hover-card" id="hoverCard"></div>
 
-<script src="assets/js/showdown-utils.js?v=20261012l"></script>
+<script src="assets/js/showdown-utils.js?v=20261012m"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -482,12 +482,12 @@ function renderHighlights(){
   let html = `<h2>Resumo geral</h2><div class="highlight-grid">`;
   html += `<div class="highlight-box"><div class="label">Torneios</div><div class="value">${totalTournaments}</div></div>`;
   html += `<div class="highlight-box"><div class="label">Pokémon distintos</div><div class="value">${distinctCount}</div></div>`;
-  html += `<div class="highlight-box"><div class="label">Pokémon mais usado</div><div class="value">${topPokeEntry?topPokeEntry[0]:'—'}</div><div class="sub">${topPokeEntry?topPokeEntry[1].total+' vezes':''}</div></div>`;
-  html += `<div class="highlight-box"><div class="label">Golpe mais visto</div><div class="value">${topMoveEntry?topMoveEntry[0]:'—'}</div><div class="sub">${topMoveEntry?topMoveEntry[1]+' vezes':''}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Pokémon mais usado</div><div class="value">${topPokeEntry?escapeHtml(topPokeEntry[0]):'—'}</div><div class="sub">${topPokeEntry?topPokeEntry[1].total+' vezes':''}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Golpe mais visto</div><div class="value">${topMoveEntry?escapeHtml(topMoveEntry[0]):'—'}</div><div class="sub">${topMoveEntry?topMoveEntry[1]+' vezes':''}</div></div>`;
   html += `</div>`;
   if(topLucky){
     const wr = ((topLucky[1].wins/(topLucky[1].wins+topLucky[1].losses))*100).toFixed(0);
-    html += `<div style="margin-top:10px;font-size:12px;color:var(--text-dim);">🍀 Pokémon da sorte (mín. 3 partidas do time em que saiu): <b style="color:var(--tera-cyan);">${topLucky[0]}</b> — ${wr}% de vitórias em ${topLucky[1].wins+topLucky[1].losses} partida(s)</div>`;
+    html += `<div style="margin-top:10px;font-size:12px;color:var(--text-dim);">🍀 Pokémon da sorte (mín. 3 partidas do time em que saiu): <b style="color:var(--tera-cyan);">${escapeHtml(topLucky[0])}</b> — ${wr}% de vitórias em ${topLucky[1].wins+topLucky[1].losses} partida(s)</div>`;
   }
   if(!totalTournaments){
     html += '<div class="empty-state" style="margin-top:16px;">Ainda não há torneios guardados.</div>';
@@ -607,14 +607,14 @@ function renderPlayerHighlights(){
   let html = `<h2>Resumo geral</h2><div class="highlight-grid">`;
   html += `<div class="highlight-box"><div class="label">Torneios</div><div class="value">${totalTournaments}</div></div>`;
   html += `<div class="highlight-box"><div class="label">Jogadores distintos</div><div class="value">${distinctCount}</div></div>`;
-  html += `<div class="highlight-box"><div class="label">Nº1 do ranking (Elo)</div><div class="value">${topEloEntry?topEloEntry[0]:'—'}</div><div class="sub">${topEloEntry?topEloEntry[1]+' pontos':''}</div></div>`;
-  html += `<div class="highlight-box"><div class="label">Mais vitórias</div><div class="value">${topWins?topWins[0]:'—'}</div><div class="sub">${topWins?topWins[1].wins+' vitórias':''}</div></div>`;
-  html += `<div class="highlight-box"><div class="label">Mais títulos</div><div class="value">${topTitles&&topTitles[1].titles>0?topTitles[0]:'—'}</div><div class="sub">${topTitles&&topTitles[1].titles>0?topTitles[1].titles+' título(s)':''}</div></div>`;
-  html += `<div class="highlight-box"><div class="label">🔥 Em sequência</div><div class="value">${topStreak?topStreak[0]:'—'}</div><div class="sub">${topStreak?topStreak[1].count+' vitórias seguidas':''}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Nº1 do ranking (Elo)</div><div class="value">${topEloEntry?escapeHtml(topEloEntry[0]):'—'}</div><div class="sub">${topEloEntry?topEloEntry[1]+' pontos':''}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Mais vitórias</div><div class="value">${topWins?escapeHtml(topWins[0]):'—'}</div><div class="sub">${topWins?topWins[1].wins+' vitórias':''}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">Mais títulos</div><div class="value">${topTitles&&topTitles[1].titles>0?escapeHtml(topTitles[0]):'—'}</div><div class="sub">${topTitles&&topTitles[1].titles>0?topTitles[1].titles+' título(s)':''}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">🔥 Em sequência</div><div class="value">${topStreak?escapeHtml(topStreak[0]):'—'}</div><div class="sub">${topStreak?topStreak[1].count+' vitórias seguidas':''}</div></div>`;
   html += `</div>`;
   if(topWinrate){
     const wr = ((topWinrate[1].wins/(topWinrate[1].wins+topWinrate[1].losses))*100).toFixed(0);
-    html += `<div style="margin-top:10px;font-size:12px;color:var(--text-dim);">Melhor winrate (mín. 3 partidas): <b style="color:var(--tera-cyan);">${topWinrate[0]}</b> — ${wr}%</div>`;
+    html += `<div style="margin-top:10px;font-size:12px;color:var(--text-dim);">Melhor winrate (mín. 3 partidas): <b style="color:var(--tera-cyan);">${escapeHtml(topWinrate[0])}</b> — ${wr}%</div>`;
   }
   if(!totalTournaments){
     html += '<div class="empty-state" style="margin-top:16px;">Ainda não há torneios guardados.</div>';
@@ -684,7 +684,7 @@ function renderPlayerList(){
 
     return `<div class="player-card">
       <div class="player-card-head">
-        <a href="perfil.html?jogador=${encodeURIComponent(name)}" style="display:flex;align-items:center;gap:10px;text-decoration:none;" onmouseover="showHoverCard(event,'${name.replace(/'/g,"\\'")}')" onmousemove="positionHoverCard(event)" onmouseout="hideHoverCard()">
+        <a href="perfil.html?jogador=${encodeURIComponent(name)}" style="display:flex;align-items:center;gap:10px;text-decoration:none;" onmouseover="showHoverCard(event,${jsq(name)})" onmousemove="positionHoverCard(event)" onmouseout="hideHoverCard()">
           ${avatar}
           <span>
             <span class="player-card-name" style="color:${profile.equippedAccent && getCosmeticById(profile.equippedAccent) ? getCosmeticById(profile.equippedAccent).color : 'var(--text-main)'};">${trophyEmojiFor(name, currentTrophies)} ${escapeHtml(displayName)}</span>

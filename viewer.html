@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012l">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261012m">
 <style>
 :root{ --bg-code:#0d0f18; }
 body.light-theme{ --bg-code:#e4e7f0; }
@@ -176,7 +176,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
 
 <div class="hover-card" id="hoverCard"></div>
 
-<script src="assets/js/showdown-utils.js?v=20261012l"></script>
+<script src="assets/js/showdown-utils.js?v=20261012m"></script>
 <script>
 initTheme();
 // SUPABASE_URL e SUPABASE_ANON_KEY são definidos no próximo bloco de script,
@@ -440,7 +440,7 @@ function matchRow(m){
     const profile = playerProfiles[n] || {};
     const accentCosmetic = profile.equippedAccent ? getCosmeticById(profile.equippedAccent) : null;
     const color = accentCosmetic ? accentCosmetic.color : 'inherit';
-    return `<a class="p ${cls}" style="text-decoration:none;color:${color};" href="perfil.html?jogador=${encodeURIComponent(n)}" onmouseover="showHoverCard(event,'${n.replace(/'/g,"\\'")}')" onmousemove="positionHoverCard(event)" onmouseout="hideHoverCard()">${escapeHtml(n)}</a>`;
+    return `<a class="p ${cls}" style="text-decoration:none;color:${color};" href="perfil.html?jogador=${encodeURIComponent(n)}" onmouseover="showHoverCard(event,${jsq(n)})" onmousemove="positionHoverCard(event)" onmouseout="hideHoverCard()">${escapeHtml(n)}</a>`;
   };
 
   const replayUrls = m.replayUrls || (m.replayUrl ? [m.replayUrl] : []);
@@ -600,16 +600,16 @@ function renderMyDraw(){
     const boxId = `box-r-${i}`;
     const pasteId = `paste-r-${i}`;
     const nick = r.text ? (parseShowdownImport(r.text)||{}).nickname : null;
-    const monLabel = nick ? `${escapeHtml(nick)} <span style="color:var(--text-faint);font-weight:400;">(${r.mon})</span>` : r.mon;
+    const monLabel = nick ? `${escapeHtml(nick)} <span style="color:var(--text-faint);font-weight:400;">(${escapeHtml(r.mon)})</span>` : escapeHtml(r.mon);
     html += `<div class="mon-block">
       <div class="mon-head">
         <span class="mon-name">${pokeSpriteHtml(r.mon, 48)}<span>${monLabel}</span></span>
         <span><button class="copy-btn" onclick="copyText('${boxId}', this)">Copiar</button><span class="copied-msg">Copiado!</span></span>
       </div>
       <div class="import-box" id="${boxId}">${escapeHtml(r.text || r.mon)}</div>
-      ${r.text ? `<button class="copy-btn" style="margin-top:6px;" onclick="doFavoriteSet('${boxId}','${r.mon.replace(/'/g,"\\'")}')">⭐ Favoritar este set</button>` : ''}
-      ${importSection(pasteId, `<button class="copy-btn" onclick="importMyMon(${pIdx},${i},'random', this)">Importar e salvar</button><span class="save-msg"></span>`, `${r.mon} @ Leftovers&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2`)}
-      ${!locked ? `<button class="copy-btn" style="margin-top:6px;" onclick="requestReroll(${pIdx},${i},'${r.mon.replace(/'/g,"\\'")}')">🎲 Pedir reroll (${computeRerollPrice(myRerollCount)} 🪙)</button>` : ''}
+      ${r.text ? `<button class="copy-btn" style="margin-top:6px;" onclick="doFavoriteSet('${boxId}',${jsq(r.mon)})">⭐ Favoritar este set</button>` : ''}
+      ${importSection(pasteId, `<button class="copy-btn" onclick="importMyMon(${pIdx},${i},'random', this)">Importar e salvar</button><span class="save-msg"></span>`, `${escapeHtml(r.mon)} @ Leftovers&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2`)}
+      ${!locked ? `<button class="copy-btn" style="margin-top:6px;" onclick="requestReroll(${pIdx},${i},${jsq(r.mon)})">🎲 Pedir reroll (${computeRerollPrice(myRerollCount)} 🪙)</button>` : ''}
     </div>`;
   });
   (d.free||[]).forEach((f,i)=>{
@@ -624,16 +624,16 @@ function renderMyDraw(){
       return;
     }
     const freeNick = f.text ? (parseShowdownImport(f.text)||{}).nickname : null;
-    const freeLabel = freeNick ? `${escapeHtml(freeNick)} <span style="color:var(--text-faint);font-weight:400;">(${f.name})</span>` : f.name;
+    const freeLabel = freeNick ? `${escapeHtml(freeNick)} <span style="color:var(--text-faint);font-weight:400;">(${escapeHtml(f.name)})</span>` : escapeHtml(f.name);
     html += `<div class="mon-block free">
       <div class="mon-head">
         <span class="mon-name free-label"><span>Escolha livre ${i+1}:</span>${pokeSpriteHtml(f.name, 48)}<span>${freeLabel}</span></span>
         <span><button class="copy-btn" onclick="copyText('${boxId}', this)">Copiar</button><span class="copied-msg">Copiado!</span></span>
       </div>
       <div class="import-box" id="${boxId}">${escapeHtml(f.text || f.name)}</div>
-      ${f.text ? `<button class="copy-btn" style="margin-top:6px;" onclick="doFavoriteSet('${boxId}','${f.name.replace(/'/g,"\\'")}')">⭐ Favoritar este set</button>` : ''}
+      ${f.text ? `<button class="copy-btn" style="margin-top:6px;" onclick="doFavoriteSet('${boxId}',${jsq(f.name)})">⭐ Favoritar este set</button>` : ''}
       ${freePickButton(i, true)}
-      ${importSection(pasteId, `<button class="copy-btn" onclick="importMyMon(${pIdx},${i},'free', this)">Importar e salvar</button><span class="save-msg"></span>`, `${f.name} @ Leftovers&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2`)}
+      ${importSection(pasteId, `<button class="copy-btn" onclick="importMyMon(${pIdx},${i},'free', this)">Importar e salvar</button><span class="save-msg"></span>`, `${escapeHtml(f.name)} @ Leftovers&#10;Ability: ...&#10;EVs: 252 HP / ...&#10;Jolly Nature&#10;- Move 1&#10;- Move 2`)}
     </div>`;
   });
   html += `</div>`;
