@@ -70,7 +70,7 @@ const EventCore = (function(){
   function signature(ctx){
     const tour = ctx.tournaments.map(t => t.id + ':' + t.status + ':' + ((t.data && t.data.matches) || []).map(m => m.winner || '').join(',')).join('|');
     const board = (ctx.board.messages || []).map(m => m.id).join(',') + '/' + (ctx.board.reactions || []).map(r => r.id + r.emoji).join(',');
-    const x1 = (ctx.x1 || []).map(r => [r.id, r.status, r.replay_path || '', r.reported_winner || '', r.best_of || 1, r.score_challenger == null ? '' : r.score_challenger + '-' + r.score_opponent].join(':')).join(',');
+    const x1 = (ctx.x1 || []).map(r => [r.id, r.status, r.replay_path || '', r.reported_winner || '', r.best_of || 1, r.score_challenger == null ? '' : r.score_challenger + '-' + r.score_opponent, r.team_mode || 'free', (r.team_challenger || []).length, (r.team_opponent || []).length].join(':')).join(',');
     const shop = ctx.shop ? ctx.shop.purchases.map(p => p.item_id).join(',') : '';
     const duels = (ctx.x1Board || []).map(x => x.reported_winner + x.challenger_name + x.opponent_name).join(',');
     return [tour, ctx.claims.length, ctx.tx.length, ctx.gifts.length, ctx.lottery.length, ctx.nick.length, ctx.preds.length, board, x1, shop, duels].join('#');
@@ -389,13 +389,97 @@ const EventCore = (function(){
       return out;
     },
     replayLinks(r){ return splitReplayPaths(r.replay_path); },
-    async send(ctx, opponent, bestOf){
+
+    // ---- Times do duelo ----
+    // `team_mode`: 'free' (cada um leva os seus 6; por defeito) | 'random' (o sistema sorteia 6 para cada um ao ACEITAR: só da região da semana, forma original,
+    // sem repetidos entre os dois). Cada jogador pode importar/exportar o seu time (6 sets em formato Showdown); `team_challenger`/`team_opponent` = [{name, text}].
+    TEAM_MODES: ['free', 'random'],
+    teamModeLabel(m){ return m === 'random' ? '🎲 Aleatórios' : '✋ Livres'; },
+    teamKey(r, name){ return r.challenger_name === name ? 'team_challenger' : (r.opponent_name === name ? 'team_opponent' : null); },
+    // No modo livre o time do adversário só se vê quando os dois já registaram o seu (ou o resultado já foi registado); no aleatório os dois sorteios são públicos.
+    teamsRevealed(r){
+      if(r.team_mode === 'random') return !!(r.team_challenger && r.team_opponent);
+      return !!(r.team_challenger && r.team_opponent) || ['reported', 'confirmed', 'disputed', 'resolved'].includes(r.status);
+    },
+    // Sorteia 6 espécies para cada um (12 espécies base diferentes) da região: a mesma lista (com sets) que o sorteio do torneio usa. null = sem Pokémon que chegue.
+    async drawTeams(regionKey){
+      let names = null;
+      try{
+        const pools = await fetchTierPools();
+        if(pools && pools.pools){ const key = (pools.alias && pools.alias['National Dex AG']) || 'National Dex AG'; names = (pools.pools[key] || []).filter(n => isSpeciesAllowedInEventRegion(n, regionKey)); }
+      } catch(e){ names = null; }
+      if(!names || names.length < 12) names = freePickCandidates(null, 'Evento', { region: regionKey }) || [];
+      const byBase = {};
+      names.forEach(n => { const b = getBaseSpecies(n); (byBase[b] = byBase[b] || []).push(n); });
+      const bases = Object.keys(byBase);
+      if(bases.length < 12) return null;
+      const rnd = n => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; };
+      for(let i = bases.length - 1; i > 0; i--){ const j = rnd(i + 1); [bases[i], bases[j]] = [bases[j], bases[i]]; }
+      const chosen = bases.slice(0, 12).map(b => byBase[b][rnd(byBase[b].length)]);
+      const mk = list => list.map(n => ({ name: n, text: '' }));
+      return { challenger: mk(chosen.slice(0, 6)), opponent: mk(chosen.slice(6, 12)) };
+    },
+    // Lê um time colado (formato Showdown: os 6 sets separados por uma linha em branco) e valida-o. Devolve {ok, errors:[texto], team:[{name,text}]}.
+    // Livre: 6 espécies diferentes, da região da semana e em forma original. Aleatório: tem de ser exatamente os 6 sorteados (por qualquer ordem; os sets são teus).
+    parseTeam(text, r, regionKey, ownTeam){
+      const entries = parseShowdownTeamImport(String(text || ''));
+      if(!entries.length) return { ok:false, errors:['Não reconheci nenhum Pokémon neste texto — cola o time exportado do Showdown (os 6 Pokémon separados por uma linha em branco).'], team:[] };
+      const errors = [];
+      if(entries.length !== 6) errors.push(`O time tem de ter exatamente 6 Pokémon (encontrei ${entries.length}).`);
+      const seen = {};
+      entries.forEach(e => { const b = getBaseSpecies(e.parsed.name); (seen[b] = seen[b] || []).push(e.parsed.name); });
+      Object.keys(seen).forEach(b => { if(seen[b].length > 1) errors.push(`Não podes ter a mesma espécie duas vezes (${seen[b].join(', ')}).`); });
+      let ordered = entries;
+      if(r.team_mode === 'random'){
+        const drawn = (ownTeam || []).map(m => m.name), used = new Array(entries.length).fill(false), pick = [];
+        const norm = s => String(s || '').trim().toLowerCase();
+        const missing = [];
+        drawn.forEach(d => { const i = entries.findIndex((e, k) => !used[k] && norm(e.parsed.name) === norm(d)); if(i === -1) missing.push(d); else { used[i] = true; pick.push(entries[i]); } });
+        const extra = entries.filter((e, k) => !used[k]).map(e => e.parsed.name);
+        if(missing.length) errors.push(`Faltam no texto os teus sorteados: ${missing.join(', ')}.`);
+        if(extra.length) errors.push(`Não são dos teus sorteados: ${extra.join(', ')}.`);
+        if(!missing.length && !extra.length) ordered = pick;       // fica na ordem do sorteio
+      } else if(regionKey && EVENT_REGIONS[regionKey]){
+        const reg = EVENT_REGIONS[regionKey];
+        entries.forEach(e => {
+          const n = e.parsed.name;
+          if(isSpeciesAllowedInEventRegion(n, regionKey)) return;
+          const found = getEventRegionOfSpecies(n);
+          errors.push(found === regionKey ? `${n} é uma forma regional — só vale a forma original.` : `${n} não é de ${reg.label} (${reg.dex})${found && EVENT_REGIONS[found] ? ' — é de ' + EVENT_REGIONS[found].label : ' — é de outra geração'}.`);
+        });
+      }
+      return { ok: errors.length === 0, errors, team: ordered.map(e => ({ name: e.parsed.name, text: e.raw.slice(0, 3000) })) };
+    },
+    exportTeam(team){ return (team || []).map(m => (m.text && m.text.trim()) || m.name).join('\n\n'); },
+    // Grava o time DESTE jogador (só a sua coluna: não pisa o do adversário) depois de o desafio ser aceite. Razões: notyours | notyet | error
+    async saveTeam(ctx, id, team){
+      const r = x1.get(ctx, id), key = r && x1.teamKey(r, ctx.me);
+      if(!r || !key) return { ok:false, reason:'notyours' };
+      if(!['accepted', 'reported', 'disputed', 'confirmed', 'resolved'].includes(r.status)) return { ok:false, reason:'notyet' };
+      let res;
+      try{
+        res = await fetch(`${URL_}/rest/v1/x1_challenges?id=eq.${enc(id)}&status=in.(accepted,reported,disputed,confirmed,resolved)`, {
+          method:'PATCH',
+          headers: Object.assign(sbAuthHeaders(KEY_), { 'Content-Type':'application/json', 'Prefer':'return=representation' }),
+          body: JSON.stringify({ [key]: team })
+        });
+      } catch(e){ return { ok:false, reason:'error' }; }
+      if(!res.ok) return { ok:false, reason:'error' };
+      const rows = await res.json();
+      await x1.refresh(ctx);
+      if(!rows || !rows.length) return { ok:false, reason:'notyet' };
+      logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', `Registou o time do x1 ${r.challenger_name} vs ${r.opponent_name}`);
+      return { ok:true };
+    },
+    async send(ctx, opponent, bestOf, teamMode){
       await x1.refresh(ctx); // quota com dados frescos
       const why = x1.cannotSend(ctx, opponent);
       if(why) return { ok:false, reason: why };
       const fmt = x1.FORMATS.includes(+bestOf) ? +bestOf : 1;
+      const mode = x1.TEAM_MODES.includes(teamMode) ? teamMode : 'free';
       const row = { event_id: ctx.ev.id, week: ctx.ev.current_week, challenger_name: ctx.me, opponent_name: opponent, status: 'pending' };
       if(fmt > 1) row.best_of = fmt;     // melhor de 1 não envia o campo: continua a funcionar mesmo que a base ainda não tenha a coluna
+      if(mode === 'random') row.team_mode = mode;     // idem: times livres é o valor por defeito
       let res;
       try{
         res = await fetch(`${URL_}/rest/v1/x1_challenges`, {
@@ -407,13 +491,14 @@ const EventCore = (function(){
       if(!res.ok){
         // a própria base de dados recusa (gatilho x1_rules): quota cheia, adversário repetido ou auto-desafio
         let txt = ''; try{ txt = await res.text(); } catch(e){}
-        const reason = /x1_quota/.test(txt) ? 'quota' : /x1_dup/.test(txt) ? 'dup' : /x1_self/.test(txt) ? 'self' : (fmt > 1 && /best_of/.test(txt) ? 'noformat' : 'error');
-        if(reason !== 'error' && reason !== 'noformat') await x1.refresh(ctx);
+        const reason = /x1_quota/.test(txt) ? 'quota' : /x1_dup/.test(txt) ? 'dup' : /x1_self/.test(txt) ? 'self'
+          : (mode === 'random' && /team_mode/.test(txt) ? 'nomode' : (fmt > 1 && /best_of/.test(txt) ? 'noformat' : 'error'));
+        if(reason !== 'error' && reason !== 'noformat' && reason !== 'nomode') await x1.refresh(ctx);
         return { ok:false, reason };
       }
       await x1.refresh(ctx);
-      logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', `Desafiou ${opponent} para um x1 ${x1.formatLabel(fmt)} (semana ${ctx.ev.current_week})`);
-      return { ok:true, bestOf: fmt };
+      logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', `Desafiou ${opponent} para um x1 ${x1.formatLabel(fmt)}${mode === 'random' ? ' com times aleatórios' : ''} (semana ${ctx.ev.current_week})`);
+      return { ok:true, bestOf: fmt, teamMode: mode };
     },
     // Só aceita links do Showdown (o do replay, ou o da sala da batalha, que se converte para o do replay): o que um jogador escreve aqui
     // aparece como link para todos, por isso nada de endereços arbitrários. '' = sem link; null = inválido. (A lógica vive em showdown-utils.js.)
@@ -438,11 +523,17 @@ const EventCore = (function(){
     },
     get(ctx, id){ return ctx.x1.find(r => r.id === id) || null; },
     // O adversário aceita ou recusa
-    respond(ctx, id, accept){
+    // regionKey = região da semana do desafio (para o sorteio dos times, no modo aleatório)
+    async respond(ctx, id, accept, regionKey){
       const r = x1.get(ctx, id);
-      if(!r || r.opponent_name !== ctx.me) return Promise.resolve({ ok:false, reason:'notyours' });
-      return x1._go(ctx, id, 'pending', accept ? { status:'accepted', accepted_at: new Date().toISOString() } : { status:'declined' },
-        `${accept ? 'Aceitou' : 'Recusou'} o desafio x1 de ${r.challenger_name}`);
+      if(!r || r.opponent_name !== ctx.me) return { ok:false, reason:'notyours' };
+      const patch = accept ? { status:'accepted', accepted_at: new Date().toISOString() } : { status:'declined' };
+      if(accept && r.team_mode === 'random'){
+        const t = await x1.drawTeams(regionKey);
+        if(!t) return { ok:false, reason:'nodraw' };
+        patch.team_challenger = t.challenger; patch.team_opponent = t.opponent;     // aceitar + sortear numa só gravação (só se ainda estiver pendente)
+      }
+      return x1._go(ctx, id, 'pending', patch, `${accept ? 'Aceitou' : 'Recusou'} o desafio x1 de ${r.challenger_name}`);
     },
     // Quem enviou pode cancelar enquanto ninguém respondeu
     cancel(ctx, id){
@@ -488,6 +579,23 @@ const EventCore = (function(){
       const guard = r.replay_path ? `&replay_path=eq.${enc(r.replay_path)}` : '&replay_path=is.null';   // só grava se ninguém mudou os replays entretanto
       return x1._go(ctx, id, r.status, { replay_path: joinReplayPaths(merged) }, `Juntou o replay do x1 ${r.challenger_name} vs ${r.opponent_name}`, guard);
     },
+    // Quem jogou pode TROCAR os links dos replays já guardados (ex.: colou o errado) ou tirá-los todos (texto vazio). Os links novos substituem os antigos.
+    // Só mexe em links do Showdown (se o organizador tiver guardado um ficheiro do repositório, esse é dele). Razões: notyours | notyet | badreplay | toomany | nochange | notmine
+    setReplays(ctx, id, replayText){
+      const r = x1.get(ctx, id);
+      if(!r || (r.challenger_name !== ctx.me && r.opponent_name !== ctx.me)) return Promise.resolve({ ok:false, reason:'notyours' });
+      if(!['reported', 'confirmed', 'resolved'].includes(r.status)) return Promise.resolve({ ok:false, reason:'notyet' });
+      if(!x1.canEditReplays(r)) return Promise.resolve({ ok:false, reason:'notmine' });
+      const list = x1.cleanReplayList(replayText);
+      if(list === null) return Promise.resolve({ ok:false, reason:'badreplay' });
+      if(list.length > (r.best_of || 1)) return Promise.resolve({ ok:false, reason:'toomany' });
+      const novo = joinReplayPaths(list);
+      if(novo === (r.replay_path || '')) return Promise.resolve({ ok:false, reason:'nochange' });
+      const guard = r.replay_path ? `&replay_path=eq.${enc(r.replay_path)}` : '&replay_path=is.null';   // só grava se ninguém mudou os replays entretanto
+      return x1._go(ctx, id, r.status, { replay_path: novo || null }, `${novo ? 'Trocou o replay' : 'Tirou o replay'} do x1 ${r.challenger_name} vs ${r.opponent_name}`, guard);
+    },
+    // Os links guardados são todos do Showdown (os que o site sabe trocar); falso se o organizador anexou um ficheiro do repositório.
+    canEditReplays(r){ return x1.cleanReplayList(x1.replayLinks(r).join(' ')) !== null; },
     // O OUTRO jogador (não quem registou) confirma ou contesta
     confirm(ctx, id){
       const r = x1.get(ctx, id);

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@600;700&family=Special+Elite&family=Caveat:wght@500;600&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012k">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261012l">
 <style>
 /* O visual de cada evento vive em eventos/<slug>.css (carregado dinamicamente). */
 #eventRoot{min-height:240px;}
@@ -82,8 +82,8 @@
   <div class="footer-note">As missões são calculadas a partir do que já fizeste no site — clica em "Reclamar" para receber os prémios.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261012k"></script>
-<script src="assets/js/eventos-core.js?v=20261012k"></script>
+<script src="assets/js/showdown-utils.js?v=20261012l"></script>
+<script src="assets/js/eventos-core.js?v=20261012l"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -193,7 +193,7 @@ const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && 
 // Versão dos ficheiros do evento (showdown-utils.js, eventos-core.js e eventos/<slug>.*): MUDAR (aqui e nas
 // duas <script src="...?v="> lá em cima) sempre que algum deles mudar, para o browser não misturar ficheiros
 // novos com versões antigas em cache.
-const EV_ASSET_VERSION = '20261012k';
+const EV_ASSET_VERSION = '20261012l';
 
 // Carrega o CSS e o JS do evento ativo (cada evento tem o seu par). O slug só pode ter a-z, 0-9 e "-".
 function loadEventAssets(slug){
@@ -272,7 +272,7 @@ async function init(){
   const root = document.getElementById('eventRoot');
   // Depois de uma atualização do site, o browser pode ainda ter em cache o showdown-utils.js antigo
   // (sem as funções do evento). Em vez de um erro genérico, diz o que fazer.
-  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || !EventCore.shop || typeof EventCore.x1.leaders !== 'function' || !EventCore.x1.FORMATS || typeof nameFxClass !== 'function' || !getCosmeticById('frame_vm_esquadrilha') || !getCosmeticById('frame_vm_balao')){
+  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || !EventCore.shop || typeof EventCore.x1.leaders !== 'function' || !EventCore.x1.FORMATS || !EventCore.x1.TEAM_MODES || typeof EventCore.x1.setReplays !== 'function' || typeof nameFxClass !== 'function' || !getCosmeticById('frame_vm_esquadrilha') || !getCosmeticById('frame_vm_balao')){
     setStatus(false, 'Ficheiros antigos em cache.');
     root.innerHTML = '<div class="card"><div class="empty-state">O teu browser ainda tem ficheiros antigos do site em cache. Faz <b>Ctrl+F5</b> para atualizar e abre esta página outra vez.</div></div>';
     return;
@@ -444,13 +444,16 @@ async function doX1Send(btn){
   if(!opp){ alert('Escolhe o adversário.'); return; }
   const fsel = document.getElementById('x1Format');
   const bestOf = fsel ? +fsel.value : 1;
+  const tsel = document.getElementById('x1Teams');
+  const teamMode = tsel ? tsel.value : 'free';
   if(btn) btn.disabled = true;
-  const r = await EventCore.x1.send(ctx, opp, bestOf);
+  const r = await EventCore.x1.send(ctx, opp, bestOf, teamMode);
   if(r.ok){
-    showCelebrationToast(`⚔️ Desafio ${EventCore.x1.formatLabel(r.bestOf)} enviado a <b>${escapeHtml(opp)}</b>! Quando aceitar, combinem o jogo no Showdown.`, 5000);
+    showCelebrationToast(`⚔️ Desafio ${EventCore.x1.formatLabel(r.bestOf)} ${r.teamMode === 'random' ? 'com times aleatórios ' : ''}enviado a <b>${escapeHtml(opp)}</b>! Quando aceitar, combinem o jogo no Showdown.`, 5000);
   } else {
     const msg = r.reason === 'quota' ? `Já enviaste os ${EventCore.x1.MAX_PER_WEEK} desafios desta semana.`
       : r.reason === 'noformat' ? 'Os formatos melhor de 3 e melhor de 5 ainda não estão disponíveis (a base de dados vai ser atualizada). Escolhe melhor de 1 por agora.'
+      : r.reason === 'nomode' ? 'Os times aleatórios ainda não estão disponíveis (a base de dados vai ser atualizada). Escolhe times livres por agora.'
       : r.reason === 'dup' ? 'Já desafiaste este jogador esta semana — escolhe outro.'
       : r.reason === 'noweek' ? 'Os desafios abrem com o torneio da Semana 1.'
       : r.reason === 'self' ? 'Não te podes desafiar a ti próprio.'
@@ -474,7 +477,7 @@ async function doX1Act(id, act, btn){
   if(!row) return;
   const other = row.challenger_name === loggedInPlayerName ? row.opponent_name : row.challenger_name;
   let r, regScore = null;
-  if(act === 'accept')       r = await EventCore.x1.respond(ctx, id, true);
+  if(act === 'accept')       r = await EventCore.x1.respond(ctx, id, true, row.week >= 1 && row.week <= mod.weeks.length ? mod.weeks[row.week - 1].region : null);
   else if(act === 'decline'){ if(!confirm(`Recusar o desafio de ${other}?`)) return; r = await EventCore.x1.respond(ctx, id, false); }
   else if(act === 'cancel'){  if(!confirm(`Cancelar o desafio a ${other}?`)) return;  r = await EventCore.x1.cancel(ctx, id); }
   else if(act === 'win' || act === 'lose' || act === 'score'){
@@ -512,9 +515,43 @@ async function doX1Act(id, act, btn){
     alert('Este desafio foi alterado entretanto (a outra pessoa foi mais rápida). Atualizei a lista.');
   } else if(r.reason === 'badscore'){
     alert('O resultado escolhido não é válido para este formato. Escolhe outro.');
+  } else if(r.reason === 'nodraw'){
+    alert('Não consegui sortear os times agora (a lista de Pokémon não carregou). Tenta outra vez daqui a pouco.');
   } else {
     alert('Não foi possível concluir agora. Tenta outra vez.');
   }
+  renderAll();
+}
+
+// ---------- Times dos x1 (importar / exportar) ----------
+function x1RegionOf(row){ return row && row.week >= 1 && row.week <= mod.weeks.length ? mod.weeks[row.week - 1].region : null; }
+async function copyTextToClipboard(text){
+  try{ await navigator.clipboard.writeText(text); return true; } catch(e){ /* tenta o método antigo */ }
+  try{
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
+    document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return !!ok;
+  } catch(e){ return false; }
+}
+async function doX1TeamExport(id, key){
+  const row = EventCore.x1.get(ctx, id);
+  if(!row || !row[key]) return;
+  const text = EventCore.x1.exportTeam(row[key]);
+  if(await copyTextToClipboard(text)) showCelebrationToast('📤 Time copiado! Cola-o no Showdown (Teambuilder → Import).', 4500);
+  else prompt('Não consegui copiar automaticamente. Copia daqui (Ctrl+C):', text);
+}
+async function doX1TeamSave(id, btn){
+  const row = EventCore.x1.get(ctx, id);
+  const key = row && EventCore.x1.teamKey(row, loggedInPlayerName);
+  const box = document.getElementById('x1tm-' + id);
+  if(!row || !key || !box) return;
+  const parsed = EventCore.x1.parseTeam(box.value, row, x1RegionOf(row), row[key]);
+  if(!parsed.ok){ alert('Não consegui guardar o time:\n\n• ' + parsed.errors.join('\n• ')); return; }
+  if(row[key] && !confirm('Já tens um time registado neste duelo. Substituí-lo?')) return;
+  if(btn) btn.disabled = true;
+  const r = await EventCore.x1.saveTeam(ctx, id, parsed.team);
+  if(r.ok) showCelebrationToast('📥 Time registado! Boa sorte no duelo.', 4000);
+  else if(r.reason === 'notyet') alert('Este duelo já não aceita times (mudou entretanto). Atualizei a lista.');
+  else alert('Não foi possível guardar o time agora. Tenta outra vez.');
   renderAll();
 }
 
@@ -531,6 +568,32 @@ async function doX1Replay(id, btn){
   else if(r.reason === 'toomany') alert(`Este duelo é um melhor de ${(row && row.best_of) || 1}: não pode ter mais do que ${(row && row.best_of) || 1} replay${((row && row.best_of) || 1) > 1 ? 's' : ''} (um por jogo).`);
   else if(r.reason === 'changed' || r.reason === 'notyet') alert('Este desafio mudou entretanto. Atualizei a lista.');
   else alert('Não foi possível juntar o replay agora. Tenta outra vez.');
+  renderAll();
+}
+
+// Trocar (ou tirar) os replays já guardados de um duelo — para quem colou o link errado.
+async function doX1ReplayEdit(id, btn, clear){
+  const row = EventCore.x1.get(ctx, id);
+  const input = document.getElementById('x1re-' + id);
+  if(!row || !input) return;
+  let text = clear ? '' : input.value;
+  const list = EventCore.x1.cleanReplayList(text);
+  if(list === null){ alert(REPLAY_LINK_HELP); return; }
+  if(!clear && !list.length){ alert('O campo está vazio. Cola o link certo, ou carrega em «Tirar» para apagar o replay deste duelo.'); return; }
+  const bestOf = row.best_of || 1;
+  if(list.length > bestOf){ alert(`Um melhor de ${bestOf} tem no máximo ${bestOf} replay${bestOf > 1 ? 's' : ''} (um por jogo).`); return; }
+  if(clear){ if(!confirm('Tirar o replay deste duelo? Podes juntar outro depois.')) return; }
+  else {
+    for(const l of list){ if(!(await replayLinkOk(l))) return; }
+    if(!confirm(`Substituir ${bestOf > 1 ? 'os replays' : 'o replay'} deste duelo por ${list.length > 1 ? 'estes ' + list.length + ' links' : 'este link'}?`)) return;
+  }
+  if(btn) btn.disabled = true;
+  const r = await EventCore.x1.setReplays(ctx, id, text);
+  if(r.ok) showCelebrationToast(clear ? '🗑 Replay tirado do duelo.' : '▶ Replay atualizado!', 4000);
+  else if(r.reason === 'nochange') alert('Esse é exatamente o link que já está guardado — não há nada a mudar.');
+  else if(r.reason === 'notmine') alert('Este replay foi guardado pelo organizador; pede-lhe para o mudar.');
+  else if(r.reason === 'changed' || r.reason === 'notyet') alert('Este desafio mudou entretanto. Atualizei a lista.');
+  else alert('Não foi possível alterar o replay agora. Tenta outra vez.');
   renderAll();
 }
 

@@ -409,7 +409,41 @@
     confirm: { cls:'go',   text:'✔ Confirmar resultado' }, dispute: { cls:'no', text:'⚠ Contestar' }
   };
 
-  function duelHtml(r, ctx){
+  // Painel "Times" de um duelo: o time de cada um (sprites + nomes), importar o teu (validado) e exportar. Só depois de o desafio ser aceite.
+  const TEAM_STATES = ['accepted', 'reported', 'disputed', 'confirmed', 'resolved'];
+  function teamsHtml(r, ctx, api, sid, regionKey){
+    if(!TEAM_STATES.includes(r.status)) return '';
+    const mode = r.team_mode || 'free', revealed = EventCore.x1.teamsRevealed(r), meKey = EventCore.x1.teamKey(r, ctx.me);
+    const side = (key, name) => {
+      const team = r[key], mine = key === meKey;
+      let body;
+      if(!team) body = `<span class="vm-team-empty">${mode === 'random' ? 'sorteio por fazer' : 'ainda sem time registado'}</span>`;
+      else if(!mine && !revealed) body = '<span class="vm-team-empty">🔒 revela-se quando os dois tiverem o time registado</span>';
+      else body = team.map(m => `<span class="vm-mon">${pokeSpriteHtml(m.name, 32)}<em>${escapeHtml(m.name)}</em></span>`).join('');
+      const hasSets = team && (mine || revealed) && team.some(m => m.text && m.text.trim());
+      const exp = team && (mine || revealed) ? `<button class="vm-x1btn" onclick="doX1TeamExport('${sid}','${key}')">📤 Exportar${hasSets ? '' : ' (só os nomes)'}</button>` : '';
+      return `<div class="vm-team-side${mine ? ' me' : ''}"><div class="vm-team-who"><b>${escapeHtml(name)}${mine ? ' (tu)' : ''}</b>${exp}</div><div class="vm-team-mons">${body}</div></div>`;
+    };
+    const canImport = meKey && ['accepted', 'reported', 'disputed'].includes(r.status);
+    const own = meKey ? r[meKey] : null;
+    const hint = mode === 'random'
+      ? 'Times <b>aleatórios</b>: o sistema sorteou 6 Pokémon da região para cada um. Para importar, cola os 6 sets destes Pokémon (podes mudar golpes, item, etc.; a lista tem de ser exatamente a sorteada).'
+      : 'Times <b>livres</b>: cada um leva os seus 6 (da região da semana, na forma original, sem repetir espécies). O time do adversário só aparece quando os dois tiverem registado o seu.';
+    const importBox = canImport ? `<div class="vm-team-import">
+        <textarea id="x1tm-${sid}" rows="6" placeholder="Cola aqui o time exportado do Showdown (os 6 Pokémon separados por uma linha em branco)"></textarea>
+        <button class="vm-x1btn go" onclick="doX1TeamSave('${sid}', this)">📥 ${own ? 'Substituir o meu time' : 'Importar o meu time'}</button>
+      </div>` : '';
+    const key = 'teams-' + sid, open = api.ui.open[key] !== undefined ? api.ui.open[key] : (!!meKey && !own && ['accepted'].includes(r.status));
+    const n = ['team_challenger', 'team_opponent'].filter(k => r[k]).length;
+    return `<details class="vm-teams"${open ? ' open' : ''} ontoggle="evToggle('${key}', this.open)">
+      <summary>👥 Times <small>${EventCore.x1.teamModeLabel(mode)} · ${n}/2 registados</small></summary>
+      <div class="vm-teams-hint">${hint}</div>
+      <div class="vm-teams-grid">${side('team_challenger', r.challenger_name)}${side('team_opponent', r.opponent_name)}</div>
+      ${importBox}
+    </details>`;
+  }
+
+  function duelHtml(r, ctx, api){
     const st = X1_STATUS[r.status] || { label: r.status, step: 0 };
     const w = EventCore.x1.winnerOf(r);
     const acts = EventCore.x1.actionsFor(ctx, r);
@@ -438,15 +472,26 @@
     // Depois: quem jogou ainda pode juntar links de replays se faltarem (até ao nº de jogos do formato).
     const replayAdd = isPlayer && links.length < bestOf && canSee
       ? `<div class="vm-x1replay-row"><input type="text" class="vm-x1replay" id="x1rp-${sid}" placeholder="${bestOf > 1 ? `Juntar link(s) de replay (${links.length}/${bestOf})` : 'Juntar o link do replay (replay.pokemonshowdown.com/…)'}"><button class="vm-x1btn" onclick="doX1Replay('${sid}',this)">Juntar replay</button></div>` : '';
-    const fmt = `<span class="vm-duel-fmt${bestOf > 1 ? ' long' : ''}" title="Melhor de ${bestOf}: ganha quem chegar primeiro a ${EventCore.x1.winsNeeded(bestOf)} vitória${EventCore.x1.winsNeeded(bestOf) > 1 ? 's' : ''}">${EventCore.x1.formatLabel(bestOf)}</span>`;
+    // Colaste o replay errado? Quem jogou pode trocar (ou tirar) os links já guardados; o campo vem preenchido com os atuais.
+    const replayEdit = isPlayer && links.length && canSee && EventCore.x1.canEditReplays(r)
+      ? `<details class="vm-x1replay-edit"><summary>✏️ Alterar replay${links.length > 1 ? 's' : ''}</summary>
+          <div class="vm-x1replay-row"><input type="text" class="vm-x1replay" id="x1re-${sid}" value="${escapeHtml(links.join(' ')).replace(/"/g, '&quot;')}" placeholder="${bestOf > 1 ? 'Links dos replays (um por jogo, separados por espaço)' : 'Link do replay (replay.pokemonshowdown.com/…)'}">
+            <button class="vm-x1btn" onclick="doX1ReplayEdit('${sid}',this)">Guardar</button>
+            <button class="vm-x1btn no" onclick="doX1ReplayEdit('${sid}',this,true)">Tirar</button></div>
+          <small>Os links novos <b>substituem</b> os antigos. «Tirar» apaga o replay deste duelo (podes juntar outro depois).</small></details>` : '';
+    const modeKey = r.team_mode || 'free';
+    const fmt =`<span class="vm-duel-fmt${bestOf > 1 ? ' long' : ''}" title="Melhor de ${bestOf}: ganha quem chegar primeiro a ${EventCore.x1.winsNeeded(bestOf)} vitória${EventCore.x1.winsNeeded(bestOf) > 1 ? 's' : ''}">${EventCore.x1.formatLabel(bestOf)}</span>`
+      + `<span class="vm-duel-fmt${modeKey === 'random' ? ' long' : ''}" title="${modeKey === 'random' ? 'Times aleatórios: o sistema sorteia 6 Pokémon para cada um ao aceitar' : 'Times livres: cada um leva os seus 6 Pokémon'}">${EventCore.x1.teamModeLabel(modeKey)}</span>`;
+    const regionKey = r.week >= 1 && r.week <= mod.weeks.length ? mod.weeks[r.week - 1].region : null;
     return `<div class="vm-duel s-${r.status}${acts.length ? ' mine' : ''}">
       <div class="vm-duel-top"><span>⚔️ Semana ${r.week}${region ? ' · ' + region : ''} ${fmt}</span><span class="vm-duel-status">${st.label}</span></div>
       <div class="vm-duel-vs">${side(r.challenger_name)}<span class="vm-duel-x">VS</span>${side(r.opponent_name)}</div>
       <ol class="vm-steps">${steps}</ol>
       ${verdict}${r.status === 'disputed' && r.note ? `<div class="vm-duel-note">“${escapeHtml(r.note)}”</div>` : ''}
+      ${teamsHtml(r, ctx, api, sid, regionKey)}
       ${scoreSelect}${replayField}
       ${shownActs.length ? `<div class="vm-duel-actions">${shownActs.map(a => `<button class="vm-x1btn ${X1_BTN[a].cls}" onclick="doX1Act('${sid}','${a}',this)">${X1_BTN[a].text}</button>`).join('')}</div>` : ''}
-      ${replay}${replayAdd}
+      ${replay}${replayAdd}${replayEdit}
     </div>`;
   }
 
@@ -470,15 +515,18 @@
       <div class="vm-x1send-top"><b>Novo desafio</b><span class="vm-x1quota${q.left === 0 ? ' full' : ''}">${q.used}/${q.max} esta semana</span></div>
       <div class="vm-x1send-row"><select id="x1Opponent" ${q.left === 0 ? 'disabled' : ''}>${opts}</select>
         <select id="x1Format" class="vm-x1format" title="Formato do duelo" onchange="ui.x1Format=+this.value" ${q.left === 0 ? 'disabled' : ''}>${EventCore.x1.FORMATS.map(b => `<option value="${b}"${(api.ui.x1Format || 1) === b ? ' selected' : ''}>Melhor de ${b} (${EventCore.x1.formatLabel(b)})</option>`).join('')}</select>
+        <select id="x1Teams" class="vm-x1format" title="Times do duelo" onchange="ui.x1Teams=this.value" ${q.left === 0 ? 'disabled' : ''}>
+          <option value="free"${(api.ui.x1Teams || 'free') === 'free' ? ' selected' : ''}>✋ Times livres (cada um leva os seus 6)</option>
+          <option value="random"${api.ui.x1Teams === 'random' ? ' selected' : ''}>🎲 Times aleatórios (sorteio de 6 para cada um)</option></select>
         <button class="vm-send" onclick="doX1Send(this)" ${q.left === 0 ? 'disabled' : ''}>⚔️ Desafiar</button></div>
-      ${q.left === 0 ? `<small>Já enviaste os ${q.max} desafios desta semana — voltas a poder na próxima.</small>` : `<small>Máximo ${q.max} desafios enviados por semana, a jogadores diferentes. Recusados e cancelados não contam. Tu escolhes o formato (md1, md3 ou md5: ganha quem chegar primeiro a 1, 2 ou 3 vitórias); o adversário pode aceitar ou recusar. Um duelo conta como UM x1 nas missões, seja qual for o formato.</small>`}
+      ${q.left === 0 ? `<small>Já enviaste os ${q.max} desafios desta semana — voltas a poder na próxima.</small>` : `<small>Máximo ${q.max} desafios enviados por semana, a jogadores diferentes. Recusados e cancelados não contam. Tu escolhes o formato (md1, md3 ou md5: ganha quem chegar primeiro a 1, 2 ou 3 vitórias); o adversário pode aceitar ou recusar. Escolhes também os <b>times</b>: livres, ou aleatórios (o sistema sorteia 6 Pokémon da região para cada um quando o adversário aceita). Um duelo conta como UM x1 nas missões, seja qual for o formato.</small>`}
     </div>`;
     const rows = ctx.x1;
     const forMe = rows.filter(r2 => (r2.status === 'pending' && r2.opponent_name === ctx.me) || (r2.status === 'reported' && r2.reported_by !== ctx.me && (r2.challenger_name === ctx.me || r2.opponent_name === ctx.me)));
     const forMeIds = new Set(forMe.map(r2 => r2.id));
     const ongoing = rows.filter(r2 => !forMeIds.has(r2.id) && ['pending', 'accepted', 'reported', 'disputed'].includes(r2.status));
     const done = rows.filter(r2 => ['confirmed', 'resolved', 'declined', 'cancelled'].includes(r2.status));
-    const sect = (title, list, empty) => `<h3 class="vm-h3">${title}</h3>` + (list.length ? `<div class="vm-duels">${list.map(r2 => duelHtml(r2, ctx)).join('')}</div>` : `<div class="vm-wall-empty">${empty}</div>`);
+    const sect = (title, list, empty) => `<h3 class="vm-h3">${title}</h3>` + (list.length ? `<div class="vm-duels">${list.map(r2 => duelHtml(r2, ctx, api)).join('')}</div>` : `<div class="vm-wall-empty">${empty}</div>`);
     return intro + kings + send + sect('📬 Para ti', forMe, 'Nada à tua espera. Quando alguém te desafiar (ou registar um resultado para confirmares), aparece aqui.')
       + sect('✈️ Em curso', ongoing, 'Nenhum desafio em curso.')
       + (done.length ? sect('🗂 Histórico', done, '') : '');
