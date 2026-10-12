@@ -469,6 +469,11 @@ body.light-theme .ev-theme-volta-ao-mundo [data-region="sinnoh"]{--accent:#7c4dc
 .ev-theme-volta-ao-mundo .vm-mon{display:inline-flex;align-items:center;gap:2px;padding:0 8px 0 0;border-radius:99px;background:var(--bg-panel);border:1px solid var(--line);font-size:11px;}
 .ev-theme-volta-ao-mundo .vm-mon em{font-style:normal;}
 .ev-theme-volta-ao-mundo .vm-team-empty{font-size:11.5px;color:var(--text-faint);}
+.ev-theme-volta-ao-mundo .vm-game-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 4px;}
+.ev-theme-volta-ao-mundo .vm-game-tab{padding:5px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg-panel);color:var(--text-dim);font:600 12px 'Chakra Petch',sans-serif;cursor:pointer;display:inline-flex;gap:6px;align-items:center;}
+.ev-theme-volta-ao-mundo .vm-game-tab small{font-size:10.5px;opacity:0.8;}
+.ev-theme-volta-ao-mundo .vm-game-tab.on{border-color:var(--tera-cyan);color:var(--text-main);background:rgba(79,216,208,0.12);}
+.ev-theme-volta-ao-mundo .vm-game-tab.full small{color:var(--success);opacity:1;}
 .ev-theme-volta-ao-mundo .vm-team-import{padding:0 12px 12px;}
 .ev-theme-volta-ao-mundo .vm-team-import textarea{width:100%;margin:0 0 8px;font:12px/1.4 ui-monospace,Consolas,monospace;resize:vertical;}
 @media (max-width:640px){

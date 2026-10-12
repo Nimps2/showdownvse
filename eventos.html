@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@600;700&family=Special+Elite&family=Caveat:wght@500;600&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012m">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261012n">
 <style>
 /* O visual de cada evento vive em eventos/<slug>.css (carregado dinamicamente). */
 #eventRoot{min-height:240px;}
@@ -82,8 +82,8 @@
   <div class="footer-note">As missões são calculadas a partir do que já fizeste no site — clica em "Reclamar" para receber os prémios.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261012m"></script>
-<script src="assets/js/eventos-core.js?v=20261012m"></script>
+<script src="assets/js/showdown-utils.js?v=20261012n"></script>
+<script src="assets/js/eventos-core.js?v=20261012n"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -193,7 +193,7 @@ const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && 
 // Versão dos ficheiros do evento (showdown-utils.js, eventos-core.js e eventos/<slug>.*): MUDAR (aqui e nas
 // duas <script src="...?v="> lá em cima) sempre que algum deles mudar, para o browser não misturar ficheiros
 // novos com versões antigas em cache.
-const EV_ASSET_VERSION = '20261012m';
+const EV_ASSET_VERSION = '20261012n';
 
 // Carrega o CSS e o JS do evento ativo (cada evento tem o seu par). O slug só pode ter a-z, 0-9 e "-".
 function loadEventAssets(slug){
@@ -272,7 +272,7 @@ async function init(){
   const root = document.getElementById('eventRoot');
   // Depois de uma atualização do site, o browser pode ainda ter em cache o showdown-utils.js antigo
   // (sem as funções do evento). Em vez de um erro genérico, diz o que fazer.
-  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || !EventCore.shop || typeof EventCore.x1.leaders !== 'function' || !EventCore.x1.FORMATS || !EventCore.x1.TEAM_MODES || typeof EventCore.x1.setReplays !== 'function' || typeof sbFetchAll !== 'function' || typeof nameFxClass !== 'function' || !getCosmeticById('frame_vm_esquadrilha') || !getCosmeticById('frame_vm_balao')){
+  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || !EventCore.shop || typeof EventCore.x1.leaders !== 'function' || !EventCore.x1.FORMATS || !EventCore.x1.TEAM_MODES || typeof EventCore.x1.setReplays !== 'function' || typeof EventCore.x1.teamOf !== 'function' || typeof sbFetchAll !== 'function' || typeof nameFxClass !== 'function' || !getCosmeticById('frame_vm_esquadrilha') || !getCosmeticById('frame_vm_balao')){
     setStatus(false, 'Ficheiros antigos em cache.');
     root.innerHTML = '<div class="card"><div class="empty-state">O teu browser ainda tem ficheiros antigos do site em cache. Faz <b>Ctrl+F5</b> para atualizar e abre esta página outra vez.</div></div>';
     return;
@@ -532,24 +532,27 @@ async function copyTextToClipboard(text){
     document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return !!ok;
   } catch(e){ return false; }
 }
-async function doX1TeamExport(id, key){
+function doX1Game(id, g){ ui.x1Game = ui.x1Game || {}; ui.x1Game[id] = g; renderAll(); }
+async function doX1TeamExport(id, key, game){
   const row = EventCore.x1.get(ctx, id);
-  if(!row || !row[key]) return;
-  const text = EventCore.x1.exportTeam(row[key]);
+  const team = row && EventCore.x1.teamOf(row, key, game);
+  if(!team) return;
+  const text = EventCore.x1.exportTeam(team);
   if(await copyTextToClipboard(text)) showCelebrationToast('📤 Time copiado! Cola-o no Showdown (Teambuilder → Import).', 4500);
   else prompt('Não consegui copiar automaticamente. Copia daqui (Ctrl+C):', text);
 }
-async function doX1TeamSave(id, btn){
+async function doX1TeamSave(id, btn, game){
   const row = EventCore.x1.get(ctx, id);
   const key = row && EventCore.x1.teamKey(row, loggedInPlayerName);
   const box = document.getElementById('x1tm-' + id);
   if(!row || !key || !box) return;
-  const parsed = EventCore.x1.parseTeam(box.value, row, x1RegionOf(row), row[key]);
+  const perGame = EventCore.x1.perGame(row), existing = EventCore.x1.teamOf(row, key, game);
+  const parsed = EventCore.x1.parseTeam(box.value, row, x1RegionOf(row), existing);
   if(!parsed.ok){ alert('Não consegui guardar o time:\n\n• ' + parsed.errors.join('\n• ')); return; }
-  if(row[key] && !confirm('Já tens um time registado neste duelo. Substituí-lo?')) return;
+  if(existing && !confirm(perGame ? `Já tens um time registado no jogo ${game}. Substituí-lo?` : 'Já tens um time registado neste duelo. Substituí-lo?')) return;
   if(btn) btn.disabled = true;
-  const r = await EventCore.x1.saveTeam(ctx, id, parsed.team);
-  if(r.ok) showCelebrationToast('📥 Time registado! Boa sorte no duelo.', 4000);
+  const r = await EventCore.x1.saveTeam(ctx, id, parsed.team, game);
+  if(r.ok) showCelebrationToast(perGame ? `📥 Time do jogo ${game} registado! Boa sorte.` : '📥 Time registado! Boa sorte no duelo.', 4000);
   else if(r.reason === 'notyet') alert('Este duelo já não aceita times (mudou entretanto). Atualizei a lista.');
   else alert('Não foi possível guardar o time agora. Tenta outra vez.');
   renderAll();

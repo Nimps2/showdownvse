@@ -74,7 +74,7 @@ const EventCore = (function(){
   function signature(ctx){
     const tour = ctx.tournaments.map(t => t.id + ':' + t.status + ':' + ((t.data && t.data.matches) || []).map(m => m.winner || '').join(',')).join('|');
     const board = (ctx.board.messages || []).map(m => m.id).join(',') + '/' + (ctx.board.reactions || []).map(r => r.id + r.emoji).join(',');
-    const x1 = (ctx.x1 || []).map(r => [r.id, r.status, r.replay_path || '', r.reported_winner || '', r.best_of || 1, r.score_challenger == null ? '' : r.score_challenger + '-' + r.score_opponent, r.team_mode || 'free', (r.team_challenger || []).length, (r.team_opponent || []).length].join(':')).join(',');
+    const x1 = (ctx.x1 || []).map(r => [r.id, r.status, r.replay_path || '', r.reported_winner || '', r.best_of || 1, r.score_challenger == null ? '' : r.score_challenger + '-' + r.score_opponent, r.team_mode || 'free', (r.team_challenger || []).length, (r.team_opponent || []).length, (r.teams_challenger || []).map(t => t ? t.length : 0).join('.'), (r.teams_opponent || []).map(t => t ? t.length : 0).join('.')].join(':')).join(',');
     const shop = ctx.shop ? ctx.shop.purchases.map(p => p.item_id).join(',') : '';
     const duels = (ctx.x1Board || []).map(x => x.reported_winner + x.challenger_name + x.opponent_name).join(',');
     return [tour, ctx.claims.length, ctx.tx.length, ctx.gifts.length, ctx.lottery.length, ctx.nick.length, ctx.preds.length, board, x1, shop, duels].join('#');
@@ -400,10 +400,23 @@ const EventCore = (function(){
     TEAM_MODES: ['free', 'random'],
     teamModeLabel(m){ return m === 'random' ? '🎲 Aleatórios' : '✋ Livres'; },
     teamKey(r, name){ return r.challenger_name === name ? 'team_challenger' : (r.opponent_name === name ? 'team_opponent' : null); },
-    // No modo livre o time do adversário só se vê quando os dois já registaram o seu (ou o resultado já foi registado); no aleatório os dois sorteios são públicos.
-    teamsRevealed(r){
-      if(r.team_mode === 'random') return !!(r.team_challenger && r.team_opponent);
-      return !!(r.team_challenger && r.team_opponent) || ['reported', 'confirmed', 'disputed', 'resolved'].includes(r.status);
+    // Times livres numa SÉRIE (melhor de 3 ou 5): cada jogador regista um time POR JOGO (`teams_challenger`/`teams_opponent` = lista com o time de cada jogo, null onde ainda não há;
+    // o jogo 1 também fica em `team_*`). Em melhor de 1 e nos times aleatórios há um só time por duelo (`team_*`).
+    perGame(r){ return (r.team_mode || 'free') === 'free' && (r.best_of || 1) > 1; },
+    gameCount(r){ return x1.perGame(r) ? (r.best_of || 1) : 1; },
+    teamsKeyOf(key){ return key === 'team_challenger' ? 'teams_challenger' : 'teams_opponent'; },
+    // O time de um lado (key = 'team_challenger' | 'team_opponent') num jogo (1..). Duelos de antes desta funcionalidade só têm `team_*`: contam como o jogo 1.
+    teamOf(r, key, game){
+      if(!x1.perGame(r)) return r[key] || null;
+      const g = game || 1, arr = r[x1.teamsKeyOf(key)];
+      if(Array.isArray(arr) && arr[g - 1]) return arr[g - 1];
+      return g === 1 ? (r[key] || null) : null;
+    },
+    // No modo livre o time do adversário só se vê quando os dois já registaram o seu (nesse jogo) ou o resultado já foi registado; no aleatório os dois sorteios são públicos.
+    teamsRevealed(r, game){
+      const both = !!(x1.teamOf(r, 'team_challenger', game) && x1.teamOf(r, 'team_opponent', game));
+      if(r.team_mode === 'random') return both;
+      return both || ['reported', 'confirmed', 'disputed', 'resolved'].includes(r.status);
     },
     // Sorteia 6 espécies para cada um (12 espécies base diferentes) da região: a mesma lista (com sets) que o sorteio do torneio usa. null = sem Pokémon que chegue.
     async drawTeams(regionKey){
@@ -455,24 +468,35 @@ const EventCore = (function(){
       return { ok: errors.length === 0, errors, team: ordered.map(e => ({ name: e.parsed.name, text: e.raw.slice(0, 3000) })) };
     },
     exportTeam(team){ return (team || []).map(m => (m.text && m.text.trim()) || m.name).join('\n\n'); },
-    // Grava o time DESTE jogador (só a sua coluna: não pisa o do adversário) depois de o desafio ser aceite. Razões: notyours | notyet | error
-    async saveTeam(ctx, id, team){
+    // Grava o time DESTE jogador (só as suas colunas: não pisa as do adversário) depois de o desafio ser aceite. `game` = o jogo da série (1..), só conta nos times livres de
+    // melhor de 3/5 (um time por jogo); nos outros é sempre o time único. Razões: notyours | notyet | error
+    async saveTeam(ctx, id, team, game){
       const r = x1.get(ctx, id), key = r && x1.teamKey(r, ctx.me);
       if(!r || !key) return { ok:false, reason:'notyours' };
       if(!['accepted', 'reported', 'disputed', 'confirmed', 'resolved'].includes(r.status)) return { ok:false, reason:'notyet' };
+      const patch = {};
+      let g = 1;
+      if(x1.perGame(r)){
+        g = Math.min(Math.max(parseInt(game, 10) || 1, 1), r.best_of);
+        const tk = x1.teamsKeyOf(key), cur = Array.isArray(r[tk]) ? r[tk].slice() : (r[key] ? [r[key]] : []);     // duelos antigos: o time único é o jogo 1
+        while(cur.length < g) cur.push(null);
+        cur[g - 1] = team;
+        patch[tk] = cur;
+        if(g === 1) patch[key] = team;           // o jogo 1 também fica em team_* (o que o gestor e as páginas antigas leem)
+      } else patch[key] = team;
       let res;
       try{
         res = await fetch(`${URL_}/rest/v1/x1_challenges?id=eq.${enc(id)}&status=in.(accepted,reported,disputed,confirmed,resolved)`, {
           method:'PATCH',
           headers: Object.assign(sbAuthHeaders(KEY_), { 'Content-Type':'application/json', 'Prefer':'return=representation' }),
-          body: JSON.stringify({ [key]: team })
+          body: JSON.stringify(patch)
         });
       } catch(e){ return { ok:false, reason:'error' }; }
       if(!res.ok) return { ok:false, reason:'error' };
       const rows = await res.json();
       await x1.refresh(ctx);
       if(!rows || !rows.length) return { ok:false, reason:'notyet' };
-      logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', `Registou o time do x1 ${r.challenger_name} vs ${r.opponent_name}`);
+      logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', `Registou o time${x1.perGame(r) ? ' do jogo ' + g : ''} do x1 ${r.challenger_name} vs ${r.opponent_name}`);
       return { ok:true };
     },
     async send(ctx, opponent, bestOf, teamMode){

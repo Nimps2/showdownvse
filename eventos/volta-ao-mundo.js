@@ -410,34 +410,50 @@
   };
 
   // Painel "Times" de um duelo: o time de cada um (sprites + nomes), importar o teu (validado) e exportar. Só depois de o desafio ser aceite.
+  // Times livres numa série (melhor de 3/5): um time POR JOGO — botões "Jogo 1…N" escolhem o jogo a ver/importar/exportar.
   const TEAM_STATES = ['accepted', 'reported', 'disputed', 'confirmed', 'resolved'];
   function teamsHtml(r, ctx, api, sid, regionKey){
     if(!TEAM_STATES.includes(r.status)) return '';
-    const mode = r.team_mode || 'free', revealed = EventCore.x1.teamsRevealed(r), meKey = EventCore.x1.teamKey(r, ctx.me);
+    const X = EventCore.x1;
+    const mode = r.team_mode || 'free', perGame = X.perGame(r), games = X.gameCount(r), meKey = X.teamKey(r, ctx.me);
+    api.ui.x1Game = api.ui.x1Game || {};
+    let game = 1;
+    if(perGame){                    // o jogo que escolheste; senão o primeiro em que ainda não tens time
+      const firstMissing = meKey ? Array.from({ length: games }, (_, i) => i + 1).find(g => !X.teamOf(r, meKey, g)) : null;
+      game = Math.min(Math.max(api.ui.x1Game[sid] || firstMissing || 1, 1), games);
+    }
+    const revealed = X.teamsRevealed(r, game), where = perGame ? ' neste jogo' : '';
     const side = (key, name) => {
-      const team = r[key], mine = key === meKey;
+      const team = X.teamOf(r, key, game), mine = key === meKey;
       let body;
-      if(!team) body = `<span class="vm-team-empty">${mode === 'random' ? 'sorteio por fazer' : 'ainda sem time registado'}</span>`;
-      else if(!mine && !revealed) body = '<span class="vm-team-empty">🔒 revela-se quando os dois tiverem o time registado</span>';
+      if(!team) body = `<span class="vm-team-empty">${mode === 'random' ? 'sorteio por fazer' : 'ainda sem time registado' + where}</span>`;
+      else if(!mine && !revealed) body = `<span class="vm-team-empty">🔒 revela-se quando os dois tiverem o time${where} registado</span>`;
       else body = team.map(m => `<span class="vm-mon">${pokeSpriteHtml(m.name, 32)}<em>${escapeHtml(m.name)}</em></span>`).join('');
       const hasSets = team && (mine || revealed) && team.some(m => m.text && m.text.trim());
-      const exp = team && (mine || revealed) ? `<button class="vm-x1btn" onclick="doX1TeamExport('${sid}','${key}')">📤 Exportar${hasSets ? '' : ' (só os nomes)'}</button>` : '';
+      const exp = team && (mine || revealed) ? `<button class="vm-x1btn" onclick="doX1TeamExport('${sid}','${key}',${game})">📤 Exportar${hasSets ? '' : ' (só os nomes)'}</button>` : '';
       return `<div class="vm-team-side${mine ? ' me' : ''}"><div class="vm-team-who"><b>${escapeHtml(name)}${mine ? ' (tu)' : ''}</b>${exp}</div><div class="vm-team-mons">${body}</div></div>`;
     };
     const canImport = meKey && ['accepted', 'reported', 'disputed'].includes(r.status);
-    const own = meKey ? r[meKey] : null;
+    const own = meKey ? X.teamOf(r, meKey, game) : null;
     const hint = mode === 'random'
       ? 'Times <b>aleatórios</b>: o sistema sorteou 6 Pokémon da região para cada um. Para importar, cola os 6 sets destes Pokémon (podes mudar golpes, item, etc.; a lista tem de ser exatamente a sorteada).'
-      : 'Times <b>livres</b>: cada um leva os seus 6 (da região da semana, na forma original, sem repetir espécies). O time do adversário só aparece quando os dois tiverem registado o seu.';
+      : (perGame
+        ? `Times <b>livres, um por jogo</b>: em cada jogo da série (melhor de ${games}) podes levar um time diferente. Escolhe o jogo em baixo e importa o time desse jogo (6 Pokémon da região da semana, forma original, sem repetir espécies no mesmo time). O time do adversário em cada jogo só aparece quando os dois tiverem registado o time desse jogo.`
+        : 'Times <b>livres</b>: cada um leva os seus 6 (da região da semana, na forma original, sem repetir espécies). O time do adversário só aparece quando os dois tiverem registado o seu.');
+    const tabs = perGame ? `<div class="vm-game-tabs">${Array.from({ length: games }, (_, i) => i + 1).map(g => {
+      const cnt = (X.teamOf(r, 'team_challenger', g) ? 1 : 0) + (X.teamOf(r, 'team_opponent', g) ? 1 : 0);
+      return `<button class="vm-game-tab${g === game ? ' on' : ''}${cnt === 2 ? ' full' : ''}" onclick="doX1Game('${sid}',${g})" title="Jogo ${g}: ${cnt}/2 times registados">Jogo ${g}<small>${cnt}/2</small></button>`;
+    }).join('')}</div>` : '';
     const importBox = canImport ? `<div class="vm-team-import">
-        <textarea id="x1tm-${sid}" rows="6" placeholder="Cola aqui o time exportado do Showdown (os 6 Pokémon separados por uma linha em branco)"></textarea>
-        <button class="vm-x1btn go" onclick="doX1TeamSave('${sid}', this)">📥 ${own ? 'Substituir o meu time' : 'Importar o meu time'}</button>
+        <textarea id="x1tm-${sid}" rows="6" placeholder="Cola aqui o time${perGame ? ' do jogo ' + game : ''} exportado do Showdown (os 6 Pokémon separados por uma linha em branco)"></textarea>
+        <button class="vm-x1btn go" onclick="doX1TeamSave('${sid}', this, ${game})">📥 ${own ? 'Substituir' : 'Importar'} o meu time${perGame ? ' do jogo ' + game : ''}</button>
       </div>` : '';
     const key = 'teams-' + sid, open = api.ui.open[key] !== undefined ? api.ui.open[key] : (!!meKey && !own && ['accepted'].includes(r.status));
-    const n = ['team_challenger', 'team_opponent'].filter(k => r[k]).length;
+    const n = [X.teamOf(r, 'team_challenger', game), X.teamOf(r, 'team_opponent', game)].filter(Boolean).length;
     return `<details class="vm-teams"${open ? ' open' : ''} ontoggle="evToggle('${key}', this.open)">
-      <summary>👥 Times <small>${EventCore.x1.teamModeLabel(mode)} · ${n}/2 registados</small></summary>
+      <summary>👥 Times <small>${X.teamModeLabel(mode)} · ${perGame ? 'Jogo ' + game + ': ' : ''}${n}/2 registados</small></summary>
       <div class="vm-teams-hint">${hint}</div>
+      ${tabs}
       <div class="vm-teams-grid">${side('team_challenger', r.challenger_name)}${side('team_opponent', r.opponent_name)}</div>
       ${importBox}
     </details>`;
