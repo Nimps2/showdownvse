@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calendário — Torneio Showdown - VSE</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013a">
+</head>
+<body>
+<div id="playerCornerContainer"></div>
+
+<div id="topbar" class="topbar">
+  <a href="index.html" class="brand">
+    <div class="brand-mark"></div>
+    <div class="brand-name">Torneio VSE</div>
+  </a>
+  <nav class="topnav">
+    <a href="index.html">Início</a>
+    <a href="viewer.html">Bracket</a>
+    <a href="estatisticas.html">Estatísticas</a>
+    <a href="hall-da-fama.html">Hall da Fama</a>
+    <a href="loja.html">Loja</a>
+    <a href="conquistas.html">Conquistas</a>
+    <a href="palpites.html">Palpiteiro</a>
+    <a href="calendario.html" class="current">Calendário</a>
+  </nav>
+  <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
+</div>
+
+<div id="mainContent" class="wrap">
+  <div class="status-strip">
+    <span class="status-dot" id="statusDot"></span>
+    <span class="status-text" id="statusText">A carregar o calendário…</span>
+  </div>
+
+  <div class="card">
+    <h2>📅 Agora</h2>
+    <div class="cal-now" id="calNow"><div class="empty-state">A carregar…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="cal-head">
+      <button type="button" class="cal-nav" id="calPrev" title="Mês anterior" aria-label="Mês anterior">‹</button>
+      <h2 id="calTitle" class="cal-title">—</h2>
+      <button type="button" class="cal-nav" id="calNext" title="Mês seguinte" aria-label="Mês seguinte">›</button>
+      <button type="button" class="cal-today" id="calToday">Hoje</button>
+    </div>
+    <div class="cal-legend" id="calLegend"></div>
+    <div class="cal-weekdays" aria-hidden="true"><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span></div>
+    <div class="cal-grid" id="calGrid" role="grid" aria-label="Calendário do mês"></div>
+    <div class="cal-detail" id="calDetail"></div>
+  </div>
+
+  <div class="card">
+    <h2>⏭️ Próximas datas</h2>
+    <div id="calUpcoming"><div class="empty-state">A carregar…</div></div>
+  </div>
+
+  <div class="card">
+    <h2>🗓️ Temporadas</h2>
+    <div class="cal-help">Uma temporada dura <span id="seasonMonths">3</span> meses e conta desde o dia do primeiro torneio do grupo. Serve para as estatísticas por temporada e para conquistas como o Bicampeão.</div>
+    <div id="calSeasons"><div class="empty-state">A carregar…</div></div>
+  </div>
+
+  <div class="card">
+    <h2>🎉 Eventos</h2>
+    <div class="cal-help">Os eventos são épocas especiais com regras próprias, missões e uma loja. As datas de eventos a decorrer são previstas (o organizador decide quando termina cada um).</div>
+    <div id="calEvents"><div class="empty-state">A carregar…</div></div>
+  </div>
+
+  <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
+</div>
+
+<script src="assets/js/showdown-utils.js?v=20261013a"></script>
+<script>
+initTheme();
+const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+
+let loggedInPlayerName = null;
+let tournaments = [];          // {id, tier, status, created_at, name, champion, evname}
+let events = [];               // eventos já vistos pelo calendário (calendarEventFrom)
+let anchor = null;             // data do primeiro torneio (início da temporada 1)
+let seasonRanges = [];         // [{n, start, end}] da 1 até à seguinte à atual
+let currentSeason = 1;
+let today = startOfLocalDay(new Date());
+let viewYear = today.getFullYear(), viewMonth = today.getMonth();
+let selectedKey = null;
+let dayMap = {};               // 'AAAA-MM-DD' -> [itens do dia]
+
+function setStatus(ok, text){
+  document.getElementById('statusDot').className = 'status-dot ' + (ok ? 'on' : 'off');
+  document.getElementById('statusText').textContent = text;
+}
+
+// ---------- Formatação ----------
+const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+function fmtDate(d, withYear){
+  return d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', ...(withYear ? { year: 'numeric' } : {}) });
+}
+function fmtLong(d){ const t = d.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); return t.charAt(0).toUpperCase() + t.slice(1); }
+function daysBetween(a, b){ return Math.round((startOfLocalDay(b) - startOfLocalDay(a)) / 86400000); }
+function daysLabel(n){
+  if(n === 0) return 'hoje';
+  if(n === 1) return 'amanhã';
+  if(n === -1) return 'ontem';
+  return n > 0 ? `daqui a ${n} dias` : `há ${-n} dias`;
+}
+
+// ---------- Dados ----------
+async function loadData(){
+  const h = { headers: sbAuthHeaders(SUPABASE_ANON_KEY) };
+  let evRows = [], evFailed = false;
+  [tournaments, evRows] = await Promise.all([
+    sbFetchAll(`${SUPABASE_URL}/rest/v1/tournaments?select=id,tier,status,created_at,name:data-%3E%3Ename,champion:data-%3E%3Echampion,evname:data-%3Eevent-%3E%3Ename&order=created_at.asc`, SUPABASE_ANON_KEY),
+    fetch(`${SUPABASE_URL}/rest/v1/events?select=id,slug,name,status,starts_at,ends_at,created_at,current_week,total_weeks&status=in.(active,planned,ended)&order=starts_at.asc`, h)
+      .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .catch(() => { evFailed = true; return []; })
+  ]);
+  events = evRows.map(e => calendarEventFrom(e, today));
+  anchor = getSeasonAnchor(tournaments);
+  seasonRanges = [];
+  if(anchor){
+    currentSeason = Math.max(1, computeSeasonNumber(new Date().toISOString(), anchor));
+    for(let n = 1; n <= currentSeason + 1; n++) seasonRanges.push(getSeasonDateRange(anchor, n));
+  }
+  return evFailed;
+}
+
+// ---------- Itens por dia ----------
+function buildDayMap(){
+  dayMap = {};
+  const put = (d, item) => { const k = localDayKey(d); (dayMap[k] = dayMap[k] || []).push(item); };
+  seasonRanges.forEach(s => {
+    put(s.start, { type: 'season', kind: 'start', n: s.n });
+    put(s.end, { type: 'season', kind: 'end', n: s.n });
+  });
+  events.forEach(ev => {
+    for(let d = ev.start, i = 0; d <= ev.end && i < 400; d = addLocalDays(d, 1), i++){
+      const first = i === 0, last = localDayKey(d) === localDayKey(ev.end);
+      put(d, { type: 'event', ev, first, last, monday: d.getDay() === 1 });
+    }
+  });
+  tournaments.forEach(t => put(startOfLocalDay(new Date(t.created_at)), { type: 'tournament', t }));
+}
+
+function seasonOfDay(d){
+  return seasonRanges.find(s => d >= s.start && d <= s.end) || null;
+}
+
+// ---------- Cartões "Agora" ----------
+function renderNow(){
+  const parts = [];
+  // Temporada
+  if(anchor){
+    const s = seasonRanges[currentSeason - 1] || seasonRanges[seasonRanges.length - 1];
+    const left = daysBetween(today, s.end);
+    const inSeason = tournaments.filter(t => { const d = startOfLocalDay(new Date(t.created_at)); return d >= s.start && d <= s.end; }).length;
+    parts.push(`<div class="cal-tile"><div class="cal-tile-k">🗓️ Temporada atual</div><div class="cal-tile-v">Temporada ${s.n}</div>
+      <div class="cal-tile-s">${fmtDate(s.start, true)} → ${fmtDate(s.end, true)}<br>termina ${daysLabel(left)} · ${inSeason} torneio${inSeason === 1 ? '' : 's'} até agora</div></div>`);
+  } else {
+    parts.push(`<div class="cal-tile"><div class="cal-tile-k">🗓️ Temporada atual</div><div class="cal-tile-v">—</div><div class="cal-tile-s">Ainda não há torneios.</div></div>`);
+  }
+  // Evento a decorrer
+  const active = events.find(e => e.status === 'active');
+  if(active){
+    const left = daysBetween(today, active.end);
+    parts.push(`<div class="cal-tile" style="--evc:${escapeHtml(active.color)}"><div class="cal-tile-k">${escapeHtml(active.emoji)} Evento a decorrer</div><div class="cal-tile-v">${escapeHtml(active.name)}</div>
+      <div class="cal-tile-s">${active.week > 0 ? `Semana ${active.week} de ${active.weeks}` : 'Arranca com o torneio da Semana 1'}<br>fim previsto ${fmtDate(active.end, true)} (${daysLabel(left)})</div>
+      <a class="cal-tile-link" href="eventos.html">Abrir o evento →</a></div>`);
+  } else {
+    parts.push(`<div class="cal-tile"><div class="cal-tile-k">🎉 Evento a decorrer</div><div class="cal-tile-v">Nenhum</div><div class="cal-tile-s">Não há nenhum evento ativo neste momento.</div></div>`);
+  }
+  // Próximo evento agendado
+  const planned = events.filter(e => e.status === 'planned').sort((a, b) => a.start - b.start)[0];
+  if(planned){
+    const until = daysBetween(today, planned.start);
+    parts.push(`<div class="cal-tile" style="--evc:${escapeHtml(planned.color)}"><div class="cal-tile-k">⏭️ Próximo evento</div><div class="cal-tile-v">${escapeHtml(planned.emoji)} ${escapeHtml(planned.name)}</div>
+      <div class="cal-tile-s">${until >= 0 ? `começa ${fmtDate(planned.start, true)} (${daysLabel(until)})` : 'estava previsto para ' + fmtDate(planned.start, true) + ' — ainda não começou'}<br>${planned.weeks} semana${planned.weeks === 1 ? '' : 's'}, até ${fmtDate(planned.end, true)} (previsto)</div></div>`);
+  } else {
+    parts.push(`<div class="cal-tile"><div class="cal-tile-k">⏭️ Próximo evento</div><div class="cal-tile-v">Ainda sem data</div><div class="cal-tile-s">O organizador ainda não agendou nenhum evento.</div></div>`);
+  }
+  document.getElementById('calNow').innerHTML = parts.join('');
+}
+
+// ---------- Mês ----------
+function legendHtml(){
+  const seen = {}, legs = [];
+  events.forEach(e => { const k = e.emoji + e.color; if(!seen[k]){ seen[k] = 1; legs.push({ emoji: e.emoji, color: e.color, label: eventSlugInfo(e.slug).label || 'Outro evento' }); } });
+  return `<span class="cal-leg"><i class="cal-dot season"></i>Início/fim de temporada</span>`
+    + legs.map(l => `<span class="cal-leg"><i class="cal-dot" style="background:${escapeHtml(l.color)}"></i>${escapeHtml(l.emoji)} ${escapeHtml(l.label)}</span>`).join('')
+    + `<span class="cal-leg"><i class="cal-dot tour"></i>🏆 Torneio</span>`;
+}
+
+function chipsFor(items){
+  const chips = [];
+  items.filter(i => i.type === 'season').forEach(i => chips.push({ cls: 'season', ico: i.kind === 'start' ? '🌟' : '🏁', txt: i.kind === 'start' ? `Temporada ${i.n} começa` : `Fim da temporada ${i.n}` }));
+  items.filter(i => i.type === 'event' && (i.first || i.last || i.monday)).forEach(i => chips.push({
+    cls: 'event', color: i.ev.color, ico: i.ev.emoji,
+    txt: i.first ? `${i.ev.name} ${i.ev.status === 'ended' ? 'começou' : 'começa'}` : (i.last ? `${i.ev.name} ${i.ev.status === 'ended' ? 'terminou' : 'termina'}${i.ev.endIsForecast ? ' (prev.)' : ''}` : i.ev.name)
+  }));
+  items.filter(i => i.type === 'tournament').forEach(i => chips.push({ cls: 'tour', ico: '🏆', txt: i.t.name || i.t.tier || 'Torneio' }));
+  return chips;
+}
+
+function renderMonth(){
+  document.getElementById('calTitle').textContent = `${MONTHS_PT[viewMonth]} ${viewYear}`;
+  document.getElementById('calLegend').innerHTML = legendHtml();
+  const first = new Date(viewYear, viewMonth, 1);
+  const lead = (first.getDay() + 6) % 7;                  // segunda = 0
+  const gridStart = addLocalDays(first, -lead);
+  const cells = [];
+  for(let i = 0; i < 42; i++){
+    const d = addLocalDays(gridStart, i), key = localDayKey(d), items = dayMap[key] || [];
+    if(i >= 35 && d.getMonth() !== viewMonth) break;       // 6.ª semana só se for precisa
+    const evs = items.filter(x => x.type === 'event');
+    const chips = chipsFor(items), shown = chips.slice(0, 3), extra = chips.length - shown.length;
+    const cls = ['cal-day', d.getMonth() !== viewMonth ? 'other' : '', key === localDayKey(today) ? 'today' : '', key === selectedKey ? 'sel' : '', evs.length ? 'in-event' : ''].filter(Boolean).join(' ');
+    const evc = evs.length ? ` style="--evc:${escapeHtml(evs[0].ev.color)}"` : '';
+    const label = `${fmtLong(d)}${chips.length ? ': ' + chips.map(c => c.txt).join('; ') : ''}`;
+    cells.push(`<button type="button" class="${cls}" data-day="${key}"${evc} aria-label="${escapeHtml(label)}">
+      <span class="cal-num">${d.getDate()}</span>
+      ${shown.map(c => `<span class="cal-chip ${c.cls}"${c.color ? ` style="--chc:${escapeHtml(c.color)}"` : ''} title="${escapeHtml(c.txt)}"><span class="i">${c.ico}</span><span class="t">${escapeHtml(c.txt)}</span></span>`).join('')}
+      ${extra > 0 ? `<span class="cal-more">+${extra}</span>` : ''}
+    </button>`);
+  }
+  document.getElementById('calGrid').innerHTML = cells.join('');
+  renderDetail();
+}
+
+function renderDetail(){
+  const box = document.getElementById('calDetail');
+  if(!selectedKey){ box.innerHTML = '<div class="cal-detail-hint">Toca num dia para ver o que está marcado.</div>'; return; }
+  const d = parseLocalDayKey(selectedKey), items = dayMap[selectedKey] || [];
+  const rows = [];
+  items.filter(i => i.type === 'season').forEach(i => rows.push(`<div class="cal-row"><span class="cal-row-i">${i.kind === 'start' ? '🌟' : '🏁'}</span><div><b>${i.kind === 'start' ? `Começa a temporada ${i.n}` : `Termina a temporada ${i.n}`}</b></div></div>`));
+  items.filter(i => i.type === 'event').forEach(i => {
+    const ev = i.ev, state = ev.status === 'ended' ? 'terminado' : (ev.status === 'active' ? 'a decorrer' : 'agendado');
+    const what = i.first ? 'começa' : (i.last ? (ev.status === 'ended' ? 'terminou' : 'termina') : 'a decorrer');
+    rows.push(`<div class="cal-row" style="--evc:${escapeHtml(ev.color)}"><span class="cal-row-i">${escapeHtml(ev.emoji)}</span><div><b>${escapeHtml(ev.name)}</b> — ${what}${i.last && ev.endIsForecast ? ' (data prevista)' : ''}<br><small>${state} · ${fmtDate(ev.start, true)} → ${fmtDate(ev.end, true)}${ev.endIsForecast ? ' (previsto)' : ''}</small></div></div>`);
+  });
+  items.filter(i => i.type === 'tournament').forEach(i => {
+    const t = i.t;
+    rows.push(`<div class="cal-row"><span class="cal-row-i">🏆</span><div><b>${escapeHtml(t.name || 'Torneio')}</b>${t.evname ? ` <small>(${escapeHtml(t.evname)})</small>` : ''}<br><small>${escapeHtml(t.tier || '')}${t.champion ? ' · campeão: ' + escapeHtml(t.champion) : (t.status === 'em_curso' ? ' · a decorrer' : '')}</small></div></div>`);
+  });
+  const s = seasonOfDay(d);
+  box.innerHTML = `<div class="cal-detail-head">${escapeHtml(fmtLong(d))}${s ? ` <small>· temporada ${s.n}</small>` : ''}</div>`
+    + (rows.length ? rows.join('') : '<div class="cal-detail-hint">Nada marcado neste dia.</div>');
+}
+
+// ---------- Próximas datas, temporadas, eventos ----------
+function renderUpcoming(){
+  const list = [];
+  seasonRanges.forEach(s => {
+    if(s.start >= today) list.push({ d: s.start, ico: '🌟', txt: `Começa a temporada ${s.n}` });
+    if(s.end >= today) list.push({ d: s.end, ico: '🏁', txt: `Termina a temporada ${s.n}` });
+  });
+  events.forEach(ev => {
+    if(ev.status === 'planned' && ev.start >= today) list.push({ d: ev.start, ico: ev.emoji, txt: `Começa o evento ${ev.name}` });
+    if(ev.status !== 'ended' && ev.end >= today) list.push({ d: ev.end, ico: ev.emoji, txt: `Termina o evento ${ev.name} (data prevista)` });
+  });
+  list.sort((a, b) => a.d - b.d);
+  const el = document.getElementById('calUpcoming');
+  el.innerHTML = list.length
+    ? list.slice(0, 8).map(x => `<div class="cal-row"><span class="cal-row-i">${escapeHtml(x.ico)}</span><div><b>${escapeHtml(x.txt)}</b><br><small>${escapeHtml(fmtLong(x.d))} · ${daysLabel(daysBetween(today, x.d))}</small></div></div>`).join('')
+    : '<div class="empty-state">Nada marcado para os próximos tempos.</div>';
+}
+
+function renderSeasons(){
+  document.getElementById('seasonMonths').textContent = SEASON_LENGTH_MONTHS;
+  const el = document.getElementById('calSeasons');
+  if(!seasonRanges.length){ el.innerHTML = '<div class="empty-state">Ainda não há torneios — a temporada 1 começa no primeiro torneio.</div>'; return; }
+  el.innerHTML = seasonRanges.slice().reverse().map(s => {
+    const cnt = tournaments.filter(t => { const d = startOfLocalDay(new Date(t.created_at)); return d >= s.start && d <= s.end; }).length;
+    const state = s.n === currentSeason ? '<span class="cal-badge on">a decorrer</span>' : (s.n < currentSeason ? '<span class="cal-badge">terminada</span>' : '<span class="cal-badge next">a seguir</span>');
+    return `<div class="cal-item"><div class="cal-meta"><b>Temporada ${s.n}</b> <span class="cal-sub">${fmtDate(s.start, true)} → ${fmtDate(s.end, true)}</span></div><span class="cal-right">${s.n <= currentSeason ? `${cnt} torneio${cnt === 1 ? '' : 's'}` : ''} ${state}</span></div>`;
+  }).join('');
+}
+
+function renderEvents(){
+  const el = document.getElementById('calEvents');
+  if(!events.length){ el.innerHTML = '<div class="empty-state">Ainda não houve eventos.</div>'; return; }
+  const order = { active: 0, planned: 1, ended: 2 };
+  const sorted = events.slice().sort((a, b) => order[a.status] - order[b.status] || (a.status === 'ended' ? b.start - a.start : a.start - b.start));
+  el.innerHTML = sorted.map(ev => {
+    const badge = ev.status === 'active' ? '<span class="cal-badge on">a decorrer</span>' : (ev.status === 'planned' ? '<span class="cal-badge next">agendado</span>' : '<span class="cal-badge">terminado</span>');
+    return `<div class="cal-item" style="--evc:${escapeHtml(ev.color)}"><div class="cal-meta">${escapeHtml(ev.emoji)} <b>${escapeHtml(ev.name)}</b> <span class="cal-sub">${fmtDate(ev.start, true)} → ${fmtDate(ev.end, true)}${ev.endIsForecast ? ' (previsto)' : ''}</span></div><span class="cal-right">${ev.weeks} semana${ev.weeks === 1 ? '' : 's'} ${badge}</span></div>`;
+  }).join('');
+}
+
+// ---------- Navegação ----------
+function shiftMonth(delta){
+  const d = new Date(viewYear, viewMonth + delta, 1);
+  viewYear = d.getFullYear(); viewMonth = d.getMonth();
+  renderMonth();
+}
+function goToday(){
+  viewYear = today.getFullYear(); viewMonth = today.getMonth();
+  selectedKey = localDayKey(today);
+  renderMonth();
+}
+document.getElementById('calPrev').addEventListener('click', () => shiftMonth(-1));
+document.getElementById('calNext').addEventListener('click', () => shiftMonth(1));
+document.getElementById('calToday').addEventListener('click', goToday);
+document.getElementById('calGrid').addEventListener('click', e => {
+  const b = e.target.closest('.cal-day'); if(!b) return;
+  selectedKey = b.dataset.day;
+  const d = parseLocalDayKey(selectedKey);
+  if(d && (d.getMonth() !== viewMonth || d.getFullYear() !== viewYear)){ viewYear = d.getFullYear(); viewMonth = d.getMonth(); }
+  renderMonth();
+});
+
+// ---------- Canto: perfil, bónus diário, evento, sino (só se houver login guardado; a página em si é pública) ----------
+async function loadCornerBadge(){
+  const savedName = localStorage.getItem('player_login_name');
+  if(!savedName){ document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(null, null); return; }
+  loggedInPlayerName = savedName;
+  try{
+    const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(savedName, profiles[savedName]);
+    checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, savedName).then(available => {
+      document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
+    });
+    if(typeof mountEventCornerIcon === 'function') mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } catch(e){
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(null, null);
+  }
+}
+
+let dailyBonusClaimInFlight = false;
+async function handleDailyBonusClick(){
+  if(dailyBonusClaimInFlight) return;
+  dailyBonusClaimInFlight = true;
+  const icon = document.getElementById('dailyBonusIcon');
+  if(icon) icon.classList.remove('available');
+  try{
+    const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+    if(result.awarded){
+      showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
+    }
+  } finally {
+    dailyBonusClaimInFlight = false;
+  }
+}
+function doPlayerLogout(){
+  localStorage.removeItem('player_login_name');
+  endPlayerSession(SUPABASE_URL, SUPABASE_ANON_KEY);
+  loggedInPlayerName = null;
+  document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(null, null);
+}
+
+async function init(){
+  // Depois de uma atualização do site o browser pode ainda ter o showdown-utils.js antigo em cache.
+  if(typeof getSeasonDateRange !== 'function' || typeof calendarEventFrom !== 'function' || typeof sbFetchAll !== 'function'){
+    setStatus(false, 'Ficheiros antigos em cache.');
+    document.getElementById('mainContent').insertAdjacentHTML('beforeend', '<div class="card"><div class="empty-state">O teu browser ainda tem ficheiros antigos do site em cache. Faz <b>Ctrl+F5</b> para atualizar e abre esta página outra vez.</div></div>');
+    return;
+  }
+  try{
+    const evFailed = await loadData();
+    buildDayMap();
+    selectedKey = localDayKey(today);
+    renderNow(); renderMonth(); renderUpcoming(); renderSeasons(); renderEvents();
+    setStatus(!evFailed, evFailed ? 'Não consegui ler os eventos — mostro só as temporadas e os torneios.' : `Ligado — ${tournaments.length} torneio(s) e ${events.length} evento(s).`);
+  } catch(e){
+    setStatus(false, 'Não foi possível ligar à base de dados.');
+    document.getElementById('calNow').innerHTML = '<div class="empty-state">Não consegui carregar o calendário. Tenta atualizar a página.</div>';
+  }
+}
+
+loadCornerBadge();
+init();
+</script>
+</body>
+</html>

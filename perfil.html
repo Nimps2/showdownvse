@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012n">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013a">
 <style>
 .customize-toggle-btn{
   background:var(--bg-card);border:1px solid var(--line);color:var(--tera-cyan);padding:9px 16px;
@@ -100,6 +100,7 @@
     <a href="loja.html">Loja</a>
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
+    <a href="calendario.html">Calendário</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
 </div>
@@ -117,7 +118,7 @@
   <div class="footer-note">Estatísticas calculadas a partir de todos os torneios guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261012n"></script>
+<script src="assets/js/showdown-utils.js?v=20261013a"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -304,7 +305,7 @@ async function renderProfile(){
     const matchLines = (t.matches || []).map(m=>{
       const resultTxt = m.won ? 'Venceu' : 'Perdeu';
       const replayHtml = (m.replayUrls||[]).some(u=>u)
-        ? ' · ' + m.replayUrls.map((u,i)=> u ? `<a href="${escapeHtml(u)}" target="_blank" style="color:var(--tera-cyan);text-decoration:none;">▶ ${m.replayUrls.length>1 ? 'jogo '+(i+1) : 'replay'}</a>` : '').join(' ')
+        ? ' · ' + m.replayUrls.map((u,i)=> u ? `<a href="${escapeHtml(u)}" target="_blank" onclick="return openReplayModal(this, event)" style="color:var(--tera-cyan);text-decoration:none;">▶ ${m.replayUrls.length>1 ? 'jogo '+(i+1) : 'replay'}</a>` : '').join(' ')
         : '';
       return `<div style="font-size:11px;color:var(--text-faint);padding-left:8px;margin-top:2px;">${escapeHtml(m.label)}: ${resultTxt} vs ${escapeHtml(m.opponent)}${replayHtml}</div>`;
     }).join('');
@@ -505,7 +506,7 @@ async function renderProfile(){
       <div class="shop-grid">
         ${iconicTeam.length ? iconicTeam.map(m=>`
           <div class="shop-item">
-            <div class="shop-swatch" style="display:flex;align-items:center;justify-content:center;background:var(--bg-panel);font-size:11px;font-weight:700;">${escapeHtml(m.species)}</div>
+            <div class="shop-swatch" title="${escapeHtml(m.species)}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:var(--bg-panel);font-size:10.5px;font-weight:700;">${pokeSpriteHtml(m.species, 48)}<span>${escapeHtml(m.species)}</span></div>
             <div class="shop-item-name">${m.count}x usado</div>
           </div>`).join('') : '<div class="empty-state" style="grid-column:1/-1;">Sem dados suficientes ainda.</div>'}
       </div>

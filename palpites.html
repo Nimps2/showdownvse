@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012n">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013a">
 <style>
 .match-bet-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;}
 .match-bet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
@@ -58,6 +58,7 @@
     <a href="loja.html">Loja</a>
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html" class="current">Palpiteiro</a>
+    <a href="calendario.html">Calendário</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
 </div>
@@ -106,7 +107,7 @@
   <div class="footer-note">Aposta moedas em quem vai vencer cada partida — acerta e ganha o dobro, erra e perde a aposta. Jogos de sorte como a roleta agora ficam na <a class="nav-link" href="loja.html">loja</a>. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261012n"></script>
+<script src="assets/js/showdown-utils.js?v=20261013a"></script>
 <script>
 initTheme();
 document.getElementById('nicknamePrizeLabel').textContent = NICKNAME_VOTE_PRIZE;
@@ -493,7 +494,7 @@ async function renderNicknameVoteCard(){
     html += `<div style="margin-top:14px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">Votação atual</div>`;
     html += standings.map(s=>{
       const comboNote = s.ownerTotal > s.votes ? ` <span style="color:var(--text-faint);font-size:10px;">(${escapeHtml(s.ownerName)} soma ${s.ownerTotal} no total)</span>` : '';
-      return `<div class="history-row"><span>${escapeHtml(s.nickname)} (${escapeHtml(s.species)}) — ${escapeHtml(s.ownerName)}${comboNote}</span><b style="color:var(--tera-amber);">${s.votes} voto(s)</b></div>`;
+      return `<div class="history-row"><span>${pokeSpriteHtml(s.species, 32)} ${escapeHtml(s.nickname)} (${escapeHtml(s.species)}) — ${escapeHtml(s.ownerName)}${comboNote}</span><b style="color:var(--tera-amber);">${s.votes} voto(s)</b></div>`;
     }).join('');
   }
   el.innerHTML = html;

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@600;700&family=Special+Elite&family=Caveat:wght@500;600&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012n">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013a">
 <style>
 /* O visual de cada evento vive em eventos/<slug>.css (carregado dinamicamente). */
 #eventRoot{min-height:240px;}
@@ -64,6 +64,7 @@
     <a href="loja.html">Loja</a>
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
+    <a href="calendario.html">Calendário</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
 </div>
@@ -82,8 +83,8 @@
   <div class="footer-note">As missões são calculadas a partir do que já fizeste no site — clica em "Reclamar" para receber os prémios.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261012n"></script>
-<script src="assets/js/eventos-core.js?v=20261012n"></script>
+<script src="assets/js/showdown-utils.js?v=20261013a"></script>
+<script src="assets/js/eventos-core.js?v=20261013a"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -193,7 +194,7 @@ const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && 
 // Versão dos ficheiros do evento (showdown-utils.js, eventos-core.js e eventos/<slug>.*): MUDAR (aqui e nas
 // duas <script src="...?v="> lá em cima) sempre que algum deles mudar, para o browser não misturar ficheiros
 // novos com versões antigas em cache.
-const EV_ASSET_VERSION = '20261012n';
+const EV_ASSET_VERSION = '20261013a';
 
 // Carrega o CSS e o JS do evento ativo (cada evento tem o seu par). O slug só pode ter a-z, 0-9 e "-".
 function loadEventAssets(slug){
@@ -251,7 +252,7 @@ function renderPastEvents(){
         <span class="evh-pos">${medals[i] || (i + 1)}</span><span class="evh-who">${escapeHtml(r.name)}</span>
         ${m ? `<span class="evh-lvl">Nível ${EventCore.levelFor(m, r.xp).level}</span>` : ''}<span class="evh-xp">${r.xp} XP</span></div>`).join('');
     return `<div class="evh-card">
-      <div class="evh-head"><span class="evh-name">🌍 ${escapeHtml(ev.name)}</span><span class="evh-dates">${fmt(ev.starts_at || ev.created_at)} → ${fmt(ev.ends_at)}</span>
+      <div class="evh-head"><span class="evh-name">${escapeHtml(eventSlugInfo(ev.slug).emoji)} ${escapeHtml(ev.name)}</span><span class="evh-dates">${fmt(ev.starts_at || ev.created_at)} → ${fmt(ev.ends_at)}</span>
         <span class="evh-pill">${ev.current_week}/${ev.total_weeks} semanas · ${p.ranking.length} jogador${p.ranking.length === 1 ? '' : 'es'}</span></div>
       ${champs ? `<div class="evh-sub">Campeões de cada semana</div><div class="evh-champs">${champs}</div>` : ''}
       ${rows ? `<div class="evh-sub">Pódio do evento (XP)</div>${rows}` : ''}
@@ -272,7 +273,7 @@ async function init(){
   const root = document.getElementById('eventRoot');
   // Depois de uma atualização do site, o browser pode ainda ter em cache o showdown-utils.js antigo
   // (sem as funções do evento). Em vez de um erro genérico, diz o que fazer.
-  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || !EventCore.shop || typeof EventCore.x1.leaders !== 'function' || !EventCore.x1.FORMATS || !EventCore.x1.TEAM_MODES || typeof EventCore.x1.setReplays !== 'function' || typeof EventCore.x1.teamOf !== 'function' || typeof sbFetchAll !== 'function' || typeof nameFxClass !== 'function' || !getCosmeticById('frame_vm_esquadrilha') || !getCosmeticById('frame_vm_balao')){
+  if(typeof fetchEventTournaments !== 'function' || typeof grantCosmetic !== 'function' || !EventCore.board || !EventCore.x1 || !EventCore.shop || typeof EventCore.x1.leaders !== 'function' || !EventCore.x1.FORMATS || !EventCore.x1.TEAM_MODES || typeof EventCore.x1.setReplays !== 'function' || typeof EventCore.x1.teamOf !== 'function' || typeof sbFetchAll !== 'function' || typeof openReplayModal !== 'function' || typeof nameFxClass !== 'function' || typeof eventRuleViolationText !== 'function' || typeof eventSlugInfo !== 'function' || !getCosmeticById('frame_hw_fantasmas') || !getCosmeticById('frame_vm_esquadrilha') || !getCosmeticById('frame_vm_balao')){
     setStatus(false, 'Ficheiros antigos em cache.');
     root.innerHTML = '<div class="card"><div class="empty-state">O teu browser ainda tem ficheiros antigos do site em cache. Faz <b>Ctrl+F5</b> para atualizar e abre esta página outra vez.</div></div>';
     return;
@@ -295,7 +296,7 @@ async function init(){
       setStatus(true, 'Ligado — não há nenhum evento ativo.');
       // para mostrar o nível de cada jogador nos eventos anteriores é preciso o módulo desse evento (se não carregar, mostra só o XP)
       await Promise.all([...new Set(pastEvents.map(p => p.ev.slug))].map(s => loadEventAssets(s).catch(() => {})));
-      root.innerHTML = '<div class="card"><h2>🌍 Eventos</h2><div class="empty-state">Não há nenhum evento ativo de momento. Quando houver, aparece aqui — com missões, níveis e prémios exclusivos.</div></div>'
+      root.innerHTML = '<div class="card"><h2>🎉 Eventos</h2><div class="empty-state">Não há nenhum evento ativo de momento. Quando houver, aparece aqui — com missões, níveis e prémios exclusivos.</div></div>'
         + (pastEvents.length ? `<div class="card" style="margin-top:14px;"><h3 class="evh-title">📚 Eventos anteriores</h3>${renderPastEvents()}</div>` : '');
       return;
     }
@@ -354,6 +355,7 @@ function evDraftInput(el){
 }
 
 // ---------- Ações ----------
+const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
 async function doClaim(missionId, btn){
   const mission = EventCore.expandMissions(mod, activeEvent, { x1: X1_ENABLED }, ctx).find(m => m.id === missionId);
   if(!mission) return;
@@ -366,7 +368,7 @@ async function doClaim(missionId, btn){
     ui.justClaimed = missionId;
     renderAll();
     ui.justClaimed = null;
-    if(mod.celebrate) mod.celebrate(document.querySelector(`.vm-pass[data-mid="${missionId}"] .vm-claimed`), 'claim');
+    if(mod.celebrate) mod.celebrate(document.querySelector(`[data-mid="${missionId}"] [class*="-claimed"]`) || document.querySelector(`[data-mid="${missionId}"]`), 'claim');
     const levelAfter = EventCore.levelFor(mod, EventCore.totals(ctx, loggedInPlayerName).xp).level;
     if(levelAfter > levelBefore){
       setTimeout(() => {
@@ -391,14 +393,14 @@ async function doPostCard(btn){
   const r = await EventCore.board.post(ctx, ui.draft);
   if(r.ok){
     ui.draft = '';
-    showCelebrationToast('📮 Postal enviado! Já está no quadro do evento.', 4500);
+    showCelebrationToast(`${mod.boardIcon || '📮'} ${cap(mod.boardWord || 'postal')} enviado! Já está no ${mod.boardName || 'quadro'} do evento.`, 4500);
     renderAll();
     return;
   }
   const msg = r.reason === 'empty' ? 'Escreve alguma coisa antes de enviar.'
-    : r.reason === 'toolong' ? `O postal só pode ter ${EventCore.board.MAX_LEN} caracteres.`
-    : r.reason === 'already' ? 'Já deixaste o teu postal de hoje — volta amanhã!'
-    : r.reason === 'unavailable' ? 'O quadro ainda não está disponível.'
+    : r.reason === 'toolong' ? `O ${mod.boardWord || 'postal'} só pode ter ${EventCore.board.MAX_LEN} caracteres.`
+    : r.reason === 'already' ? `Já deixaste o teu ${mod.boardWord || 'postal'} de hoje — volta amanhã!`
+    : r.reason === 'unavailable' ? `O ${mod.boardName || 'quadro'} ainda não está disponível.`
     : 'Não foi possível enviar agora. Tenta outra vez.';
   alert(msg);
   if(r.reason === 'already') renderAll(); else if(btn) btn.disabled = false;
@@ -411,7 +413,7 @@ async function doReact(messageId, emojiIdx){
   renderAll();
 }
 
-// ---------- Loja de Milhas ----------
+// ---------- Loja do evento (Milhas, Doces, ...) ----------
 async function doShopBuy(itemId, btn){
   const it = ctx.shop.items.find(x => x.item_id === itemId);
   const c = getCosmeticById(itemId);
@@ -423,14 +425,15 @@ async function doShopBuy(itemId, btn){
     if(!(myProfile.ownedCosmetics || []).includes(itemId)) myProfile.ownedCosmetics = (myProfile.ownedCosmetics || []).concat([itemId]);
     showCelebrationToast(`🛍️ Comprado: <b>${escapeHtml(c.name)}</b><br><span style="font-size:11px;opacity:0.9;">Equipa-o em Perfil → Customizar · sobram ${mod.currency.emoji} ${r.balance}</span>`, 6500);
     renderAll();
-    if(mod.celebrate) mod.celebrate(document.querySelector(`.vm-shop-item[data-item="${itemId}"]`), 'claim');
+    if(mod.celebrate) mod.celebrate(document.querySelector(`[data-item="${itemId}"]`), 'claim');
     return;
   }
   if(r.reason === 'auth' || r.reason === 'busy') return;   // 'auth': a página recarrega sozinha para entrar outra vez
   const msg = r.reason === 'insufficient' ? `Não tens ${mod.currency.name} suficientes${r.balance != null ? ` (tens ${r.balance})` : ''}.`
-    : r.reason === 'alreadyowned' ? 'Já tens esta lembrança.'
+    : r.reason === 'alreadyowned' ? `Já tens esta ${mod.itemWord || 'lembrança'}.`
     : r.reason === 'closed' ? 'A loja fechou: o evento já terminou.'
-    : r.reason === 'noitem' ? 'Esta lembrança já não está à venda.'
+    : r.reason === 'noitem' ? `Esta ${mod.itemWord || 'lembrança'} já não está à venda.`
+    : r.reason === 'locked' ? `Esta ${mod.itemWord || 'lembrança'} só abre na semana ${r.week || '?'} do evento.`
     : 'Não foi possível comprar agora. Tenta outra vez.';
   alert(msg);
   try{ await EventCore.refresh(ctx); } catch(e){ /* sem rede: mantém o que já temos */ }

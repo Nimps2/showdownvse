@@ -475,7 +475,7 @@
       : (r.status === 'reported' && w ? `<div class="vm-duel-verdict soft">${escapeHtml(r.reported_by)} registou: vitória de <b>${escapeHtml(w)}</b>${scoreTxt}</div>` : '');
     const links = EventCore.x1.replayLinks(r), canSee = ['reported', 'confirmed', 'resolved'].includes(r.status);
     const replay = links.length && canSee
-      ? `<div class="vm-duel-replays">${links.map((l, i) => `<a class="vm-duel-replay" href="${encodeURI(l).replace(/"/g, '%22')}" target="_blank" rel="noopener">▶ ${links.length > 1 ? 'Jogo ' + (i + 1) : 'Ver replay'}</a>`).join('')}</div>` : '';
+      ? `<div class="vm-duel-replays">${links.map((l, i) => `<a class="vm-duel-replay" href="${encodeURI(l).replace(/"/g, '%22')}" target="_blank" rel="noopener" onclick="return openReplayModal(this, event)">▶ ${links.length > 1 ? 'Jogo ' + (i + 1) : 'Ver replay'}</a>`).join('')}</div>` : '';
     const isPlayer = r.challenger_name === ctx.me || r.opponent_name === ctx.me;
     // Em melhor de 3/5 o resultado é um placar (em vez de "Eu ganhei"/"Eu perdi"): lista de resultados possíveis do ponto de vista de quem regista.
     const useScore = bestOf > 1 && acts.includes('win');
@@ -627,6 +627,7 @@
     { cat:'badges',      label:'Emblemas',        icon:'🏷️' },
     { cat:'accents',     label:'Cor de destaque', icon:'✨' },
     { cat:'titles',      label:'Títulos',         icon:'✒️' },
+    { cat:'nameEffects', label:'Efeitos de nome', icon:'🔤' },
     { cat:'backgrounds', label:'Cor da moldura',  icon:'🎨' },
     { cat:'frames',      label:'Molduras animadas', icon:'🖼️' }
   ];
@@ -634,6 +635,10 @@
     const sid = safeId(it.item_id), cur = mod.currency.emoji;
     let action;
     if(state === 'owned') action = '<div class="vm-shop-own">✔ Já tens</div>';
+    else if(state === 'locked'){
+      const wk = it.available_week, reg = wk >= 1 && wk <= mod.weeks.length ? EVENT_REGIONS[mod.weeks[wk - 1].region].label : '';
+      action = `<div class="vm-shop-need">🔒 Abre na semana ${wk}${reg ? ' (' + reg + ')' : ''}</div>`;
+    }
     else if(state === 'cant') action = `<div class="vm-shop-need">Faltam ${it.cost - balance} ${cur}</div>`;
     else action = `<button class="vm-shop-buy" onclick="doShopBuy('${sid}', this)">Comprar</button>`;
     return `<div class="vm-shop-item ${state}" data-item="${sid}">
@@ -653,7 +658,7 @@
       const list = items.filter(it => findCosmeticCategory(it.item_id) === g.cat);
       if(!list.length) return '';
       return `<section class="vm-section"><h3 class="vm-h3">${g.icon} ${g.label}</h3><div class="vm-shop-grid">${
-        list.map(it => shopItemHtml(it, getCosmeticById(it.item_id), owned.has(it.item_id) ? 'owned' : (t.balance >= it.cost ? 'can' : 'cant'), t.balance)).join('')
+        list.map(it => shopItemHtml(it, getCosmeticById(it.item_id), owned.has(it.item_id) ? 'owned' : (it.available_week && it.available_week > ctx.ev.current_week ? 'locked' : (t.balance >= it.cost ? 'can' : 'cant')), t.balance)).join('')
       }</div></section>`;
     }).join('');
     return `<section class="vm-shop-head">

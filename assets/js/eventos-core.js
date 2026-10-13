@@ -89,10 +89,11 @@ const EventCore = (function(){
   // Loja de Milhas: o que se vende (event_shop_items, com o PREÇO) e as compras deste jogador (event_purchases).
   // Se as tabelas ainda não existem (SQL por correr) ou não há itens, {available:false} e o separador não aparece.
   async function loadShop(ev, me){
-    const [items, purchases] = await Promise.all([
-      getJsonStatus(`event_shop_items?event_slug=eq.${enc(ev.slug)}&select=item_id,cost,sort_order&order=sort_order.asc`),
+    let [items, purchases] = await Promise.all([
+      getJsonStatus(`event_shop_items?event_slug=eq.${enc(ev.slug)}&select=item_id,cost,sort_order,available_week&order=sort_order.asc`),
       getJsonStatus(`event_purchases?event_id=eq.${enc(ev.id)}&player_name=eq.${enc(me)}&select=item_id,cost,created_at`)
     ]);
+    if(!items.ok) items = await getJsonStatus(`event_shop_items?event_slug=eq.${enc(ev.slug)}&select=item_id,cost,sort_order&order=sort_order.asc`);      // base sem a coluna available_week (SQL por correr)
     if(!items.ok || !purchases.ok) return { available:false, items:[], purchases:[] };
     return { available: items.data.length > 0, items: items.data, purchases: purchases.data };
   }
@@ -461,8 +462,7 @@ const EventCore = (function(){
         entries.forEach(e => {
           const n = e.parsed.name;
           if(isSpeciesAllowedInEventRegion(n, regionKey)) return;
-          const found = getEventRegionOfSpecies(n);
-          errors.push(found === regionKey ? `${n} é uma forma regional — só vale a forma original.` : `${n} não é de ${reg.label} (${reg.dex})${found && EVENT_REGIONS[found] ? ' — é de ' + EVENT_REGIONS[found].label : ' — é de outra geração'}.`);
+          errors.push(eventRuleViolationText(n, regionKey));
         });
       }
       return { ok: errors.length === 0, errors, team: ordered.map(e => ({ name: e.parsed.name, text: e.raw.slice(0, 3000) })) };
@@ -763,7 +763,7 @@ const EventCore = (function(){
         const r = await dbFunction(URL_, KEY_, 'buy_event_item', { p_name: ctx.me, p_event: ctx.ev.id, p_item: itemId, p_token: getPlayerToken(ctx.me) });
         if(!r.ok || !r.data) return { ok:false, reason:'error' };
         if(r.data.reason === 'auth'){ handleSessionExpired(); return { ok:false, reason:'auth' }; }
-        if(!r.data.ok) return { ok:false, reason: r.data.reason || 'error', balance: r.data.balance };
+        if(!r.data.ok) return { ok:false, reason: r.data.reason || 'error', balance: r.data.balance, week: r.data.week };
         const c = getCosmeticById(itemId);
         logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', `Comprou na loja de Milhas: "${c ? c.name : itemId}" (${r.data.cost} milhas)`);
         const fresh = await loadShop(ctx.ev, ctx.me);

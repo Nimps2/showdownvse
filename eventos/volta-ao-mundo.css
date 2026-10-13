@@ -479,3 +479,5 @@ body.light-theme .ev-theme-volta-ao-mundo [data-region="sinnoh"]{--accent:#7c4dc
 @media (max-width:640px){
   .ev-theme-volta-ao-mundo .vm-teams-grid{grid-template-columns:1fr;}
 }
+.ev-theme-volta-ao-mundo .vm-shop-item.locked{opacity:0.62;}
+.ev-theme-volta-ao-mundo .vm-shop-item.locked .vm-shop-need{color:var(--text-dim);}

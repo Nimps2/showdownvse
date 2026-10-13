@@ -213,6 +213,40 @@ function sbAuthHeaders(supabaseAnonKey){
   return { 'apikey': supabaseAnonKey, 'Authorization': `Bearer ${supabaseAnonKey}` };
 }
 
+// ---------- Replay embutido (janela dentro do site) ----------
+// O que se pode abrir DENTRO do site: um ficheiro do repositório (replays/....html) ou um replay do Showdown (https://replay.pokemonshowdown.com/<id>, também aceita o link da sala da batalha). '' = outra coisa.
+function replayEmbedUrl(href){
+  const u = String(href || '').trim();
+  if(/^replays\/[^<>"\\?#]+\.html$/i.test(u) && !/(^|\/)\.\.(\/|$)/.test(u)) return u;      // sem "../" (não sair da pasta replays)
+  return normalizeShowdownReplayUrl(u) || '';
+}
+// Para o onclick dos links de replay: `onclick="return openReplayModal(this, event)"`. Clique normal = abre numa janela por cima da página (com o botão "abrir noutra aba");
+// Ctrl/Cmd/Shift/botão do meio, ou um endereço que não é um replay conhecido, seguem o link como sempre.
+function openReplayModal(a, ev){
+  if(ev && (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey || ev.button === 1)) return true;
+  const url = replayEmbedUrl(a && a.getAttribute('href'));
+  if(!url) return true;
+  closeReplayModal();
+  const ov = document.createElement('div');
+  ov.id = 'replayModal'; ov.className = 'replay-modal';
+  const abs = /^https?:/i.test(url) ? url : new URL(encodeURI(url), document.baseURI).href;
+  ov.innerHTML = `<div class="replay-modal-box" role="dialog" aria-label="Replay">
+    <div class="replay-modal-head"><b>▶ Replay</b><span style="flex:1;"></span>
+      <a class="replay-modal-open" href="${escapeHtml(abs)}" target="_blank" rel="noopener">↗ Abrir noutra aba</a>
+      <button type="button" class="replay-modal-x" onclick="closeReplayModal()" title="Fechar (Esc)">✕</button></div>
+    <iframe class="replay-modal-frame" src="${escapeHtml(abs)}" title="Replay" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe></div>`;
+  ov.addEventListener('click', e => { if(e.target === ov) closeReplayModal(); });
+  document.body.appendChild(ov);
+  document.addEventListener('keydown', _replayModalKey);
+  return false;
+}
+function _replayModalKey(e){ if(e.key === 'Escape') closeReplayModal(); }
+function closeReplayModal(){
+  const ov = document.getElementById('replayModal');
+  if(ov) ov.remove();
+  document.removeEventListener('keydown', _replayModalKey);
+}
+
 // ---------- Links de replays do Showdown ----------
 // Devolve o link do REPLAY (https://replay.pokemonshowdown.com/<id>) a partir do que o jogador colou: aceita o próprio link do replay (http ou https,
 // com "?..."/"#..."/barra no fim) e o link da SALA da batalha (https://play.pokemonshowdown.com/battle-gen9ou-123..., o que se copia do browser durante
@@ -448,7 +482,11 @@ const COSMETIC_CATALOG = {
     { id:'bg_vm_kanto',  name:'Neon de Kanto',    price:0, css:'linear-gradient(135deg,#ff4fa3,#5b3df0)', color:'#ff4fa3', eventOnly:'volta-ao-mundo' },
     { id:'bg_vm_johto',  name:'Dourado de Johto', price:0, css:'linear-gradient(135deg,#f0d36b,#c98a2b)', color:'#f0d36b', eventOnly:'volta-ao-mundo' },
     { id:'bg_vm_hoenn',  name:'Vulcão de Hoenn',  price:0, css:'linear-gradient(135deg,#ff7a3d,#8f1d1d)', color:'#ff7a3d', eventOnly:'volta-ao-mundo' },
-    { id:'bg_vm_sinnoh', name:'Neve de Sinnoh',   price:0, css:'linear-gradient(135deg,#d7ecff,#6fa8e8)', color:'#9fd0ff', eventOnly:'volta-ao-mundo' }
+    { id:'bg_vm_sinnoh', name:'Neve de Sinnoh',   price:0, css:'linear-gradient(135deg,#d7ecff,#6fa8e8)', color:'#9fd0ff', eventOnly:'volta-ao-mundo' },
+    // Evento Halloween (prémio de nível e loja de Doces)
+    { id:'bg_hw_noite',   name:'Noite de Bruxas',  price:0, css:'linear-gradient(135deg,#ff8a1f,#3a1466)', color:'#ff8a1f', eventOnly:'halloween' },
+    { id:'bg_hw_sangue',  name:'Lua de Sangue',    price:0, css:'linear-gradient(135deg,#c1121f,#1a0a12)', color:'#e5383b', eventOnly:'halloween' },
+    { id:'bg_hw_cripta',  name:'Cripta Esmeralda', price:0, css:'linear-gradient(135deg,#3ddc84,#1d1033)', color:'#3ddc84', eventOnly:'halloween' }
   ],
   accents: [
     { id:'accent_default', name:'Ciano (padrão)', price:0,  color:'#4fd8d0' },
@@ -458,7 +496,10 @@ const COSMETIC_CATALOG = {
     { id:'accent_emerald', name:'Esmeralda',      price:50, color:'#5ed890' },
     // Lembranças da loja de Milhas (ver backgrounds).
     { id:'accent_vm_ceu',   name:'Azul-Céu',     price:0, color:'#4fa8f0', eventOnly:'volta-ao-mundo' },
-    { id:'accent_vm_pista', name:'Luz de Pista', price:0, color:'#ffb347', eventOnly:'volta-ao-mundo' }
+    { id:'accent_vm_pista', name:'Luz de Pista', price:0, color:'#ffb347', eventOnly:'volta-ao-mundo' },
+    // Evento Halloween (loja de Doces)
+    { id:'accent_hw_laranja', name:'Laranja-Abóbora', price:0, color:'#ff8a1f', eventOnly:'halloween' },
+    { id:'accent_hw_veneno',  name:'Verde-Veneno',    price:0, color:'#9cff4f', eventOnly:'halloween' }
   ],
   // "Moldura do Avatar" já não é uma borda estática — agora é um EFEITO
   // ANIMADO à volta do avatar, colorido com a cor escolhida em "Cor da
@@ -473,7 +514,10 @@ const COSMETIC_CATALOG = {
     { id:'frame_vm_rota', name:'Rota Aérea', price:0, effect:'plane', eventOnly:'volta-ao-mundo' },
     { id:'frame_vm_esquadrilha', name:'Esquadrilha', price:0, effect:'fleet', eventOnly:'volta-ao-mundo' },
     // Lembrança PREMIUM da loja de Milhas (ver event_shop_items): balão de ar quente a dar a volta ao avatar.
-    { id:'frame_vm_balao', name:'Balão de Ar Quente', price:0, effect:'balloon', eventOnly:'volta-ao-mundo' }
+    { id:'frame_vm_balao', name:'Balão de Ar Quente', price:0, effect:'balloon', eventOnly:'volta-ao-mundo' },
+    // Evento Halloween: prémio do nível 7 (morcegos) e lembrança premium da loja de Doces (fantasmas)
+    { id:'frame_hw_morcegos',   name:'Revoada de Morcegos',    price:0, effect:'bats',   eventOnly:'halloween' },
+    { id:'frame_hw_fantasmas',  name:'Fantasmas Brincalhões',  price:0, effect:'ghosts', eventOnly:'halloween' }
   ],
   nameEffects: [
     { id:'effect_none',  name:'Nenhum',  price:0,  css:'' },
@@ -482,7 +526,13 @@ const COSMETIC_CATALOG = {
     { id:'effect_glow',  name:'Brilho',  price:70, fx:'glow', css:'' },
     { id:'effect_pulse', name:'Pulsar',  price:90, fx:'pulse', css:'' },
     { id:'effect_vm_rasto', name:'Rasto de Avião', price:0, fx:'contrail', css:'', eventOnly:'volta-ao-mundo' },
-    { id:'effect_vm_aurora', name:'Aurora de Cabine', price:0, fx:'aurora', css:'', eventOnly:'volta-ao-mundo' }
+    { id:'effect_vm_aurora', name:'Aurora de Cabine', price:0, fx:'aurora', css:'', eventOnly:'volta-ao-mundo' },
+    // Premium da loja de Milhas (3.ª ronda): só se compram com Milhas
+    { id:'effect_vm_quadro', name:'Quadro de Partidas', price:0, fx:'splitflap', css:'', eventOnly:'volta-ao-mundo' },
+    { id:'effect_vm_selo', name:'Selo Postal', price:0, fx:'stamp', css:'', eventOnly:'volta-ao-mundo' },
+    // Evento Halloween: o nome assombrado é prémio do nível 5; a luz de vela é premium da loja de Doces
+    { id:'effect_hw_assombrado', name:'Nome Assombrado', price:0, fx:'ghost',  css:'', eventOnly:'halloween' },
+    { id:'effect_hw_vela',       name:'Luz de Vela',     price:0, fx:'candle', css:'', eventOnly:'halloween' }
   ],
   titles: [
     { id:'title_none',         name:'Nenhum',              price:0,  text:'' },
@@ -506,7 +556,20 @@ const COSMETIC_CATALOG = {
     { id:'title_vm_comissario', name:'Chefe de Cabine',      price:0, text:'🧑‍✈️ Chefe de Cabine',   eventOnly:'volta-ao-mundo' },
     { id:'title_vm_primeira',   name:'Primeira Classe',      price:0, text:'🥂 Primeira Classe',      eventOnly:'volta-ao-mundo' },
     // Atribuído pelo organizador (gestor) a quem tiver mais vitórias em x1 no evento; não está à venda em lado nenhum.
-    { id:'title_vm_rei_duelos', name:'Rei dos Duelos',       price:0, text:'👑 Rei dos Duelos',       eventOnly:'volta-ao-mundo' }
+    { id:'title_vm_rei_duelos', name:'Rei dos Duelos',       price:0, text:'👑 Rei dos Duelos',       eventOnly:'volta-ao-mundo' },
+    // Abrem na loja de Milhas nas semanas 2, 3 e 4 (event_shop_items.available_week)
+    { id:'title_vm_johto_expl', name:'Explorador de Johto',    price:0, text:'🔔 Explorador de Johto',    eventOnly:'volta-ao-mundo' },
+    { id:'title_vm_hoenn_merg', name:'Mergulhador de Hoenn',   price:0, text:'🤿 Mergulhador de Hoenn',   eventOnly:'volta-ao-mundo' },
+    { id:'title_vm_sinnoh_alp', name:'Alpinista de Sinnoh',    price:0, text:'🏔️ Alpinista de Sinnoh',    eventOnly:'volta-ao-mundo' },
+    // Evento Halloween
+    { id:'title_hw_doce_trav',    name:'Doçura ou Travessura',        price:0, text:'🎃 Doçura ou Travessura',        eventOnly:'halloween' },
+    { id:'title_hw_lenda',        name:'Lenda da Noite das Almas',    price:0, text:'🌙 Lenda da Noite das Almas',    eventOnly:'halloween' },
+    { id:'title_hw_campeao_s1',   name:'Campeão da Primeira Noite',   price:0, text:'🕯️ Campeão da Primeira Noite',   eventOnly:'halloween' },
+    { id:'title_hw_campeao_s2',   name:'Campeão da Segunda Noite',    price:0, text:'🕸️ Campeão da Segunda Noite',    eventOnly:'halloween' },
+    { id:'title_hw_rei_duelos',   name:'Rei dos Duelos Sombrios',     price:0, text:'👑 Rei dos Duelos Sombrios',     eventOnly:'halloween' },
+    { id:'title_hw_cacador',      name:'Caçador de Fantasmas',        price:0, text:'🔦 Caçador de Fantasmas',        eventOnly:'halloween' },
+    { id:'title_hw_pocoes',       name:'Mestre das Poções',           price:0, text:'🧪 Mestre das Poções',           eventOnly:'halloween' },
+    { id:'title_hw_vampiro',      name:'Conde da Noite',              price:0, text:'🧛 Conde da Noite',              eventOnly:'halloween' }
   ],
   badges: [
     { id:'badge_stall',   name:'Fã de Stall',   price:30, emoji:'🐌' },
@@ -529,7 +592,22 @@ const COSMETIC_CATALOG = {
     { id:'badge_vm_bilhete',    name:'Bilhete Dourado',      price:0, emoji:'🎫', eventOnly:'volta-ao-mundo' },
     // Itens baratos (2.ª ronda da loja de Milhas): para quem tem poucas Milhas.
     { id:'badge_vm_etiqueta',   name:'Etiqueta de Bagagem',  price:0, emoji:'🏷️', eventOnly:'volta-ao-mundo' },
-    { id:'badge_vm_bone',       name:'Boné de Viajante',     price:0, emoji:'🧢', eventOnly:'volta-ao-mundo' }
+    { id:'badge_vm_bone',       name:'Boné de Viajante',     price:0, emoji:'🧢', eventOnly:'volta-ao-mundo' },
+    // Abrem na loja de Milhas nas semanas 2, 3 e 4
+    { id:'badge_vm_torresino',  name:'Torre Sino',           price:0, emoji:'🏯', eventOnly:'volta-ao-mundo' },
+    { id:'badge_vm_ilha',       name:'Ilha Tropical',        price:0, emoji:'🏝️', eventOnly:'volta-ao-mundo' },
+    { id:'badge_vm_corona',     name:'Monte Corona',         price:0, emoji:'⛰️', eventOnly:'volta-ao-mundo' },
+    // Evento Halloween
+    { id:'badge_hw_abobora',    name:'Abóbora Entalhada',    price:0, emoji:'🎃', eventOnly:'halloween' },
+    { id:'badge_hw_fantasma',   name:'Fantasminha',          price:0, emoji:'👻', eventOnly:'halloween' },
+    { id:'badge_hw_morcego',    name:'Morcego da Meia-Noite', price:0, emoji:'🦇', eventOnly:'halloween' },
+    { id:'badge_hw_doces',      name:'Saco de Doces',        price:0, emoji:'🍬', eventOnly:'halloween' },
+    { id:'badge_hw_caveira',    name:'Caveira Sorridente',   price:0, emoji:'💀', eventOnly:'halloween' },
+    { id:'badge_hw_teia',       name:'Teia de Aranha',       price:0, emoji:'🕸️', eventOnly:'halloween' },
+    { id:'badge_hw_vela',       name:'Vela Bruxuleante',     price:0, emoji:'🕯️', eventOnly:'halloween' },
+    { id:'badge_hw_chapeu',     name:'Chapéu de Bruxo',      price:0, emoji:'🧙', eventOnly:'halloween' },
+    { id:'badge_hw_aranha',     name:'Aranha Peluda',        price:0, emoji:'🕷️', eventOnly:'halloween' },
+    { id:'badge_hw_lua',        name:'Lua Cheia',            price:0, emoji:'🌕', eventOnly:'halloween' }
   ],
   features: [
     { id:'feature_custom_pagebg', name:'Fundo de perfil personalizado (foto)', price:120 },
@@ -747,6 +825,33 @@ function ensureAvatarFxStyles(){
       animation:vseBalloonUpright 18s linear infinite,vseBalloonBob 3.4s ease-in-out infinite;}
     @media (prefers-reduced-motion:reduce){.avatar-fx-balloon span,.avatar-fx-balloon span::before{animation:none!important;}}
 
+    /* Revoada de Morcegos (evento Halloween, nível 7): 3 morcegos a rodar em órbitas diferentes (um em sentido contrário) e a bater as asas.
+       Mesma técnica da Esquadrilha: cada <span> ocupa a camada toda e RODA; o morcego é o ::before. */
+    @keyframes vseBatsOrbit{to{transform:rotate(360deg);}}
+    @keyframes vseBatFlap{0%,100%{transform:translate(-50%,0) scaleY(1);}50%{transform:translate(-50%,0) scaleY(0.5);}}
+    .avatar-fx-bats span{top:0!important;left:0!important;width:100%;height:100%;animation:vseBatsOrbit 9s linear infinite;animation-delay:0s!important;}
+    .avatar-fx-bats span:nth-child(2){animation-duration:13s;animation-direction:reverse;}
+    .avatar-fx-bats span:nth-child(3){animation-duration:17s;animation-delay:-6s!important;}
+    .avatar-fx-bats span::before{content:'';position:absolute;top:2%;left:50%;width:calc(var(--fx-gem,9px)*1.9);height:calc(var(--fx-gem,9px)*1.2);transform:translate(-50%,0);
+      background:var(--fx-color);animation:vseBatFlap 0.5s ease-in-out infinite;
+      clip-path:polygon(50% 30%,56% 20%,60% 32%,72% 22%,90% 20%,100% 38%,86% 44%,76% 54%,68% 46%,60% 62%,50% 80%,40% 62%,32% 46%,24% 54%,14% 44%,0% 38%,10% 20%,28% 22%,40% 32%,44% 20%);}
+    .avatar-fx-bats span:nth-child(2)::before{top:9%;opacity:0.85;animation-duration:0.62s;}
+    .avatar-fx-bats span:nth-child(3)::before{top:16%;opacity:0.7;animation-duration:0.74s;}
+
+    /* Fantasmas Brincalhões (evento Halloween, loja de Doces): 2 fantasminhas a dar a volta ao avatar, a flutuar para cima e para baixo; ficam sempre direitos. */
+    @keyframes vseGhostsOrbit{to{transform:rotate(360deg);}}
+    @keyframes vseGhostUpright{from{transform:translate(-50%,0) rotate(0deg);}to{transform:translate(-50%,0) rotate(-360deg);}}
+    @keyframes vseGhostBob{0%,100%{margin-top:0;}50%{margin-top:3%;}}
+    .avatar-fx-ghosts span{top:0!important;left:0!important;width:100%;height:100%;animation:vseGhostsOrbit 14s linear infinite;animation-delay:0s!important;
+      filter:drop-shadow(0 0 3px color-mix(in srgb,var(--fx-color) 55%,transparent));}
+    .avatar-fx-ghosts span:nth-child(2){animation-direction:reverse;animation-duration:19s;}
+    .avatar-fx-ghosts span::before{content:'';position:absolute;top:2%;left:50%;width:calc(var(--fx-gem,9px)*1.35);height:calc(var(--fx-gem,9px)*1.6);transform:translate(-50%,0);
+      background:radial-gradient(circle at 33% 38%,rgba(20,10,40,0.85) 0 10%,transparent 11%),radial-gradient(circle at 67% 38%,rgba(20,10,40,0.85) 0 10%,transparent 11%),var(--fx-color);
+      clip-path:polygon(50% 0%,70% 6%,84% 20%,92% 40%,92% 100%,82% 88%,72% 100%,62% 88%,50% 100%,38% 88%,28% 100%,18% 88%,8% 100%,8% 40%,16% 20%,30% 6%);
+      animation:vseGhostUpright 14s linear infinite,vseGhostBob 2.8s ease-in-out infinite;}
+    .avatar-fx-ghosts span:nth-child(2)::before{animation-duration:19s,3.3s;animation-direction:reverse,normal;opacity:0.85;}
+    @media (prefers-reduced-motion:reduce){.avatar-fx-bats span,.avatar-fx-bats span::before,.avatar-fx-ghosts span,.avatar-fx-ghosts span::before{animation:none!important;}}
+
     @keyframes vseFxHueRotate{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
     .avatar-fx-layer.avatar-fx-multicolor{animation:vseFxHueRotate 5s linear infinite;}
   `;
@@ -794,6 +899,23 @@ function ensureNameFxStyles(){
     @keyframes vseNameFlow{to{background-position:300% 0;}}
     .name-fx-aurora{background:linear-gradient(90deg,#4fa8f0,#a56bf0,#f0b64f,#e0607a,#4fa8f0);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;
       -webkit-text-fill-color:transparent;color:transparent;animation:vseNameFlow 5s linear infinite;filter:drop-shadow(0 0 5px rgba(165,107,240,0.45));}
+    /* Quadro de Partidas: o nome "vira" como o painel de um aeroporto, de vez em quando */
+    @keyframes vseSplitFlap{0%,84%,100%{transform:perspective(220px) rotateX(0);}88%{transform:perspective(220px) rotateX(-88deg);}93%{transform:perspective(220px) rotateX(18deg);}96%{transform:perspective(220px) rotateX(0);}}
+    .name-fx-splitflap{text-transform:uppercase;letter-spacing:0.07em;padding:0 0.35em;border-radius:4px;transform-origin:50% 50%;
+      background:linear-gradient(to bottom,rgba(255,255,255,0.13) 0 49%,rgba(0,0,0,0.38) 49% 52%,rgba(255,255,255,0.05) 52% 100%);animation:vseSplitFlap 6s ease-in-out infinite;}
+    /* Selo Postal: uma "carimbada" aparece ao lado do nome, de vez em quando */
+    @keyframes vseStampHit{0%,58%{opacity:0;transform:rotate(-14deg) scale(1.9);}66%{opacity:0.95;transform:rotate(-14deg) scale(1);}90%{opacity:0.95;transform:rotate(-14deg) scale(1);}100%{opacity:0;transform:rotate(-14deg) scale(1);}}
+    .name-fx-stamp{position:relative;padding-right:1.9em;}
+    .name-fx-stamp::after{content:'VSE';position:absolute;right:0;top:50%;margin-top:-0.62em;font-size:0.5em;font-weight:800;letter-spacing:0.1em;line-height:1;padding:0.14em 0.32em;border:2px solid currentColor;border-radius:3px;opacity:0;transform:rotate(-14deg);animation:vseStampHit 5s ease-in infinite;}
+    /* Nome Assombrado (Halloween): o nome esvanece e flutua como um fantasma, com um 👻 ao lado */
+    @keyframes vseNameGhost{0%,100%{opacity:1;transform:translateY(0);filter:blur(0);}42%{opacity:0.45;transform:translateY(-1.5px);filter:blur(0.7px);}58%{opacity:0.95;transform:translateY(0);filter:blur(0);}}
+    .name-fx-ghost{animation:vseNameGhost 4.5s ease-in-out infinite;text-shadow:0 0 7px color-mix(in srgb,currentColor 55%,transparent);}
+    .name-fx-ghost::after{content:'👻';font-size:0.62em;margin-left:0.28em;opacity:0.85;}
+    /* Luz de Vela (Halloween, loja de Doces): o brilho do nome treme como a chama de uma vela */
+    @keyframes vseNameCandle{0%,100%{text-shadow:0 0 4px currentColor,0 0 10px #ff8a1f;}18%{text-shadow:0 0 6px currentColor,0 0 16px #ffb347,0 0 26px rgba(255,138,31,0.45);}34%{text-shadow:0 0 3px currentColor,0 0 8px #ff8a1f;}52%{text-shadow:0 0 7px currentColor,0 0 18px #ffb347,0 0 24px rgba(255,138,31,0.4);}70%{text-shadow:0 0 4px currentColor,0 0 11px #ff8a1f;}85%{text-shadow:0 0 6px currentColor,0 0 15px #ffb347;}}
+    .name-fx-candle{animation:vseNameCandle 2.6s ease-in-out infinite;}
+    .name-fx-candle::before{content:'🕯️';font-size:0.7em;margin-right:0.25em;}
+    @media (prefers-reduced-motion:reduce){.name-fx-splitflap{animation:none;}.name-fx-stamp::after{animation:none;opacity:0.85;}.name-fx-ghost,.name-fx-candle{animation:none;}}
   `;
   document.head.appendChild(style);
 }
@@ -810,11 +932,11 @@ function nameEffectPreviewHtml(item, profile){
   return `<div class="shop-swatch" style="height:44px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg-panel);color:${color};font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:15px;"><span class="${nameFxClass(item)}">Abc</span></div>`;
 }
 
-const AVATAR_FX_COUNTS = { sparks:10, starry:6, blossom:5, diamond:4, plane:1, fleet:3, balloon:1 };
+const AVATAR_FX_COUNTS = { sparks:10, starry:6, blossom:5, diamond:4, plane:1, fleet:3, balloon:1, bats:3, ghosts:2 };
 // Efeitos que não usam os primeiros N ângulos da lista acima — o Diamante
 // quer as 4 gemas espalhadas pelos pontos cardeais (direita, baixo, esquerda,
 // cima), pela ordem em que o anel as "visita" ao rodar.
-const AVATAR_FX_ANGLE_OVERRIDES = { diamond:[0, 90, 180, 270], plane:[0], fleet:[0, 0, 0], balloon:[0] };
+const AVATAR_FX_ANGLE_OVERRIDES = { diamond:[0, 90, 180, 270], plane:[0], fleet:[0, 0, 0], balloon:[0], bats:[0, 0, 0], ghosts:[0, 0] };
 // Duração (s) do ciclo de cada efeito, para espaçar o atraso de cada partícula.
 const AVATAR_FX_PERIODS = { sparks:1.4, starry:2.4, blossom:3.6, diamond:4 };
 
@@ -834,7 +956,7 @@ function avatarFxParticlesHtml(effectType, radiusPct){
 }
 
 // effectColor: cor (hex) escolhida em "Cor da moldura". effectType: 'none' |
-// 'sparks' | 'starry' | 'blossom' | 'diamond' | 'plane' | 'fleet' | 'balloon'. multiColor: true para a Aurora Animada,
+// 'sparks' | 'starry' | 'blossom' | 'diamond' | 'plane' | 'fleet' | 'balloon' | 'bats' | 'ghosts'. multiColor: true para a Aurora Animada,
 // faz o efeito ciclar de cor continuamente em vez de ficar fixo.
 function avatarHtml(name, photoUrl, sizePx, effectColor, effectType, multiColor){
   const size = sizePx || 44;
@@ -2701,6 +2823,49 @@ function filterRowsBySeason(allRows, seasonNumber){
   return allRows.filter(r => computeSeasonNumber(r.created_at, anchor) === seasonNumber);
 }
 
+// ---------- Calendário (calendario.html) ----------
+// Aspeto de cada evento no calendário e no ícone de canto. Um evento novo sem entrada aqui aparece com 🎉.
+const EVENT_SLUG_INFO = {
+  'volta-ao-mundo': { emoji:'🌍', color:'#4fa8f0', label:'Volta ao Mundo' },
+  'halloween':      { emoji:'🎃', color:'#ff8a1f', label:'Halloween' }
+};
+function eventSlugInfo(slug){ return EVENT_SLUG_INFO[slug] || { emoji:'🎉', color:'#a56bf0', label:'' }; }
+
+// Datas SEMPRE como dias locais (meia-noite): "2026-10-13". addLocalDays não sofre com a mudança da hora de verão.
+function localDayKey(d){ const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; }
+function startOfLocalDay(d){ const x = new Date(d); return new Date(x.getFullYear(), x.getMonth(), x.getDate()); }
+function addLocalDays(d, n){ return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+function parseLocalDayKey(key){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key || '')); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+
+// Primeiro e último dia (inclusive) da temporada N. A temporada 1 começa no dia do primeiro torneio e cada uma dura SEASON_LENGTH_MONTHS meses;
+// no fim confirma-se com computeSeasonNumber (a regra "oficial"), por causa de âncoras nos dias 29–31.
+function getSeasonDateRange(anchor, n){
+  const a = startOfLocalDay(anchor);
+  const startOf = k => {
+    let d = new Date(a.getFullYear(), a.getMonth() + SEASON_LENGTH_MONTHS * (k - 1), a.getDate());
+    for(let i = 0; i < 5 && computeSeasonNumber(d.toISOString(), a) < k; i++) d = addLocalDays(d, 1);
+    for(let i = 0; i < 5 && k > 1 && computeSeasonNumber(addLocalDays(d, -1).toISOString(), a) >= k; i++) d = addLocalDays(d, -1);
+    return d;
+  };
+  return { n, start: startOf(n), end: addLocalDays(startOf(n + 1), -1) };
+}
+
+// Um evento visto pelo calendário: {id, slug, name, status, start, end, endIsForecast, emoji, color, weeks, week}. Datas em dias locais (inclusive).
+//  - terminado: fim = ends_at real · agendado: fim = ends_at previsto (ou início + semanas) · ativo: fim PREVISTO = início + semanas (nunca antes de hoje).
+function calendarEventFrom(ev, today){
+  const start = startOfLocalDay(new Date(ev.starts_at || ev.created_at));
+  const weeks = ev.total_weeks > 0 ? ev.total_weeks : 1;
+  const forecast = addLocalDays(start, weeks * 7);
+  let end, forecastEnd = false;
+  if(ev.status === 'ended') end = ev.ends_at ? startOfLocalDay(new Date(ev.ends_at)) : start;   // terminado sem data de fim (eventos de teste antigos): só o dia de início
+  else if(ev.status === 'planned' && ev.ends_at) { end = startOfLocalDay(new Date(ev.ends_at)); forecastEnd = true; }
+  else { end = forecast; forecastEnd = true; }
+  if(ev.status === 'active' && today && end < today) end = today;     // passou da data prevista e ainda não foi terminado
+  if(end < start) end = start;
+  const info = eventSlugInfo(ev.slug);
+  return { id: ev.id, slug: ev.slug, name: ev.name, status: ev.status, start, end, endIsForecast: forecastEnd, emoji: info.emoji, color: info.color, weeks, week: ev.current_week || 0 };
+}
+
 // ---------- MVP automático a cada 3 torneios (usado como proxy de "por mês") ----------
 // Agrupa os torneios concluídos em blocos de 3 (por ordem cronológica) e
 // escolhe o MVP de cada bloco: mais vitórias nesses 3 torneios, com o
@@ -3195,8 +3360,27 @@ const EVENT_REGIONS = {
   kanto:  { label:'Kanto',  dex:'#1–151' },
   johto:  { label:'Johto',  dex:'#152–251' },
   hoenn:  { label:'Hoenn',  dex:'#252–386' },
-  sinnoh: { label:'Sinnoh', dex:'#387–493' }
+  sinnoh: { label:'Sinnoh', dex:'#387–493' },
+  // Evento de Halloween: em vez de uma região, a regra é por TIPO (ver EVENT_EXACT_SPECIES)
+  halloween: { label:'Halloween', dex:'só Pokémon Dark ou Ghost', exact:true }
 };
+// Regras "exatas" (por tipo, não por região): as espécies/formas que valem, escritas como o Showdown as escreve (formas regionais incluídas: Muk-Alola é Dark, o Muk normal não).
+// Halloween = os Pokémon da pool National Dex AG que têm Dark OU Ghost num dos tipos (tipos oficiais do Showdown, 2026-10-13). Para refazer a lista: ver docs/FUNCIONALIDADES.md (Evento Halloween).
+const EVENT_EXACT_SPECIES = {
+  halloween: 'Banette,Basculegion,Basculegion-F,Bisharp,Bombirdier,Brambleghast,Brute Bonnet,Cacturne,Calyrex-Shadow,Ceruledge,Chandelure,Crawdaunt,Darkrai,Decidueye,Dragapult,Drifblim,Dusknoir,Froslass,Gengar,Gholdengo,Giratina,Giratina-Origin,Golurk,Greninja,Grimmsnarl,Honchkrow,Hoopa,Hoopa-Unbound,Houndoom,Houndstone,Hydreigon,Incineroar,Iron Jugulis,Kingambit,Krookodile,Lokix,Lunala,Mabosstiff,Malamar,Mandibuzz,Meowscarada,Mightyena,Mimikyu,Mismagius,Moltres-Galar,Morpeko,Muk-Alola,Necrozma-Dawn-Wings,Oricorio-Sensu,Overqwil,Palossand,Pecharunt,Persian-Alola,Polteageist,Qwilfish-Hisui,Rotom,Sableye,Samurott-Hisui,Scrafty,Shiftry,Sinistcha,Skeledirge,Skuntank,Sneasel,Spiritomb,Ting-Lu,Trevenant,Typhlosion-Hisui,Tyranitar,Umbreon,Weavile,Wo-Chien,Yveltal,Zarude,Zoroark,Zoroark-Hisui'
+};
+let _eventExactIndex = null;
+function eventExactSet(region){
+  if(!EVENT_EXACT_SPECIES[region]) return null;
+  if(!_eventExactIndex) _eventExactIndex = {};
+  if(!_eventExactIndex[region]){
+    const set = {};
+    EVENT_EXACT_SPECIES[region].split(',').forEach(n => { if(n) set[eventSpeciesId(n)] = n; });
+    _eventExactIndex[region] = set;
+  }
+  return _eventExactIndex[region];
+}
+function isEventExactRegion(region){ return !!EVENT_EXACT_SPECIES[region]; }
 const EVENT_REGION_SPECIES = {
   kanto: 'Bulbasaur,Ivysaur,Venusaur,Charmander,Charmeleon,Charizard,Squirtle,Wartortle,Blastoise,Caterpie,Metapod,'
     + 'Butterfree,Weedle,Kakuna,Beedrill,Pidgey,Pidgeotto,Pidgeot,Rattata,Raticate,Spearow,Fearow,Ekans,Arbok,'
@@ -3264,6 +3448,7 @@ function getEventRegionOfSpecies(name){
 function isSpeciesInEventRegion(name, region){ return getEventRegionOfSpecies(name) === region; }
 // Nomes (como o Showdown os escreve) de todas as espécies base de uma região.
 function getEventRegionSpeciesNames(region){
+  if(EVENT_EXACT_SPECIES[region]) return EVENT_EXACT_SPECIES[region].split(',');
   return EVENT_REGION_SPECIES[region] ? EVENT_REGION_SPECIES[region].split(',') : [];
 }
 
@@ -3276,7 +3461,18 @@ function isEventExcludedForme(name){
 }
 // É esta espécie válida na região da semana? (região certa E forma original)
 function isSpeciesAllowedInEventRegion(name, region){
+  const exact = eventExactSet(region);
+  if(exact) return !!exact[eventSpeciesId(name)];          // regra por tipo: tem de estar na lista (formas regionais valem)
   return getEventRegionOfSpecies(name) === region && !isEventExcludedForme(name);
+}
+// Texto curto a explicar porque é que uma espécie NÃO vale nesta região/regra (para avisos e erros).
+function eventRuleViolationText(name, region){
+  const r = EVENT_REGIONS[region];
+  if(!r) return `${name} não vale neste evento.`;
+  if(r.exact) return `${name} não é um Pokémon Dark nem Ghost — neste evento só valem esses tipos.`;
+  const found = getEventRegionOfSpecies(name);
+  if(found === region && isEventExcludedForme(name)) return `${name} é uma forma regional — só vale a forma original.`;
+  return `${name} não é de ${r.label} (${r.dex})${found && EVENT_REGIONS[found] ? ' — é de ' + EVENT_REGIONS[found].label : ' — é de outra geração'}.`;
 }
 // Tier gravado nos torneios de evento (próprio, para não contar como National Dex AG nas
 // estatísticas, nem no ciclo de votação de tier). A pool de Pokémon é a da National Dex AG.
@@ -3328,7 +3524,84 @@ async function fetchEventTournaments(supabaseUrl, supabaseAnonKey, eventId){
 
 // Botão de canto "🌍" (como o do perfil e o da recompensa diária) que abre a página do
 // evento. Só aparece enquanto houver um evento ativo. Chamar depois de #playerCornerContainer existir.
+// ---------- Sino de notificações ----------
+// Um sino 🔔 (por baixo do 🌍 do evento) que junta o que está à espera DESTE jogador: x1 por responder/confirmar/jogar, partidas prontas, trocas propostas e — desde a última vez que abriu o sino —
+// comentários no perfil e presentes. Só lê (nada é gravado); atualiza ao abrir a página e de 60 em 60 s com a página visível. Montado por mountEventCornerIcon (todas as páginas já o chamam).
+async function fetchNotifications(supabaseUrl, supabaseAnonKey, me){
+  const e = encodeURIComponent, h = { headers: sbAuthHeaders(supabaseAnonKey) };
+  const get = async path => { try{ const r = await fetch(`${supabaseUrl}/rest/v1/${path}`, h); return r.ok ? await r.json() : []; } catch(err){ return []; } };
+  let seen = '1970-01-01T00:00:00Z';
+  try{ seen = localStorage.getItem('vse_notif_seen_' + me) || seen; } catch(err){}
+  const items = [];
+  const isNew = iso => new Date(iso) > new Date(seen);
+  const when = iso => { const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+  const [ev, tours, comments, gifts, trades] = await Promise.all([
+    fetchActiveEvent(supabaseUrl, supabaseAnonKey).catch(() => null),
+    get(`tournaments?status=eq.em_curso&select=id,tname:data->name,matches:data->matches,info:data->matchinfo&order=created_at.desc&limit=3`),
+    get(`profile_comments?target_name=eq.${e(me)}&select=author_name,created_at&order=created_at.desc&limit=15`),
+    get(`gifts?to_name=eq.${e(me)}&select=from_name,amount,created_at&order=created_at.desc&limit=15`),
+    get(`trade_offers?to_name=eq.${e(me)}&status=eq.pending&select=from_name,created_at&order=created_at.desc&limit=10`)
+  ]);
+  if(ev){
+    const base = `x1_challenges?event_id=eq.${e(ev.id)}&select=challenger_name,opponent_name,status,reported_by,best_of&status=in.(pending,accepted,reported,disputed)`;
+    const [a, b] = await Promise.all([get(`${base}&opponent_name=eq.${e(me)}`), get(`${base}&challenger_name=eq.${e(me)}`)]);
+    const fmt = r => (r.best_of || 1) > 1 ? ` em melhor de ${r.best_of}` : '';
+    a.concat(b).forEach(r => {
+      const other = r.challenger_name === me ? r.opponent_name : r.challenger_name;
+      if(r.status === 'pending' && r.opponent_name === me) items.push({ icon: '⚔️', text: `<b>${escapeHtml(r.challenger_name)}</b> desafiou-te para um x1${fmt(r)}`, href: 'eventos.html', hot: true });
+      else if(r.status === 'pending') items.push({ icon: '⏳', text: `À espera de <b>${escapeHtml(r.opponent_name)}</b> responder ao teu desafio x1`, href: 'eventos.html' });
+      else if(r.status === 'reported' && r.reported_by !== me) items.push({ icon: '✅', text: `<b>${escapeHtml(r.reported_by || other)}</b> registou o resultado do x1 — confirma`, href: 'eventos.html', hot: true });
+      else if(r.status === 'reported') items.push({ icon: '⏳', text: `À espera de <b>${escapeHtml(other)}</b> confirmar o resultado do x1`, href: 'eventos.html' });
+      else if(r.status === 'accepted') items.push({ icon: '🎮', text: `x1 contra <b>${escapeHtml(other)}</b> aceite — joguem e registem o resultado`, href: 'eventos.html' });
+      else if(r.status === 'disputed') items.push({ icon: '⚠️', text: `x1 contra <b>${escapeHtml(other)}</b> contestado — o organizador vai decidir`, href: 'eventos.html' });
+    });
+  }
+  (tours || []).forEach(t => (Array.isArray(t.matches) ? t.matches : []).forEach(m => {
+    if(!m || m.winner || m.wo || !m.p1 || !m.p2 || (m.p1 !== me && m.p2 !== me)) return;
+    const mi = (t.info && t.info[m.id]) || {};
+    const extra = /^20\d\d-\d\d-\d\dT\d\d:\d\d$/.test(mi.when || '') ? ` · 🗓 ${escapeHtml(when(mi.when))}` : '';
+    items.push({ icon: '🆚', text: `A tua partida está pronta: <b>${escapeHtml(m.p1)}</b> vs <b>${escapeHtml(m.p2)}</b> (${escapeHtml(m.label || 'Partida')})${extra}`, href: 'viewer.html', hot: true });
+  }));
+  (trades || []).forEach(t => items.push({ icon: '🔁', text: `<b>${escapeHtml(t.from_name)}</b> propôs-te uma troca de cosméticos`, href: 'loja.html', hot: true }));
+  (comments || []).filter(c => isNew(c.created_at) && c.author_name !== me).forEach(c => items.push({ icon: '💬', text: `<b>${escapeHtml(c.author_name)}</b> comentou no teu perfil`, href: 'perfil.html', fresh: true }));
+  (gifts || []).filter(g => isNew(g.created_at)).forEach(g => items.push({ icon: '🎁', text: `<b>${escapeHtml(g.from_name)}</b> deu-te 🪙${escapeHtml(String(g.amount))}`, href: 'loja.html', fresh: true }));
+  return items;
+}
+async function mountNotificationBell(supabaseUrl, supabaseAnonKey){
+  try{
+    const me = localStorage.getItem('player_login_name');
+    const container = document.getElementById('playerCornerContainer');
+    if(!me || !container || document.getElementById('notifBell')) return;
+    container.insertAdjacentHTML('beforeend', `<button type="button" id="notifBell" class="notif-bell" title="Notificações" aria-label="Notificações" aria-expanded="false">🔔<span class="notif-count" id="notifCount" style="display:none;"></span></button>
+      <div id="notifPanel" class="notif-panel" role="dialog" aria-label="Notificações" style="display:none;"></div>`);
+    const bell = document.getElementById('notifBell'), panel = document.getElementById('notifPanel'), badge = document.getElementById('notifCount');
+    let current = [];
+    const draw = () => {
+      const n = current.length;
+      badge.style.display = n ? '' : 'none'; badge.textContent = n > 9 ? '9+' : String(n);
+      bell.classList.toggle('has-alert', current.some(i => i.hot));
+      panel.innerHTML = `<div class="notif-head">🔔 Notificações</div>` + (n
+        ? current.map(i => `<a class="notif-item${i.hot ? ' hot' : ''}" href="${escapeHtml(i.href)}"><span class="notif-ico">${i.icon}</span><span>${i.text}</span></a>`).join('')
+        : '<div class="notif-empty">Sem novidades por agora. 🎉</div>');
+    };
+    const refresh = async force => { if(document.hidden && force !== true) return; try{ current = await fetchNotifications(supabaseUrl, supabaseAnonKey, me); draw(); } catch(err){ /* não crítico */ } };
+    const close = () => { panel.style.display = 'none'; bell.setAttribute('aria-expanded', 'false'); };
+    bell.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const open = panel.style.display === 'none';
+      panel.style.display = open ? 'block' : 'none'; bell.setAttribute('aria-expanded', String(open));
+      if(open){ try{ localStorage.setItem('vse_notif_seen_' + me, new Date().toISOString()); } catch(err){} setTimeout(() => { current = current.filter(i => !i.fresh); draw(); }, 400); }
+    });
+    document.addEventListener('click', ev => { if(!panel.contains(ev.target) && ev.target !== bell) close(); });
+    document.addEventListener('keydown', ev => { if(ev.key === 'Escape') close(); });
+    await refresh(true);
+    setInterval(refresh, 60000);
+    document.addEventListener('visibilitychange', () => { if(!document.hidden) refresh(true); });
+  } catch(e){ /* não crítico */ }
+}
+
 async function mountEventCornerIcon(supabaseUrl, supabaseAnonKey){
+  try{ mountNotificationBell(supabaseUrl, supabaseAnonKey); } catch(e){ /* não crítico */ }
   try{
     const container = document.getElementById('playerCornerContainer');
     if(!container || document.getElementById('eventCornerIcon')) return;
@@ -3336,7 +3609,7 @@ async function mountEventCornerIcon(supabaseUrl, supabaseAnonKey){
     if(!ev || document.getElementById('eventCornerIcon')) return;
     const week = ev.current_week > 0 ? ` — Semana ${ev.current_week} de ${ev.total_weeks}` : ' — começa em breve';
     const title = `Evento: ${ev.name}${week}`.replace(/"/g, '&quot;');
-    container.insertAdjacentHTML('beforeend', `<a href="eventos.html" id="eventCornerIcon" class="event-corner-icon" title="${title}">🌍</a>`);
+    container.insertAdjacentHTML('beforeend', `<a href="eventos.html" id="eventCornerIcon" class="event-corner-icon" title="${title}">${eventSlugInfo(ev.slug).emoji}</a>`);
     // Bolinha vermelha: desafio x1 por responder ou resultado por confirmar (nome lido do login guardado).
     const me = localStorage.getItem('player_login_name');
     if(me){

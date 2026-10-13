@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261012n">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013a">
 <style>
 :root{ --bg-code:#0d0f18; }
 body.light-theme{ --bg-code:#e4e7f0; }
@@ -142,6 +142,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
     <a href="loja.html">Loja</a>
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
+    <a href="calendario.html">Calendário</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
 </div>
@@ -176,7 +177,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
 
 <div class="hover-card" id="hoverCard"></div>
 
-<script src="assets/js/showdown-utils.js?v=20261012n"></script>
+<script src="assets/js/showdown-utils.js?v=20261013a"></script>
 <script>
 initTheme();
 // SUPABASE_URL e SUPABASE_ANON_KEY são definidos no próximo bloco de script,
@@ -359,10 +360,11 @@ async function pollForBracketUpdates(){
     const rows = await res.json();
     if(!rows || !rows[0]) return;
     const freshData = rows[0].data || {};
-    const oldMatchesStr = JSON.stringify(currentData.matches || []);
-    const newMatchesStr = JSON.stringify(freshData.matches || []);
+    const oldMatchesStr = JSON.stringify([currentData.matches || [], currentData.matchinfo || {}]);
+    const newMatchesStr = JSON.stringify([freshData.matches || [], freshData.matchinfo || {}]);
     if(oldMatchesStr !== newMatchesStr){
       currentData.matches = freshData.matches;
+      currentData.matchinfo = freshData.matchinfo;
       currentData.champion = freshData.champion;
       renderBracket();
     }
@@ -445,8 +447,23 @@ function matchRow(m){
 
   const replayUrls = m.replayUrls || (m.replayUrl ? [m.replayUrl] : []);
   const replayLink = replayUrls.some(u=>u)
-    ? `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">${replayUrls.map((u,i)=> u ? `<a href="${escapeHtml(u)}" target="_blank" style="font-size:11px;color:var(--tera-cyan);text-decoration:none;font-family:'Chakra Petch',sans-serif;border:1px solid var(--line);padding:5px 10px;border-radius:6px;">▶ ${replayUrls.length>1 ? 'Jogo '+(i+1) : 'Ver replay'}</a>` : '').join('')}</div>`
+    ? `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">${replayUrls.map((u,i)=> u ? `<a href="${escapeHtml(u)}" target="_blank" onclick="return openReplayModal(this, event)" style="font-size:11px;color:var(--tera-cyan);text-decoration:none;font-family:'Chakra Petch',sans-serif;border:1px solid var(--line);padding:5px 10px;border-radius:6px;">▶ ${replayUrls.length>1 ? 'Jogo '+(i+1) : 'Ver replay'}</a>` : '').join('')}</div>`
     : '';
+
+  // Horário combinado e "ver ao vivo" (guardados pelos dois jogadores em data.matchinfo; só enquanto a partida não tem resultado)
+  const mi = ((currentData && currentData.matchinfo) || {})[m.id] || {};
+  const liveOk = typeof mi.live === 'string' && /^https:\/\/play\.pokemonshowdown\.com\/battle-[A-Za-z0-9._~-]{3,80}$/.test(mi.live);
+  const whenOk = typeof mi.when === 'string' && /^20\d\d-\d\d-\d\dT\d\d:\d\d$/.test(mi.when);
+  const open = m.p1 && m.p2 && !m.winner;
+  const infoBits = [];
+  if(open && whenOk) infoBits.push(`<span class="match-when" title="Horário combinado entre os dois jogadores">🗓 ${escapeHtml(formatMatchWhen(mi.when))}</span>`);
+  if(open && liveOk) infoBits.push(`<a class="match-live" href="${escapeHtml(mi.live)}" target="_blank" rel="noopener">▶ Ver ao vivo</a>`);
+  const mine = loggedInPlayerName && (m.p1 === loggedInPlayerName || m.p2 === loggedInPlayerName);
+  if(open && mine){
+    infoBits.push(`<button type="button" class="match-info-btn" onclick="setMatchInfo(${jsq(m.id)},'when')">🗓 ${whenOk ? 'Mudar horário' : 'Combinar horário'}</button>`);
+    infoBits.push(`<button type="button" class="match-info-btn" onclick="setMatchInfo(${jsq(m.id)},'live')">📺 ${liveOk ? 'Mudar link da batalha' : 'Partilhar link da batalha'}</button>`);
+  }
+  const infoRow = infoBits.length ? `<div class="match-info">${infoBits.join('')}</div>` : '';
 
   return `<div class="match">
     <div class="match-row">
@@ -456,8 +473,59 @@ function matchRow(m){
       <span class="bo-tag">Bo${m.bo}</span>
     </div>
     ${lowerBody}
+    ${infoRow}
     ${replayLink}
   </div>`;
+}
+
+// "2026-10-18T21:30" -> "dom., 18/10, 21:30" (hora local de quem vê)
+function formatMatchWhen(iso){
+  const d = new Date(iso);
+  return isNaN(d) ? iso : d.toLocaleString('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+// Janelinha para os dois jogadores guardarem o horário ('when') ou o link da batalha ('live') de uma partida pronta.
+function setMatchInfo(matchId, kind){
+  if(!loggedInPlayerName || !currentTournamentId) return;
+  const m = ((currentData && currentData.matches) || []).find(x => x.id === matchId);
+  if(!m) return;
+  const cur = (((currentData && currentData.matchinfo) || {})[matchId] || {})[kind] || '';
+  closeMiniDialog();
+  const ov = document.createElement('div'); ov.id = 'miniDialog'; ov.className = 'replay-modal';
+  const isWhen = kind === 'when';
+  const sugestao = (() => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(21, 0, 0, 0); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; })();
+  ov.innerHTML = `<div class="mini-dialog-box" role="dialog">
+    <b>${isWhen ? '🗓 Horário combinado' : '📺 Link da batalha (ver ao vivo)'}</b>
+    <div class="mini-dialog-sub">${escapeHtml(m.p1)} vs ${escapeHtml(m.p2)}</div>
+    ${isWhen
+      ? `<input type="datetime-local" id="miniDialogInput" value="${escapeHtml(cur || sugestao)}"><small>Escolhe o dia e a hora (a tua hora). O adversário vê o mesmo horário no bracket e pode mudá-lo.</small>`
+      : `<input type="text" id="miniDialogInput" value="${escapeHtml(cur)}" placeholder="https://play.pokemonshowdown.com/battle-gen9ou-123456789"><small>Quando a batalha começar, copia o endereço da barra do navegador (começa por play.pokemonshowdown.com/battle-) e cola aqui: toda a gente passa a ver "▶ Ver ao vivo".</small>`}
+    <div class="mini-dialog-actions">
+      <button type="button" class="copy-btn" onclick="saveMatchInfo(${jsq(matchId)}, ${jsq(kind)}, false)">Guardar</button>
+      ${cur ? `<button type="button" class="copy-btn" onclick="saveMatchInfo(${jsq(matchId)}, ${jsq(kind)}, true)">Apagar</button>` : ''}
+      <button type="button" class="copy-btn" onclick="closeMiniDialog()">Cancelar</button></div>
+    <div class="mini-dialog-msg" id="miniDialogMsg"></div></div>`;
+  ov.addEventListener('click', e => { if(e.target === ov) closeMiniDialog(); });
+  document.body.appendChild(ov);
+  const inp = document.getElementById('miniDialogInput'); if(inp) inp.focus();
+}
+function closeMiniDialog(){ const o = document.getElementById('miniDialog'); if(o) o.remove(); }
+async function saveMatchInfo(matchId, kind, remove){
+  const inp = document.getElementById('miniDialogInput'), msg = document.getElementById('miniDialogMsg');
+  let val = remove ? '' : (inp ? inp.value.trim() : '');
+  if(!remove && !val){ msg.textContent = 'Escreve ou escolhe algo primeiro.'; return; }
+  if(!remove && kind === 'live'){ const m = /battle-([A-Za-z0-9._~-]+)$/i.exec(val.split('?')[0].split('#')[0]); val = m ? 'https://play.pokemonshowdown.com/battle-' + m[1] : val; }
+  msg.textContent = 'A guardar…';
+  const r = await dbFunction(SUPABASE_URL, SUPABASE_ANON_KEY, 'tournament_set_match_info', { p_tournament: currentTournamentId, p_match: matchId, p_kind: kind, p_value: val, p_name: loggedInPlayerName, p_token: getPlayerToken(loggedInPlayerName) });
+  const d = r && r.ok ? r.data : null;
+  if(d && d.reason === 'auth'){ handleSessionExpired(); return; }
+  if(!d || !d.ok){
+    const why = { notplayer: 'Só os dois jogadores desta partida podem fazer isto.', decided: 'Esta partida já tem resultado.', badvalue: kind === 'live' ? 'Este não parece o link de uma batalha do Showdown (tem de começar por https://play.pokemonshowdown.com/battle-).' : 'Horário inválido.', nomatch: 'Esta partida mudou. Atualiza a página.', notfound: 'Este torneio já não existe.' }[d && d.reason] || 'Não foi possível guardar agora. Tenta outra vez.';
+    msg.textContent = why; return;
+  }
+  currentData.matchinfo = currentData.matchinfo || {};
+  if(d.info && Object.keys(d.info).length) currentData.matchinfo[matchId] = d.info; else delete currentData.matchinfo[matchId];
+  closeMiniDialog();
+  renderBracket();
 }
 
 function renderBracket(){
@@ -495,6 +563,7 @@ function eventBannerHtml(){
   const ev = currentData && currentData.event;
   if(!ev || !EVENT_REGIONS[ev.region]) return '';
   const r = EVENT_REGIONS[ev.region];
+  if(r.exact) return `<div class="event-banner">🎃 <b>${escapeHtml(ev.name || 'Evento')}</b> — Semana ${ev.week}: só Pokémon <b>Dark ou Ghost</b> (um dos tipos tem de ser um destes; formas regionais valem se forem Dark/Ghost). Vale para o torneio e para os x1 do evento.</div>`;
   return `<div class="event-banner">🌍 <b>${escapeHtml(ev.name || 'Evento')}</b> — Semana ${ev.week}: só Pokémon de <b>${r.label}</b> (${r.dex}), na forma original (sem formas regionais). Vale para o torneio e para os x1 do evento.</div>`;
 }
 
@@ -505,6 +574,14 @@ function checkEventRegion(speciesName){
   const found = getEventRegionOfSpecies(speciesName);
   if(isSpeciesAllowedInEventRegion(speciesName, ev.region)) return { ok:true };
   const r = EVENT_REGIONS[ev.region];
+  // Regra por tipo (Halloween): não é Dark nem Ghost
+  if(r.exact){
+    return {
+      ok:false,
+      short: `Fora da regra do evento: ${speciesName} não é Dark nem Ghost`,
+      long: `<b>${escapeHtml(speciesName)}</b> não é um Pokémon Dark nem Ghost — neste evento só valem esses tipos`
+    };
+  }
   // Região certa mas é uma forma regional/variante: só vale a forma original
   if(found === ev.region){
     return {
@@ -854,7 +931,9 @@ async function openFreePick(slot){
   Object.assign(fp, { open:true, slot, names:null, draws:null, q:'', hideBlocked:false, busy:false, why:'' });
   const ev = currentData.event, regionInfo = ev && EVENT_REGIONS[ev.region] ? EVENT_REGIONS[ev.region] : null;
   const note = regionInfo
-    ? `🌍 <b>${escapeHtml(ev.name || 'Evento')}</b> — Semana ${ev.week}: só Pokémon de <b>${regionInfo.label}</b> (${regionInfo.dex}), na forma original.`
+    ? (regionInfo.exact
+      ? `🎃 <b>${escapeHtml(ev.name || 'Evento')}</b> — Semana ${ev.week}: só Pokémon <b>Dark ou Ghost</b>.`
+      : `🌍 <b>${escapeHtml(ev.name || 'Evento')}</b> — Semana ${ev.week}: só Pokémon de <b>${regionInfo.label}</b> (${regionInfo.dex}), na forma original.`)
     : `Tier <b>${escapeHtml(currentData.tier || '')}</b>: só Pokémon legais neste tier.`;
   const wrap = document.createElement('div');
   wrap.className = 'fp-overlay'; wrap.id = 'fpOverlay';
