@@ -5,10 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Torneio Showdown - VSE</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0c14">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VSE">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261013d">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013e">
 <style>
 /* Início é a única página sem topbar (a própria página já é o menu de
    navegação) — por isso mantém o layout centrado próprio e reposiciona
@@ -38,6 +45,10 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
 }
 .nav-text h2{font-family:'Chakra Petch',sans-serif;font-size:15px;margin:0 0 3px 0;}
 .nav-text p{font-size:12.5px;color:var(--text-dim);margin:0;}
+.install-row{display:none;align-items:center;gap:10px;justify-content:space-between;background:var(--bg-panel);border:1px dashed var(--line);border-radius:12px;padding:12px 14px;margin:6px 0 14px;text-align:left;font-size:12.5px;color:var(--text-dim);}
+.install-row b{color:var(--text-main);}
+.install-row .install-go{background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));color:#0a0c14;border:none;border-radius:9px;padding:8px 12px;font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap;}
+.install-row .install-x{background:none;border:none;color:var(--text-faint);font-size:18px;cursor:pointer;line-height:1;padding:2px 4px;}
 </style>
 </head>
 <body>
@@ -92,7 +103,15 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
     <div class="nav-icon">📋</div>
     <div class="nav-text">
       <h2>Missões da semana</h2>
-      <p>Pequenas missões semanais com moedas: vota no apelido, faz um palpite, reclama o bónus todos os dias…</p>
+      <p>Pequenas missões semanais com moedas (vota no apelido, faz um palpite, reclama o bónus…) e o desafio diário "Quem é este Pokémon?".</p>
+    </div>
+  </a>
+
+  <a class="nav-card" href="passe.html">
+    <div class="nav-icon">🎟️</div>
+    <div class="nav-text">
+      <h2>Passe de Temporada</h2>
+      <p>30 níveis de recompensas durante a temporada: XP por torneios, x1 e missões. Começa na Temporada 2.</p>
     </div>
   </a>
 
@@ -112,15 +131,43 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
     </div>
   </a>
 
+  <div class="install-row" id="installRow"><span id="installText"></span><span style="display:flex;gap:6px;align-items:center;"><button class="install-go" id="installGo" type="button" onclick="doInstall()" style="display:none;">Instalar</button><button class="install-x" type="button" onclick="dismissInstall()" title="Esconder">×</button></span></div>
+
   <div class="footer-note">O seu perfil fica acessível pelo ícone no canto superior esquerdo. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
-<script src="assets/js/showdown-utils.js?v=20261013d"></script>
+<script src="assets/js/showdown-utils.js?v=20261013e"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
 
 let loggedInPlayerName = null;
+
+// ---------- Instalar o site como app (ecrã principal do telemóvel) ----------
+// A "app" é o próprio site: abre sempre a versão que está no GitHub, por isso atualiza-se sozinha a cada publicação (não guarda cópia offline de propósito).
+// Chrome/Edge/Android oferecem o botão Instalar; no iPhone/iPad (Safari) só dá para explicar como se faz.
+let deferredInstall = null;
+function installDismissed(){ try{ return localStorage.getItem('vse_install_dismissed') === '1'; } catch(e){ return false; } }
+function showInstallRow(text, withButton){
+  if(installDismissed()) return;
+  document.getElementById('installText').innerHTML = text;
+  document.getElementById('installGo').style.display = withButton ? '' : 'none';
+  document.getElementById('installRow').style.display = 'flex';
+}
+function dismissInstall(){ try{ localStorage.setItem('vse_install_dismissed', '1'); } catch(e){} document.getElementById('installRow').style.display = 'none'; }
+async function doInstall(){
+  if(!deferredInstall) return;
+  deferredInstall.prompt();
+  try{ await deferredInstall.userChoice; } catch(e){}
+  deferredInstall = null; document.getElementById('installRow').style.display = 'none';
+}
+(function initInstallHint(){
+  const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  if(standalone) return;
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; showInstallRow('📱 <b>Instala o VSE como app</b> no teu telemóvel ou computador: abre num toque e atualiza-se sozinha.', true); });
+  window.addEventListener('appinstalled', () => { document.getElementById('installRow').style.display = 'none'; });
+  if(/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) showInstallRow('📱 <b>Para teres o VSE como app:</b> toca em <b>Partilhar</b> (o quadrado com a seta) e depois em <b>Adicionar ao ecrã principal</b>.', false);
+})();
 
 async function loadCornerBadge(){
   const savedName = localStorage.getItem('player_login_name');

@@ -5,10 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Missões da semana — Torneio Showdown - VSE</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0c14">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VSE">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261013d">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013e">
 </head>
 <body>
 <div id="playerCornerContainer"></div>
@@ -39,6 +46,7 @@
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
     <a href="missoes.html" class="current">Missões</a>
+    <a href="passe.html">Passe</a>
     <a href="calendario.html">Calendário</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
@@ -57,10 +65,16 @@
     <div class="mw-note">Missões simples, que pagam pouco, e funcionam sempre (haja evento ou não). A semana vai de segunda a domingo (hora UTC, como o bónus diário). Cada missão só se reclama <b>uma vez por semana</b>. Na segunda-feira as missões <b>recomeçam do zero</b>: o que não reclamares até domingo perde-se.</div>
   </div>
 
+  <div class="card" id="dailyCard">
+    <h2>🎲 Desafio do dia — Quem é este Pokémon?</h2>
+    <div class="mw-note" style="margin-top:0;">Todos os dias há um Pokémon misterioso. Tens <b>3 tentativas</b>: 🪙5 se acertares à 1.ª, 🪙3 à 2.ª e 🪙1 à 3.ª. Cada erro dá uma pista e mostra mais do Pokémon. Muda à meia-noite (hora UTC). <span id="dpLeft"></span></div>
+    <div id="dpBody"><div class="empty-state">A carregar…</div></div>
+  </div>
+
   <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261013d"></script>
+<script src="assets/js/showdown-utils.js?v=20261013e"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -161,6 +175,7 @@ async function init(){
     });
     if(typeof mountEventCornerIcon === 'function') mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY);
   } catch(e){ /* o canto é só um extra */ }
+  loadDaily();
   await loadWeek();
 }
 
@@ -220,6 +235,71 @@ document.getElementById('mwList').addEventListener('click', async e => {
   } finally { claimBusy = false; }
   await loadWeek();
 });
+
+// ---------- Desafio do dia: Quem é este Pokémon? ----------
+// A resposta vive na base (a chave pública não a lê); o estado do dia e as pistas vêm de daily_pokemon_state e os palpites vão para daily_pokemon_guess.
+let dpState = null, dpPoolLoaded = false, dpBusy = false;
+function dpSpriteUrl(species){ return POKE_SPRITE_BASE + pokeSpriteId(species) + '.png'; }
+function dpLeftText(sec){
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+  return h ? `Novo Pokémon dentro de ${h} h e ${m} min.` : `Novo Pokémon dentro de ${Math.max(1, m)} min.`;
+}
+async function loadDaily(){
+  const body = document.getElementById('dpBody');
+  const r = await dbFunction(SUPABASE_URL, SUPABASE_ANON_KEY, 'daily_pokemon_state', { p_name: loggedInPlayerName });
+  if(r.status === 404){ dpState = null; body.innerHTML = '<div class="empty-state">O desafio do dia ainda não está ativo (a base de dados vai ser atualizada). Volta daqui a pouco.</div>'; return; }
+  if(!r.ok || !r.data || !r.data.ok){ body.innerHTML = '<div class="empty-state">Não consegui carregar o desafio de hoje. Tenta atualizar a página.</div>'; return; }
+  dpState = r.data;
+  if(!dpPoolLoaded){
+    dpPoolLoaded = true;
+    try{
+      const pr = await fetch(`${SUPABASE_URL}/rest/v1/daily_pokemon_pool?select=species&order=species&limit=1000`, { headers: sbAuthHeaders(SUPABASE_ANON_KEY) });
+      window.dpPool = pr.ok ? (await pr.json()).map(x => x.species) : [];
+    } catch(e){ window.dpPool = []; }
+  }
+  renderDaily();
+}
+function renderDaily(msg){
+  const s = dpState, body = document.getElementById('dpBody');
+  document.getElementById('dpLeft').textContent = dpLeftText(s.seconds_left);
+  // o que se vê do Pokémon: silhueta -> sombra cinzenta -> desfocado -> inteiro (quando acaba)
+  const level = s.finished ? 'full' : ['sil', 'grey', 'blur'][Math.min(2, s.attempts)];
+  const species = s.finished ? s.species : null;
+  const dots = Array.from({ length: s.max_attempts }, (_, i) => `<span class="dp-dot${i < s.attempts ? (s.solved && i === s.attempts - 1 ? ' ok' : ' bad') : ''}"></span>`).join('');
+  let result = '';
+  if(s.finished){
+    result = s.solved
+      ? `<div class="dp-result ok">🎉 Era <b>${escapeHtml(s.species)}</b>! Acertaste à ${s.attempts}.ª tentativa e ganhaste 🪙${s.coins}.</div>`
+      : `<div class="dp-result bad">Era <b>${escapeHtml(s.species)}</b>. Amanhã há outro!</div>`;
+    result += `<div style="margin-top:6px;"><a class="mw-go" href="pokemon.html?especie=${encodeURIComponent(s.species)}">Ver a ficha de ${escapeHtml(s.species)} →</a></div>`;
+  }
+  const form = s.finished ? '' : `<div class="dp-form"><input list="dpList" id="dpGuess" placeholder="Escreve o nome do Pokémon…" autocomplete="off" maxlength="40" onkeydown="if(event.key==='Enter') doDailyGuess()">
+      <datalist id="dpList">${(window.dpPool || []).map(n => `<option value="${escapeHtml(n)}">`).join('')}</datalist>
+      <button class="btn-primary" id="dpBtn" type="button" onclick="doDailyGuess()">Tentar</button></div>`;
+  body.innerHTML = `<div class="dp-wrap">
+      <div class="dp-stage"><img class="dp-sprite ${level}" src="${escapeHtml(dpSpriteUrl(s.sprite))}" alt="${s.finished ? escapeHtml(s.species) : 'Pokémon misterioso'}" width="192" height="192" onerror="this.style.visibility='hidden'"></div>
+      <div class="dp-side"><div class="dp-dots" title="Tentativas">${dots}</div>
+        ${(s.hints || []).map(h => `<div class="dp-hint">💡 ${escapeHtml(h)}</div>`).join('')}
+        ${msg ? `<div class="dp-msg">${msg}</div>` : ''}
+        ${form}${result}</div></div>`;
+}
+async function doDailyGuess(){
+  if(dpBusy || !dpState || dpState.finished) return;
+  const input = document.getElementById('dpGuess'), guess = (input.value || '').trim();
+  if(!guess){ input.focus(); return; }
+  dpBusy = true; document.getElementById('dpBtn').disabled = true;
+  try{
+    const r = await dbFunction(SUPABASE_URL, SUPABASE_ANON_KEY, 'daily_pokemon_guess', { p_name: loggedInPlayerName, p_guess: guess, p_token: getPlayerToken(loggedInPlayerName) });
+    const d = r.data || {};
+    if(d.reason === 'auth'){ handleSessionExpired(); return; }
+    if(d.ok && d.correct) showCelebrationToast(`🎲 Acertaste: era ${escapeHtml(d.species)}! +${d.coins} 🪙`, 4500);
+    await loadDaily();
+    if(d.ok && !d.correct && !d.finished) renderDaily('❌ Não é esse. Tenta outra vez!');
+    else if(d.reason === 'unknown') renderDaily('Esse nome não está na lista — escolhe uma das sugestões (não gastaste nenhuma tentativa).');
+    else if(d.reason === 'finished') renderDaily('Já não tens mais tentativas hoje.');
+    else if(!d.ok && d.reason) renderDaily('Não foi possível tentar agora. Tenta outra vez.');
+  } finally { dpBusy = false; }
+}
 
 pageBoot();
 </script>

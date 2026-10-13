@@ -381,3 +381,66 @@ label{display:block;font-size:11px;color:var(--text-faint);text-transform:upperc
 .mw-note{margin-top:12px;font-size:12px;color:var(--text-faint);line-height:1.5;}
 @media (max-width:560px){.mw-card{grid-template-columns:auto 1fr;}.mw-side{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:space-between;text-align:left;}}
 
+/* Momentos do torneio (hall-da-fama.html) e estilo de jogo (perfil.html) — lidos dos replays */
+.moments-box{margin-top:8px;font-size:12.5px;}
+.moments-box summary{cursor:pointer;color:var(--text-dim);font-family:'Chakra Petch',sans-serif;font-weight:600;}
+.moments-box summary:hover{color:var(--tera-cyan);}
+.moments-box ul{list-style:none;margin:6px 0 0;padding:0;}
+.moments-box li{margin:4px 0;color:var(--text-dim);line-height:1.4;}
+.moments-box li b{color:var(--text-main);}
+.style-badge{display:flex;gap:12px;align-items:center;padding:10px 12px;margin-bottom:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg-panel);}
+.style-badge .si{font-size:28px;line-height:1;}
+.style-badge b{font-family:'Chakra Petch',sans-serif;font-size:16px;color:var(--tera-cyan);}
+.style-badge .st{font-size:12px;color:var(--text-dim);margin-top:2px;}
+
+/* Desafio do dia "Quem é este Pokémon?" (missoes.html) */
+.dp-wrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-top:12px;}
+.dp-stage{width:208px;height:208px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:radial-gradient(circle at 50% 40%,#f4f6fb,#c9d0e2);border:1px solid var(--line);flex-shrink:0;}
+.dp-sprite{image-rendering:pixelated;transition:filter .5s;}
+.dp-sprite.sil{filter:brightness(0);}
+.dp-sprite.grey{filter:brightness(0.35) contrast(1.1);}
+.dp-sprite.blur{filter:blur(2.5px) saturate(0.8);}
+.dp-sprite.full{filter:none;}
+.dp-side{flex:1;min-width:210px;}
+.dp-dots{display:flex;gap:8px;margin-bottom:8px;}
+.dp-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);background:var(--bg-card);}
+.dp-dot.bad{background:var(--danger);border-color:var(--danger);}
+.dp-dot.ok{background:var(--success);border-color:var(--success);}
+.dp-hint{font-size:13px;color:var(--tera-amber);margin:4px 0;}
+.dp-msg{font-size:12.5px;color:var(--text-dim);margin:6px 0;}
+.dp-form{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.dp-form input{flex:1;min-width:160px;margin:0;}
+.dp-form .btn-primary{margin:0;width:auto;padding-left:22px;padding-right:22px;}
+.dp-result{margin-top:10px;font-size:14px;line-height:1.5;}
+.dp-result.ok{color:var(--success);}
+.dp-result.bad{color:var(--danger);}
+
+/* Passe de Temporada (passe.html) */
+.ps-sub{font-size:13px;color:var(--text-dim);margin-bottom:10px;}
+.ps-levelrow{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+.ps-level{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:34px;color:var(--tera-amber);line-height:1;}
+.ps-level small{font-size:15px;color:var(--text-faint);font-weight:600;}
+.ps-xp{font-size:13px;color:var(--text-dim);}
+.ps-bar{height:12px;border-radius:99px;background:var(--bg-panel);overflow:hidden;border:1px solid var(--line);}
+.ps-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--tera-cyan),var(--tera-violet));}
+.ps-src{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.ps-chip{font-size:11.5px;color:var(--text-dim);padding:4px 10px;border:1px solid var(--line);border-radius:99px;background:var(--bg-card);}
+.ps-chip b{color:var(--text-main);}
+.ps-track{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px;}
+.ps-rw{position:relative;border:1px solid var(--line);border-radius:12px;padding:22px 8px 10px;text-align:center;background:var(--bg-card);display:flex;flex-direction:column;align-items:center;gap:4px;}
+.ps-rw .lv{position:absolute;top:6px;left:9px;font-size:10px;font-family:'Chakra Petch',sans-serif;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;}
+.ps-rw .ico{font-size:26px;min-height:46px;display:flex;align-items:center;justify-content:center;}
+.ps-rw .lb{font-size:11px;color:var(--text-dim);line-height:1.3;min-height:28px;}
+.ps-rw.ready{border-color:color-mix(in srgb,var(--tera-amber) 75%,var(--line));box-shadow:0 0 14px color-mix(in srgb,var(--tera-amber) 22%,transparent);}
+.ps-rw.claimed{opacity:.6;}
+.ps-ok{font-size:11.5px;color:var(--success);font-weight:600;}
+.ps-hint{font-size:11px;color:var(--text-faint);}
+.ps-claim{padding:5px 12px;font-size:12px;}
+.ps-wk{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;background:var(--bg-panel);}
+.ps-wk > summary{cursor:pointer;padding:10px 14px;font-size:13px;color:var(--text-dim);display:flex;gap:10px;align-items:center;flex-wrap:wrap;list-style:none;}
+.ps-wk > summary::-webkit-details-marker{display:none;}
+.ps-wk > summary b{color:var(--text-main);font-family:'Chakra Petch',sans-serif;}
+.ps-wk .ps-lock{margin-left:auto;font-size:11.5px;color:var(--text-faint);}
+.ps-wk[open] > summary{border-bottom:1px solid var(--line);}
+.ps-wk .mw-card{margin:8px 10px;}
+.ps-wk.locked{opacity:.55;}

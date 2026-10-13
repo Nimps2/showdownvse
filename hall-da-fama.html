@@ -5,10 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hall da Fama — Torneio Showdown - VSE</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0c14">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VSE">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261013d">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013e">
 <style>
 .nav-link{color:var(--tera-cyan);font-size:12.5px;text-decoration:none;font-family:'Chakra Petch',sans-serif;}
 .nav-link:hover{text-decoration:underline;}
@@ -85,6 +92,7 @@
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
     <a href="missoes.html">Missões</a>
+    <a href="passe.html">Passe</a>
     <a href="calendario.html">Calendário</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
@@ -144,7 +152,7 @@
   <div class="footer-note">Linha do tempo calculada a partir de todos os torneios concluídos guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261013d"></script>
+<script src="assets/js/showdown-utils.js?v=20261013e"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -260,7 +268,7 @@ async function init(){
     const profilesPromise = fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data,featured_match_title,featured_match_replay_path&order=created_at.desc`, {headers: sbHeaders()});
     if(!res.ok) throw new Error('HTTP '+res.status);
-    const rows = await res.json();
+    const rows = rowsWithoutFlash(await res.json());      // os relâmpagos ficam à parte (não entram no Hall da Fama)
     allTournamentRows = rows;
     setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
     playerProfiles = await profilesPromise;
@@ -422,6 +430,7 @@ function renderTimeline(rows){
         ${runnerUp ? `<div class="runner-up">🥈 Vice-campeão: <a href="perfil.html?jogador=${encodeURIComponent(runnerUp)}">${displayName(runnerUp)}</a></div>` : ''}
         ${bronzePlayers.length ? `<div class="runner-up">🥉 3º lugar: ${bronzePlayers.map(p=>`<a href="perfil.html?jogador=${encodeURIComponent(p)}">${displayName(p)}</a>`).join(' e ')}</div>` : ''}
         ${mvpLine(data)}
+        ${momentsLine(data)}
       </div>
     </div>`;
   }).join('') + `</div>`;
@@ -432,6 +441,13 @@ function mvpLine(data){
   const m = data && data.mvp && data.mvp.mvp;
   if(!m) return '';
   return `<div class="runner-up mvp-line" title="Pontos: KO x10, dano causado /20, jogo sobrevivido x3, jogo ganho x2 (lido dos replays)">🏅 Pokémon MVP: ${pokeSpriteHtml(m.species, 32)} <a href="pokemon.html?especie=${encodeURIComponent(m.species)}">${escapeHtml(m.species)}</a> de <a href="perfil.html?jogador=${encodeURIComponent(m.owner)}">${displayName(m.owner)}</a> <small style="color:var(--text-faint);">· ${m.kos} KO${m.kos === 1 ? '' : 's'}, ${m.dmgDealt}% de dano, ${m.score} pts</small></div>`;
+}
+
+// Os destaques tirados dos replays (data.mvp.moments, calculados pelo gestor): jogo mais longo, maior virada, varredura...
+function momentsLine(data){
+  const items = (data && data.mvp && Array.isArray(data.mvp.moments) ? data.mvp.moments : []).map(momentText).filter(Boolean);
+  if(!items.length) return '';
+  return `<details class="moments-box"><summary>🎬 Momentos do torneio (${items.length})</summary><ul>${items.map(x => `<li><b>${x.icon} ${escapeHtml(x.title)}:</b> ${escapeHtml(x.text)}</li>`).join('')}</ul></details>`;
 }
 
 function renderFeaturedMatches(rows){

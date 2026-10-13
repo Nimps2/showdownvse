@@ -5,10 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pokémon — Torneio Showdown - VSE</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0c14">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VSE">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261013d">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013e">
 </head>
 <body>
 <div id="playerCornerContainer"></div>
@@ -39,6 +46,7 @@
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
     <a href="missoes.html">Missões</a>
+    <a href="passe.html">Passe</a>
     <a href="calendario.html">Calendário</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
@@ -65,7 +73,7 @@
   <div class="footer-note">*O winrate é o do time do jogador nesse torneio (não sabemos qual Pokémon jogou cada partida), por isso é só uma aproximação. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261013d"></script>
+<script src="assets/js/showdown-utils.js?v=20261013e"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -169,8 +177,8 @@ async function init(){
       sbFetchAll(`${SUPABASE_URL}/rest/v1/tournaments?select=id,tier,status,created_at,data&order=created_at.desc,id`, SUPABASE_ANON_KEY),
       fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY)
     ]);
-    allRows = rows;
-    seenSpecies = listSeenSpecies(rows);
+    allRows = rowsWithoutFlash(rows);        // os relâmpagos ficam à parte (não contam para as fichas dos Pokémon)
+    seenSpecies = listSeenSpecies(allRows);
     document.getElementById('pkSpeciesList').innerHTML = seenSpecies.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{

@@ -5,10 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Calendário — Torneio Showdown - VSE</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0c14">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VSE">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261013d">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013e">
 </head>
 <body>
 <div id="playerCornerContainer"></div>
@@ -27,6 +34,7 @@
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
     <a href="missoes.html">Missões</a>
+    <a href="passe.html">Passe</a>
     <a href="calendario.html" class="current">Calendário</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
@@ -76,7 +84,7 @@
   <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261013d"></script>
+<script src="assets/js/showdown-utils.js?v=20261013e"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -117,7 +125,7 @@ async function loadData(){
   const h = { headers: sbAuthHeaders(SUPABASE_ANON_KEY) };
   let evRows = [], evFailed = false;
   [tournaments, evRows] = await Promise.all([
-    sbFetchAll(`${SUPABASE_URL}/rest/v1/tournaments?select=id,tier,status,created_at,name:data-%3E%3Ename,champion:data-%3E%3Echampion,evname:data-%3Eevent-%3E%3Ename&order=created_at.asc`, SUPABASE_ANON_KEY),
+    sbFetchAll(`${SUPABASE_URL}/rest/v1/tournaments?select=id,tier,status,created_at,name:data-%3E%3Ename,champion:data-%3E%3Echampion,evname:data-%3Eevent-%3E%3Ename,kind:data-%3E%3Ekind&order=created_at.asc`, SUPABASE_ANON_KEY),
     fetch(`${SUPABASE_URL}/rest/v1/events?select=id,slug,name,status,starts_at,ends_at,created_at,current_week,total_weeks&status=in.(active,planned,ended)&order=starts_at.asc`, h)
       .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .catch(() => { evFailed = true; return []; })
@@ -204,7 +212,7 @@ function chipsFor(items){
     cls: 'event', color: i.ev.color, ico: i.ev.emoji,
     txt: i.first ? `${i.ev.name} ${i.ev.status === 'ended' ? 'começou' : 'começa'}` : (i.last ? `${i.ev.name} ${i.ev.status === 'ended' ? 'terminou' : 'termina'}${i.ev.endIsForecast ? ' (prev.)' : ''}` : i.ev.name)
   }));
-  items.filter(i => i.type === 'tournament').forEach(i => chips.push({ cls: 'tour', ico: '🏆', txt: i.t.name || i.t.tier || 'Torneio' }));
+  items.filter(i => i.type === 'tournament').forEach(i => chips.push({ cls: 'tour', ico: i.t.kind === 'relampago' ? '⚡' : '🏆', txt: i.t.name || i.t.tier || 'Torneio' }));
   return chips;
 }
 
@@ -246,7 +254,7 @@ function renderDetail(){
   });
   items.filter(i => i.type === 'tournament').forEach(i => {
     const t = i.t;
-    rows.push(`<div class="cal-row"><span class="cal-row-i">🏆</span><div><b>${escapeHtml(t.name || 'Torneio')}</b>${t.evname ? ` <small>(${escapeHtml(t.evname)})</small>` : ''}<br><small>${escapeHtml(t.tier || '')}${t.champion ? ' · campeão: ' + escapeHtml(t.champion) : (t.status === 'em_curso' ? ' · a decorrer' : '')}</small></div></div>`);
+    rows.push(`<div class="cal-row"><span class="cal-row-i">${t.kind === 'relampago' ? '⚡' : '🏆'}</span><div><b>${escapeHtml(t.name || 'Torneio')}</b>${t.evname ? ` <small>(${escapeHtml(t.evname)})</small>` : ''}<br><small>${escapeHtml(t.tier || '')}${t.champion ? ' · campeão: ' + escapeHtml(t.champion) : (t.status === 'em_curso' ? ' · a decorrer' : '')}</small></div></div>`);
   });
   const s = seasonOfDay(d);
   box.innerHTML = `<div class="cal-detail-head">${escapeHtml(fmtLong(d))}${s ? ` <small>· temporada ${s.n}</small>` : ''}</div>`

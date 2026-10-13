@@ -510,7 +510,10 @@ const COSMETIC_CATALOG = {
     // Evento Halloween (prémio de nível e loja de Doces)
     { id:'bg_hw_noite',   name:'Noite de Bruxas',  price:0, css:'linear-gradient(135deg,#ff8a1f,#3a1466)', color:'#ff8a1f', eventOnly:'halloween' },
     { id:'bg_hw_sangue',  name:'Lua de Sangue',    price:0, css:'linear-gradient(135deg,#c1121f,#1a0a12)', color:'#e5383b', eventOnly:'halloween' },
-    { id:'bg_hw_cripta',  name:'Cripta Esmeralda', price:0, css:'linear-gradient(135deg,#3ddc84,#1d1033)', color:'#3ddc84', eventOnly:'halloween' }
+    { id:'bg_hw_cripta',  name:'Cripta Esmeralda', price:0, css:'linear-gradient(135deg,#3ddc84,#1d1033)', color:'#3ddc84', eventOnly:'halloween' },
+    // Passe da Temporada 2 (passe.html): prémios de nível, nunca à venda (o eventOnly 'passe-t2' mantém-nos fora da loja, como os itens de evento)
+    { id:'bg_pass2_crepusculo', name:'Crepúsculo da Temporada', price:0, css:'linear-gradient(135deg,#ff9a76,#6a4c93)', color:'#ff9a76', eventOnly:'passe-t2' },
+    { id:'bg_pass2_aurora',     name:'Aurora Boreal',           price:0, css:'linear-gradient(270deg,#7bdff2,#b2f7ef,#c77dff,#7bdff2)', color:'#7bdff2', multiColor:['#7bdff2','#b2f7ef','#c77dff'], eventOnly:'passe-t2' }
   ],
   accents: [
     { id:'accent_default', name:'Ciano (padrão)', price:0,  color:'#4fd8d0' },
@@ -523,7 +526,9 @@ const COSMETIC_CATALOG = {
     { id:'accent_vm_pista', name:'Luz de Pista', price:0, color:'#ffb347', eventOnly:'volta-ao-mundo' },
     // Evento Halloween (loja de Doces)
     { id:'accent_hw_laranja', name:'Laranja-Abóbora', price:0, color:'#ff8a1f', eventOnly:'halloween' },
-    { id:'accent_hw_veneno',  name:'Verde-Veneno',    price:0, color:'#9cff4f', eventOnly:'halloween' }
+    { id:'accent_hw_veneno',  name:'Verde-Veneno',    price:0, color:'#9cff4f', eventOnly:'halloween' },
+    { id:'accent_pass2_lima', name:'Lima do Passe',   price:0, color:'#a4e84a', eventOnly:'passe-t2' },
+    { id:'accent_pass2_ouro', name:'Ouro do Passe',   price:0, color:'#ffd166', eventOnly:'passe-t2' }
   ],
   // "Moldura do Avatar" já não é uma borda estática — agora é um EFEITO
   // ANIMADO à volta do avatar, colorido com a cor escolhida em "Cor da
@@ -541,7 +546,8 @@ const COSMETIC_CATALOG = {
     { id:'frame_vm_balao', name:'Balão de Ar Quente', price:0, effect:'balloon', eventOnly:'volta-ao-mundo' },
     // Evento Halloween: prémio do nível 7 (morcegos) e lembrança premium da loja de Doces (fantasmas)
     { id:'frame_hw_morcegos',   name:'Revoada de Morcegos',    price:0, effect:'bats',   eventOnly:'halloween' },
-    { id:'frame_hw_fantasmas',  name:'Fantasmas Brincalhões',  price:0, effect:'ghosts', eventOnly:'halloween' }
+    { id:'frame_hw_fantasmas',  name:'Fantasmas Brincalhões',  price:0, effect:'ghosts', eventOnly:'halloween' },
+    { id:'frame_pass2_cometas', name:'Cometas',                price:0, effect:'comet',  eventOnly:'passe-t2' }
   ],
   nameEffects: [
     { id:'effect_none',  name:'Nenhum',  price:0,  css:'' },
@@ -593,7 +599,10 @@ const COSMETIC_CATALOG = {
     { id:'title_hw_rei_duelos',   name:'Rei dos Duelos Sombrios',     price:0, text:'👑 Rei dos Duelos Sombrios',     eventOnly:'halloween' },
     { id:'title_hw_cacador',      name:'Caçador de Fantasmas',        price:0, text:'🔦 Caçador de Fantasmas',        eventOnly:'halloween' },
     { id:'title_hw_pocoes',       name:'Mestre das Poções',           price:0, text:'🧪 Mestre das Poções',           eventOnly:'halloween' },
-    { id:'title_hw_vampiro',      name:'Conde da Noite',              price:0, text:'🧛 Conde da Noite',              eventOnly:'halloween' }
+    { id:'title_hw_vampiro',      name:'Conde da Noite',              price:0, text:'🧛 Conde da Noite',              eventOnly:'halloween' },
+    { id:'title_pass2_veterano',  name:'Veterano da Temporada 2',     price:0, text:'🎖️ Veterano da Temporada 2',     eventOnly:'passe-t2' },
+    { id:'title_pass2_mestre',    name:'Mestre do Passe',             price:0, text:'🏅 Mestre do Passe',             eventOnly:'passe-t2' },
+    { id:'title_pass2_lenda',     name:'Lenda da Temporada 2',        price:0, text:'🌠 Lenda da Temporada 2',        eventOnly:'passe-t2' }
   ],
   badges: [
     { id:'badge_stall',   name:'Fã de Stall',   price:30, emoji:'🐌' },
@@ -631,7 +640,11 @@ const COSMETIC_CATALOG = {
     { id:'badge_hw_vela',       name:'Vela Bruxuleante',     price:0, emoji:'🕯️', eventOnly:'halloween' },
     { id:'badge_hw_chapeu',     name:'Chapéu de Bruxo',      price:0, emoji:'🧙', eventOnly:'halloween' },
     { id:'badge_hw_aranha',     name:'Aranha Peluda',        price:0, emoji:'🕷️', eventOnly:'halloween' },
-    { id:'badge_hw_lua',        name:'Lua Cheia',            price:0, emoji:'🌕', eventOnly:'halloween' }
+    { id:'badge_hw_lua',        name:'Lua Cheia',            price:0, emoji:'🌕', eventOnly:'halloween' },
+    { id:'badge_pass2_iniciante', name:'Passe: Iniciante',   price:0, emoji:'🎟️', eventOnly:'passe-t2' },
+    { id:'badge_pass2_bussola',   name:'Passe: Bússola',     price:0, emoji:'🧭', eventOnly:'passe-t2' },
+    { id:'badge_pass2_estrela',   name:'Passe: Estrela',     price:0, emoji:'⭐', eventOnly:'passe-t2' },
+    { id:'badge_pass2_cometa',    name:'Passe: Cometa',      price:0, emoji:'☄️', eventOnly:'passe-t2' }
   ],
   features: [
     { id:'feature_custom_pagebg', name:'Fundo de perfil personalizado (foto)', price:120 },
@@ -758,7 +771,7 @@ function ensureAvatarFxStyles(){
        cintilar; Florescer = pétalas em órbita lenta que respiram. Um anel suave comum dá presença à cor mesmo a meio
        do ciclo. Sem filtros SVG (rasterizavam mal): só gradientes, clip-path, sombras e drop-shadow de HTML. */
     @keyframes vseRingBreath{0%,100%{opacity:0.55;transform:scale(1);}50%{opacity:1;transform:scale(1.035);}}
-    .avatar-fx-sparks::before,.avatar-fx-starry::before,.avatar-fx-blossom::before,.avatar-fx-plane::before,.avatar-fx-fleet::before,.avatar-fx-balloon::before,.avatar-fx-bats::before,.avatar-fx-ghosts::before{content:'';position:absolute;inset:calc(var(--fx-pad,10px)*0.72);border-radius:calc(var(--fx-wrap,60px)*0.2);
+    .avatar-fx-sparks::before,.avatar-fx-starry::before,.avatar-fx-blossom::before,.avatar-fx-plane::before,.avatar-fx-fleet::before,.avatar-fx-balloon::before,.avatar-fx-bats::before,.avatar-fx-ghosts::before,.avatar-fx-comet::before{content:'';position:absolute;inset:calc(var(--fx-pad,10px)*0.72);border-radius:calc(var(--fx-wrap,60px)*0.2);
       box-shadow:0 0 0 1.5px color-mix(in srgb,var(--fx-color) 44%,transparent),0 0 12px color-mix(in srgb,var(--fx-color) 36%,transparent),inset 0 0 10px color-mix(in srgb,var(--fx-color) 20%,transparent);
       animation:vseRingBreath 3.2s ease-in-out infinite;}
 
@@ -908,6 +921,21 @@ function ensureAvatarFxStyles(){
     /* "Reduzir movimento": a volta lenta continua (como na Esquadrilha); param as asas a bater e o subir/descer dos fantasmas. */
     @media (prefers-reduced-motion:reduce){.avatar-fx-bats span::before{animation:none!important;}.avatar-fx-ghosts span::before{animation-name:vseGhostUpright!important;}}
 
+    /* Cometas (Passe da Temporada 2, nível 30): 3 cometas com cauda a dar a volta ao avatar, em velocidades e sentidos diferentes. Cada <span> ocupa a camada toda e RODA;
+       ::before = a cabeça (um ponto brilhante), ::after = a cauda (um traço que se desvanece, atrás da cabeça). O segundo vai ao contrário (a cauda passa para o outro lado). */
+    @keyframes vseCometOrbit{to{transform:rotate(360deg);}}
+    .avatar-fx-comet span{top:0!important;left:0!important;width:100%;height:100%;animation:vseCometOrbit 5s linear infinite;animation-delay:0s!important;}
+    .avatar-fx-comet span:nth-child(2){animation-duration:7.5s;animation-direction:reverse;}
+    .avatar-fx-comet span:nth-child(3){animation-duration:11s;animation-delay:-4s!important;}
+    .avatar-fx-comet span::before{content:'';position:absolute;top:1%;left:50%;width:calc(var(--fx-gem,9px)*0.95);height:calc(var(--fx-gem,9px)*0.95);margin-left:calc(var(--fx-gem,9px)*-0.475);border-radius:50%;
+      background:radial-gradient(circle,#fff 0 32%,var(--fx-color) 72%);box-shadow:0 0 calc(var(--fx-gem,9px)*0.9) var(--fx-color),0 0 calc(var(--fx-gem,9px)*0.35) #fff;}
+    .avatar-fx-comet span::after{content:'';position:absolute;top:calc(1% + var(--fx-gem,9px)*0.32);right:calc(50% - var(--fx-gem,9px)*0.1);width:calc(var(--fx-gem,9px)*3.4);height:calc(var(--fx-gem,9px)*0.32);border-radius:50%;
+      background:linear-gradient(to left,color-mix(in srgb,var(--fx-color) 85%,#fff),transparent);opacity:0.85;}
+    .avatar-fx-comet span:nth-child(2)::after{right:auto;left:calc(50% - var(--fx-gem,9px)*0.1);background:linear-gradient(to right,color-mix(in srgb,var(--fx-color) 85%,#fff),transparent);}
+    .avatar-fx-comet span:nth-child(3){opacity:0.8;}
+    .avatar-fx-comet span:nth-child(3)::before{transform:scale(0.75);}
+    .avatar-fx-comet span:nth-child(3)::after{top:calc(1% + var(--fx-gem,9px)*0.26);height:calc(var(--fx-gem,9px)*0.24);width:calc(var(--fx-gem,9px)*2.6);}
+
     @keyframes vseFxHueRotate{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
     .avatar-fx-layer.avatar-fx-multicolor{animation:vseFxHueRotate 5s linear infinite;}
   `;
@@ -988,11 +1016,11 @@ function nameEffectPreviewHtml(item, profile){
   return `<div class="shop-swatch" style="height:44px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg-panel);color:${color};font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:15px;"><span class="${nameFxClass(item)}">Abc</span></div>`;
 }
 
-const AVATAR_FX_COUNTS = { sparks:10, starry:6, blossom:5, diamond:4, plane:1, fleet:3, balloon:3, bats:3, ghosts:2 };
+const AVATAR_FX_COUNTS = { sparks:10, starry:6, blossom:5, diamond:4, plane:1, fleet:3, balloon:3, bats:3, ghosts:2, comet:3 };
 // Efeitos que não usam os primeiros N ângulos da lista acima — o Diamante
 // quer as 4 gemas espalhadas pelos pontos cardeais (direita, baixo, esquerda,
 // cima), pela ordem em que o anel as "visita" ao rodar.
-const AVATAR_FX_ANGLE_OVERRIDES = { diamond:[0, 90, 180, 270], plane:[0], fleet:[0, 0, 0], balloon:[0, 0, 0], bats:[0, 0, 0], ghosts:[0, 0] };
+const AVATAR_FX_ANGLE_OVERRIDES = { diamond:[0, 90, 180, 270], plane:[0], fleet:[0, 0, 0], balloon:[0, 0, 0], bats:[0, 0, 0], ghosts:[0, 0], comet:[0, 0, 0] };
 // Duração (s) do ciclo de cada efeito, para espaçar o atraso de cada partícula.
 const AVATAR_FX_PERIODS = { sparks:1.4, starry:2.4, blossom:3.6, diamond:4 };
 
@@ -1012,7 +1040,7 @@ function avatarFxParticlesHtml(effectType, radiusPct){
 }
 
 // effectColor: cor (hex) escolhida em "Cor da moldura". effectType: 'none' |
-// 'sparks' | 'starry' | 'blossom' | 'diamond' | 'plane' | 'fleet' | 'balloon' | 'bats' | 'ghosts'. multiColor: true para a Aurora Animada,
+// 'sparks' | 'starry' | 'blossom' | 'diamond' | 'plane' | 'fleet' | 'balloon' | 'bats' | 'ghosts' | 'comet'. multiColor: true para a Aurora Animada,
 // faz o efeito ciclar de cor continuamente em vez de ficar fixo.
 function avatarHtml(name, photoUrl, sizePx, effectColor, effectType, multiColor){
   const size = sizePx || 44;
@@ -1140,6 +1168,139 @@ function computeHeadToHead(rows, playerName){
   });
 
   return { opponents, nemesis, favoriteVictim, mostFrequent, currentStreak, bestTier };
+}
+
+// ---------- Torneios relâmpago e regras personalizadas do sorteio ----------
+// Um torneio pode ser "relâmpago" (data.kind === 'relampago'): fica À PARTE (não conta para Elo, temporada, títulos nem estatísticas; só se regista quantos cada jogador fez)
+// e pode ter uma REGRA (data.rule) que restringe os Pokémon do sorteio e das escolhas livres, combinando à vontade (todas têm de se cumprir):
+//   types   — 1 ou 2 tipos: só valem Pokémon que tenham PELO MENOS um desses tipos;
+//   regions — uma ou mais regiões (por número da Pokédex; as formas regionais valem para a região da forma);
+//   gimmick — UMA mecânica por torneio (mega, gmax, dynamax, tera, zmove). Mega e Gigantamax só valem em espécies que as têm; as outras não restringem o sorteio (são só a regra da batalha).
+// O torneio "relâmpago livre" (data.freeTeams) não tem sorteio nem regras: cada jogador leva o seu time, numa categoria (tier) sorteada.
+// Os dados vêm de dados/especies-info.json (gerado por Notas e SupabaseTester/gerar_especies_info.py a partir do Showdown).
+const RULE_TYPES = {
+  Normal:'Normal', Fire:'Fogo', Water:'Água', Grass:'Planta', Electric:'Elétrico', Ice:'Gelo', Fighting:'Lutador', Poison:'Veneno', Ground:'Terreno',
+  Flying:'Voador', Psychic:'Psíquico', Bug:'Inseto', Rock:'Pedra', Ghost:'Fantasma', Dragon:'Dragão', Dark:'Sombrio', Steel:'Aço', Fairy:'Fada'
+};
+const RULE_REGIONS = {
+  kanto:{label:'Kanto', dex:'#1-151'}, johto:{label:'Johto', dex:'#152-251'}, hoenn:{label:'Hoenn', dex:'#252-386'}, sinnoh:{label:'Sinnoh', dex:'#387-493'},
+  unova:{label:'Unova', dex:'#494-649'}, kalos:{label:'Kalos', dex:'#650-721'}, alola:{label:'Alola', dex:'#722-809 e formas de Alola'}, galar:{label:'Galar', dex:'#810-898 e formas de Galar'},
+  hisui:{label:'Hisui', dex:'#899-905 e formas de Hisui'}, paldea:{label:'Paldea', dex:'#906-1025 e formas de Paldea'}
+};
+const RULE_GIMMICKS = {
+  mega:   { emoji:'💎', label:'Mega Evolução', hint:'só espécies que têm Mega Evolução' },
+  gmax:   { emoji:'🌋', label:'Gigantamax',    hint:'só espécies que têm forma Gigantamax' },
+  dynamax:{ emoji:'🔴', label:'Dynamax',       hint:'qualquer espécie; só se pode Dynamaxar' },
+  tera:   { emoji:'✨', label:'Terastalização', hint:'qualquer espécie; só se pode Terastalizar' },
+  zmove:  { emoji:'⚡', label:'Movimentos Z',  hint:'qualquer espécie; só se podem usar Movimentos Z' }
+};
+
+let _speciesInfo = null, _speciesInfoIdx = null, _speciesInfoPromise = null;
+// Carrega (uma vez) a tabela de espécies. Devolve true se está disponível. O endereço vem do <base href> da página (o gestor usa "/").
+function loadSpeciesInfo(){
+  if(_speciesInfo) return Promise.resolve(true);
+  if(!_speciesInfoPromise){
+    _speciesInfoPromise = fetch('dados/especies-info.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(j => {
+      if(!j || !j.especies) return false;
+      setSpeciesInfo(j.especies); return true;
+    }).catch(() => false).then(ok => { if(!ok) _speciesInfoPromise = null; return ok; });
+  }
+  return _speciesInfoPromise;
+}
+function setSpeciesInfo(especies){          // (também serve os testes)
+  _speciesInfo = especies || {}; _speciesInfoIdx = {};
+  Object.keys(_speciesInfo).forEach(n => { _speciesInfoIdx[eventSpeciesId(n)] = _speciesInfo[n]; });
+}
+function speciesInfoReady(){ return !!_speciesInfo; }
+// Dados de uma espécie ({t, r, m, g}) ou null. Tenta o nome inteiro e depois sem o sufixo de forma ("Tauros-Paldea-Blaze" -> "Tauros-Paldea" -> "Tauros").
+function speciesInfoOf(name){
+  if(!_speciesInfoIdx) return null;
+  const full = eventSpeciesId(name);
+  if(_speciesInfoIdx[full]) return _speciesInfoIdx[full];
+  const parts = String(name || '').split('-');
+  for(let k = parts.length - 1; k >= 1; k--){
+    const hit = _speciesInfoIdx[eventSpeciesId(parts.slice(0, k).join('-'))];
+    if(hit) return hit;
+  }
+  return null;
+}
+// Arruma uma regra vinda de um formulário/da base: só chaves válidas, no máximo 2 tipos. Devolve null se ficar vazia.
+function normalizeRule(rule){
+  if(!rule || typeof rule !== 'object') return null;
+  const types = Array.from(new Set((Array.isArray(rule.types) ? rule.types : []).filter(t => RULE_TYPES[t]))).slice(0, 2);
+  const regions = Array.from(new Set((Array.isArray(rule.regions) ? rule.regions : []).filter(r => RULE_REGIONS[r])));
+  const gimmick = RULE_GIMMICKS[rule.gimmick] ? rule.gimmick : null;
+  if(!types.length && !regions.length && !gimmick) return null;
+  const out = {};
+  if(types.length) out.types = types;
+  if(regions.length) out.regions = regions;
+  if(gimmick) out.gimmick = gimmick;
+  return out;
+}
+// A regra de um torneio (data) já arrumada, ou null. Os torneios "livres" nunca têm regra.
+function tournamentRule(data){ return data && !data.freeTeams ? normalizeRule(data.rule) : null; }
+function ruleSummary(rule){
+  const r = normalizeRule(rule); if(!r) return '';
+  const parts = [];
+  if(r.types) parts.push(`só Pokémon do tipo ${r.types.map(t => RULE_TYPES[t]).join(' ou ')}`);
+  if(r.regions) parts.push(`${r.types ? 'das regiões' : 'só Pokémon das regiões'}: ${r.regions.map(x => RULE_REGIONS[x].label).join(', ')}`);
+  if(r.gimmick) parts.push(`gimmick: ${RULE_GIMMICKS[r.gimmick].emoji} ${RULE_GIMMICKS[r.gimmick].label}`);
+  return parts.join(' · ');
+}
+// Esta espécie cumpre a regra? { ok, reason } — ok:true também quando a tabela não está carregada ou a espécie não consta (nunca bloqueia por falta de dados).
+function speciesAllowedByRule(rule, name){
+  const r = normalizeRule(rule);
+  if(!r) return { ok: true };
+  const info = speciesInfoOf(name);
+  if(!info) return { ok: true, unknown: true };
+  if(r.types && !info.t.some(t => r.types.includes(t))) return { ok: false, reason: `${name} é ${info.t.map(t => RULE_TYPES[t]).join('/')} — neste torneio ${r.types.length === 1 ? 'só vale o tipo' : 'só valem os tipos'} ${r.types.map(t => RULE_TYPES[t]).join(' e ')}.` };
+  if(r.regions && !r.regions.includes(info.r)) return { ok: false, reason: `${name} é de ${RULE_REGIONS[info.r] ? RULE_REGIONS[info.r].label : 'outra região'} — neste torneio só valem ${r.regions.map(x => RULE_REGIONS[x].label).join(', ')}.` };
+  if(r.gimmick === 'mega' && !info.m) return { ok: false, reason: `${name} não tem Mega Evolução — neste torneio só vale a Mega Evolução.` };
+  if(r.gimmick === 'gmax' && !info.g) return { ok: false, reason: `${name} não tem forma Gigantamax — neste torneio só vale o Gigantamax.` };
+  return { ok: true };
+}
+function filterSpeciesByRule(names, rule){ return (names || []).filter(n => speciesAllowedByRule(rule, n).ok); }
+
+// Relâmpago? (aceita a linha da tabela, com .data, ou o próprio data)
+function flashDataOf(x){ return x && x.data !== undefined && typeof x.data === 'object' ? (x.data || {}) : (x || {}); }
+function isFlashTournament(x){ return flashDataOf(x).kind === 'relampago'; }
+// Para as estatísticas: sem os relâmpagos (não contam para Elo, temporada, títulos, conquistas...).
+function rowsWithoutFlash(rows){ return (rows || []).filter(r => !isFlashTournament(r)); }
+function flashRows(rows){ return (rows || []).filter(isFlashTournament); }
+// Quantos torneios relâmpago o jogador fez (esteve inscrito) e quantos ganhou.
+function countFlashTournaments(rows, name){
+  let played = 0, won = 0;
+  flashRows(rows).forEach(r => { const d = flashDataOf(r); if((d.players || []).includes(name)){ played++; if(d.champion === name) won++; } });
+  return { played, won };
+}
+
+// ---------- Rivalidade: tudo o que se passou entre DOIS jogadores ----------
+// Percorre os torneios por ordem e junta as partidas com vencedor em que jogaram um contra o outro (inclui desistências, como no resto das estatísticas).
+// Devolve null se nunca se defrontaram. last = os encontros mais recentes primeiro (máx. 6); streak = quantas vezes seguidas o mesmo ganhou, até agora.
+function computeRivalry(rows, a, b){
+  if(!a || !b || a === b) return null;
+  const meetings = [];
+  (rows || []).slice().sort((x, y) => new Date(x.created_at) - new Date(y.created_at)).forEach(r => {
+    const data = r.data || {};
+    (data.matches || []).forEach(m => {
+      if(!m || !m.winner || !m.p1 || !m.p2) return;
+      if(!((m.p1 === a && m.p2 === b) || (m.p1 === b && m.p2 === a))) return;
+      let score = null;
+      if(m.bo === 3 && Array.isArray(m.games)){ const ga = m.games.filter(w => w === a).length, gb = m.games.filter(w => w === b).length; if(ga + gb > 0) score = ga + '-' + gb; }
+      meetings.push({ date: r.created_at || null, tournament: data.name || `Torneio (${data.tier || r.tier || '?'})`, tier: data.tier || r.tier || '?', label: m.label || 'Partida', winner: m.winner, score, decisive: /final/i.test(m.label || '') });
+    });
+  });
+  if(!meetings.length) return null;
+  const aWins = meetings.filter(x => x.winner === a).length, bWins = meetings.filter(x => x.winner === b).length;
+  let streak = { who: meetings[meetings.length - 1].winner, count: 0 };
+  for(let i = meetings.length - 1; i >= 0 && meetings[i].winner === streak.who; i--) streak.count++;
+  const byTier = {};
+  meetings.forEach(x => { const t = byTier[x.tier] || (byTier[x.tier] = { a: 0, b: 0 }); if(x.winner === a) t.a++; else t.b++; });
+  const dec = meetings.filter(x => x.decisive);
+  return { a, b, total: meetings.length, aWins, bWins, streak, byTier, first: meetings[0], last: meetings.slice(-6).reverse(),
+    decisive: { total: dec.length, a: dec.filter(x => x.winner === a).length, b: dec.filter(x => x.winner === b).length },
+    tournaments: new Set(meetings.map(x => x.tournament)).size,
+    balanced: meetings.length >= 4 && Math.abs(aWins - bWins) <= 1 };
 }
 
 // ---------- Mini-perfil (hover) ----------
@@ -1944,6 +2105,9 @@ const ACHIEVEMENTS = [
   { id:'recognized_mvp',        name:'MVP Reconhecido',     emoji:'🌠', desc:'Foi eleito MVP de um bloco de 3 torneios pelo menos uma vez', tier:'silver' },
   { id:'mvp_owner',             name:'Dono do Pokémon MVP', emoji:'🏅', desc:'Um Pokémon teu foi eleito Pokémon MVP de um torneio (pelos replays)', tier:'silver' },
   { id:'mvp_trio',              name:'Treinador Estrela',   emoji:'⭐', desc:'Tiveste o Pokémon MVP em 3 torneios', tier:'gold' },
+  { id:'replay_sweeper',        name:'Varredor',            emoji:'🧹', desc:'Um Pokémon teu derrubou 4 ou mais Pokémon num só jogo (pelos replays)', tier:'silver' },
+  { id:'replay_wall',           name:'Muralha',             emoji:'🧱', desc:'Um Pokémon teu aguentou 200% de dano ou mais num só jogo e acabou de pé (pelos replays)', tier:'silver' },
+  { id:'replay_comeback',       name:'Virada Épica',        emoji:'🔥', desc:'Ganhaste um jogo depois de estares 2 Pokémon ou mais atrás (pelos replays)', tier:'silver' },
   { id:'back_to_back',          name:'Bicampeão',           emoji:'🏛️', desc:'Foi campeão em pelo menos 2 temporadas diferentes', tier:'gold' },
   { id:'lucky_streak_bettor',   name:'Apostador Nato',      emoji:'🎟️', desc:'Acertou 3 palpites seguidos no Palpiteiro', tier:'bronze' },
   { id:'voice_of_the_people',   name:'Voz do Povo',         emoji:'📣', desc:'Venceu a votação de Apelido da Semana pelo menos uma vez', tier:'bronze' },
@@ -2089,6 +2253,7 @@ function computeMatchPathAchievements(name, allRows, profile){
   if(computeMvpBatches(allRows).some(b => b.mvp && b.mvp.name === name)) earned.add('recognized_mvp');
 
   { const n = countOwnedPokemonMvps(allRows, name); if(n >= 1) earned.add('mvp_owner'); if(n >= 3) earned.add('mvp_trio'); }
+  { const st = sumReplayStyle(allRows, name); if(st.sweeps >= 1) earned.add('replay_sweeper'); if(st.tanks >= 1) earned.add('replay_wall'); if(st.comebacks >= 1) earned.add('replay_comeback'); }
 
   if(computeChampionSeasonsCount(allRows, name) >= 2) earned.add('back_to_back');
 
@@ -2856,8 +3021,9 @@ function downloadCanvasAsPng(canvas, filename){
 // A âncora é a data do primeiro torneio já guardado — a "temporada" reinicia
 // sempre que se completa mais um ano a partir dessa data (mês/dia).
 function getSeasonAnchor(allRows){
-  if(!allRows || !allRows.length) return null;
-  const sorted = allRows.slice().sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+  const base = rowsWithoutFlash(allRows);          // um torneio relâmpago nunca pode ser a âncora das temporadas
+  if(!base.length) return null;
+  const sorted = base.slice().sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
   return new Date(sorted[0].created_at);
 }
 
@@ -3054,6 +3220,33 @@ function aggregateSpecies(rows, species){
 function countOwnedPokemonMvps(allRows, name){
   return (allRows || []).filter(r => r && r.data && r.data.mvp && r.data.mvp.mvp && r.data.mvp.mvp.owner === name).length;
 }
+// Estilo de jogo (pelos replays): data.mvp.styles[jogador] de cada torneio, somado. Devolve sempre um objeto (games = 0 quando não há dados).
+function sumReplayStyle(allRows, name){
+  const t = { tournaments: 0, games: 0, wins: 0, turns: 0, kos: 0, dmgDealt: 0, dmgTaken: 0, switches: 0, moves: 0, sweeps: 0, tanks: 0, comebacks: 0, tera: 0 };
+  (allRows || []).forEach(r => {
+    const s = r && r.data && r.data.mvp && r.data.mvp.styles && r.data.mvp.styles[name];
+    if(!s || !s.games) return;
+    t.tournaments++;
+    Object.keys(t).forEach(k => { if(k !== 'tournaments') t[k] += +s[k] || 0; });
+  });
+  return t;
+}
+// O "estilo" de um jogador, com números e uma etiqueta. Limiares calibrados com os replays reais (mediana: 25 turnos, 0,15 trocas por turno, 21% de dano por turno).
+// Precisa de pelo menos 3 jogos lidos para dar uma etiqueta (menos que isso é ruído). Devolve null se não houver dados nenhuns.
+const STYLE_MIN_GAMES = 3;
+function playerReplayStyle(allRows, name){
+  const t = sumReplayStyle(allRows, name);
+  if(!t.games) return null;
+  const turns = Math.max(1, t.turns), g = t.games;
+  const out = { games: g, tournaments: t.tournaments, winrate: Math.round(t.wins / g * 100), avgTurns: Math.round(t.turns / g), switchRate: t.switches / turns, switchesPerGame: Math.round(t.switches / g * 10) / 10,
+    koPerGame: Math.round(t.kos / g * 10) / 10, dmgPerTurn: Math.round(t.dmgDealt / turns), teraPct: Math.round(t.tera / g * 100), sweeps: t.sweeps, tanks: t.tanks, comebacks: t.comebacks, label: null };
+  if(g >= STYLE_MIN_GAMES){
+    if(out.switchRate >= 0.22) out.label = { icon: '🔁', name: 'Estratégico', text: 'Troca muito de Pokémon: lê o jogo e joga com o posicionamento.' };
+    else if(out.switchRate <= 0.10) out.label = { icon: '⚔️', name: 'Atacante', text: 'Raramente troca: deixa os Pokémon a atacar de frente.' };
+    else out.label = { icon: '⚖️', name: 'Equilibrado', text: 'Mistura ataque e trocas, sem se prender a um estilo.' };
+  }
+  return out;
+}
 // Os nomes de todas as espécies que já saíram (para a pesquisa), ordenados A-Z.
 function listSeenSpecies(rows){
   const set = {};
@@ -3122,7 +3315,11 @@ function replayLogFromHtml(html){
   return m ? m[1].split('\\/').join('/') : null;      // nos ficheiros de replay as barras vêm como "\/" (para não fecharem o <script>)
 }
 function parseReplayLog(log){
-  const res = { players: {}, winnerName: null, winnerSide: null, turns: 0, mons: [] };
+  // Além dos Pokémon, devolve por jogo: teamSize (tamanho do time de cada lado), switches (trocas VOLUNTÁRIAS: o Pokémon que saía ainda estava de pé), deficit (a maior desvantagem em
+  // Pokémon que cada lado chegou a ter) e left/leftHp (quantos Pokémon sobraram de pé no fim e a vida, em %, dos que se viram). Servem os "Momentos" e o "Estilo de jogo".
+  const res = { players: {}, winnerName: null, winnerSide: null, turns: 0, mons: [], teamSize: {}, switches: { p1: 0, p2: 0 }, deficit: { p1: 0, p2: 0 }, left: {}, leftHp: {} };
+  const pokeCount = {}, faints = { p1: 0, p2: 0 };
+  const sizeOf = side => res.teamSize[side] || pokeCount[side] || 6;
   const byKey = {}, active = {};
   const posOf = s => { const m = /^(p[1-4][a-c]?)(?::|$)/.exec(String(s || '')); return m ? m[1] : null; };
   const parseHp = (s, fallback) => {
@@ -3141,8 +3338,11 @@ function parseReplayLog(log){
     if(raw.charAt(0) !== '|') return;
     const p = raw.split('|'), cmd = p[1];
     if(cmd === 'player'){ if(p[2] && p[3]) res.players[p[2]] = p[3]; return; }
+    if(cmd === 'teamsize'){ if(/^p[1-4]$/.test(p[2]) && +p[3] > 0) res.teamSize[p[2]] = +p[3]; return; }
+    if(cmd === 'poke'){ if(/^p[1-4]$/.test(p[2])) pokeCount[p[2]] = (pokeCount[p[2]] || 0) + 1; return; }
     if(cmd === 'switch' || cmd === 'drag'){
       const pos = posOf(p[2]); if(!pos) return;
+      if(cmd === 'switch' && active[pos] && !active[pos].fainted && res.switches[pos.slice(0, 2)] !== undefined) res.switches[pos.slice(0, 2)]++;
       const species = String(p[3] || '').split(',')[0].trim(), m = mon(pos.slice(0, 2), species);
       m.appeared = true;
       const nick = String(p[2]).slice(String(p[2]).indexOf(':') + 1).trim();
@@ -3174,6 +3374,12 @@ function parseReplayLog(log){
       t.fainted = true; t.hp = 0;
       const by = t.lastSelf ? null : t.lastHit;
       if(by && by.side !== t.side){ by.kos++; if(!t.lastIndirect) by.directKos++; }
+      if(faints[t.side] !== undefined){
+        faints[t.side]++;
+        const opp = t.side === 'p1' ? 'p2' : 'p1';
+        const diff = (sizeOf(t.side) - faints[t.side]) - (sizeOf(opp) - faints[opp]);       // negativo = este lado está atrás
+        if(-diff > res.deficit[t.side]) res.deficit[t.side] = -diff;
+      }
       return;
     }
     if(cmd === '-terastallize'){ const m = active[posOf(p[2])]; if(m) m.tera = p[3] || true; return; }
@@ -3181,6 +3387,10 @@ function parseReplayLog(log){
     if(cmd === 'win'){ res.winnerName = p[2] || null; }
   });
   Object.keys(res.players).forEach(side => { if(res.winnerName && res.players[side] === res.winnerName) res.winnerSide = side; });
+  ['p1', 'p2'].forEach(side => {
+    res.left[side] = Math.max(0, sizeOf(side) - faints[side]);
+    res.leftHp[side] = Object.keys(byKey).map(k => byKey[k]).filter(m => m.side === side && m.appeared && !m.fainted).map(m => Math.round(m.hp));
+  });
   res.mons = Object.keys(byKey).map(k => { const m = byKey[k]; delete m.hp; delete m.lastHit; delete m.lastIndirect; delete m.lastSelf; return m; }).filter(m => m.appeared);
   return res;
 }
@@ -3188,6 +3398,8 @@ function parseReplayLog(log){
 // Junta os jogos de um torneio por ESPÉCIE e escolhe o MVP. games = [{label, parsed}] (parsed vem de parseReplayLog). O dono da espécie vem dos sorteios (data.draws + data.players):
 // num torneio cada Pokémon é de um só jogador. Pontuação: KO 10, dano causado /20 (100% de HP = 5), jogo em que sobreviveu 3, jogo ganho pelo seu lado 2. Desempate: mais KOs, mais dano, nome.
 const MVP_POINTS = { ko: 10, damagePerPoint: 20, survived: 3, win: 2 };
+// Limiares dos destaques dos replays (calibrados com os 68 replays reais do projeto): uma "varredura" = um Pokémon com 4+ KOs num só jogo; uma "muralha" = um Pokémon que aguentou 200%+ de dano (somado) e acabou de pé.
+const STYLE_SWEEP_KOS = 4, STYLE_TANK_DMG = 200;
 function mvpScore(s){ return Math.round((s.kos * MVP_POINTS.ko + s.dmgDealt / MVP_POINTS.damagePerPoint + s.survived * MVP_POINTS.survived + s.winGames * MVP_POINTS.win) * 10) / 10; }
 function aggregateReplayMvp(games, draws, players){
   const id = s => eventSpeciesId(s), ownerById = {}, ownerByBase = {};
@@ -3200,10 +3412,30 @@ function aggregateReplayMvp(games, draws, players){
     });
   });
   const per = {}, skipped = [];
+  const ownerOfSpecies = sp => ownerById[id(sp)] || ownerByBase[id(getBaseSpecies(sp))] || null;
+  const styles = {}, momentGames = [];
   let used = 0;
   (games || []).forEach(g => {
     if(!g || !g.parsed || !g.parsed.mons || !g.parsed.mons.length){ skipped.push(g && g.label || '?'); return; }
     used++;
+    // Quem é o dono de cada lado: o jogador a quem pertence a maioria dos Pokémon que esse lado usou (os sorteios dizem de quem é cada espécie).
+    const sideOwner = {};
+    ['p1', 'p2'].forEach(side => {
+      const c = {};
+      g.parsed.mons.filter(m => m.side === side).forEach(m => { const o = ownerOfSpecies(m.species); if(o) c[o] = (c[o] || 0) + 1; });
+      const best = Object.keys(c).sort((a, b) => c[b] - c[a])[0];
+      sideOwner[side] = best || null;
+    });
+    momentGames.push({ label: g.label || '', parsed: g.parsed, owner: sideOwner });
+    ['p1', 'p2'].forEach(side => {
+      const o = sideOwner[side]; if(!o) return;
+      const mine = g.parsed.mons.filter(m => m.side === side);
+      const s = styles[o] || (styles[o] = { games: 0, wins: 0, turns: 0, kos: 0, dmgDealt: 0, dmgTaken: 0, switches: 0, moves: 0, sweeps: 0, tanks: 0, comebacks: 0, tera: 0 });
+      s.games++; if(g.parsed.winnerSide === side){ s.wins++; if((g.parsed.deficit[side] || 0) >= 2) s.comebacks++; }
+      s.turns += g.parsed.turns || 0; s.switches += (g.parsed.switches && g.parsed.switches[side]) || 0;
+      mine.forEach(m => { s.kos += m.kos; s.dmgDealt += m.dmgDealt; s.dmgTaken += m.dmgTaken; s.moves += m.moves; if(m.kos >= STYLE_SWEEP_KOS) s.sweeps++; if(!m.fainted && m.dmgTaken >= STYLE_TANK_DMG) s.tanks++; });
+      if(mine.some(m => m.tera)) s.tera++;
+    });
     g.parsed.mons.forEach(m => {
       const k = id(m.species);
       const st = per[k] || (per[k] = { species: m.species, owner: ownerById[k] || ownerByBase[id(getBaseSpecies(m.species))] || null, games: 0, kos: 0, directKos: 0, deaths: 0, survived: 0, dmgDealt: 0, dmgTaken: 0, teraGames: 0, winGames: 0, moves: 0 });
@@ -3216,7 +3448,51 @@ function aggregateReplayMvp(games, draws, players){
   const stats = Object.values(per).map(s => { s.dmgDealt = Math.round(s.dmgDealt); s.dmgTaken = Math.round(s.dmgTaken); s.score = mvpScore(s); return s; })
     .sort((a, b) => b.score - a.score || b.kos - a.kos || b.dmgDealt - a.dmgDealt || a.species.localeCompare(b.species));
   const mvp = stats.find(s => s.owner) || null;
-  return { v: 1, computedAt: new Date().toISOString(), replays: used, skipped, mvp, stats: stats.slice(0, 24) };
+  Object.keys(styles).forEach(k => { const s = styles[k]; s.dmgDealt = Math.round(s.dmgDealt); s.dmgTaken = Math.round(s.dmgTaken); });
+  return { v: 2, computedAt: new Date().toISOString(), replays: used, skipped, mvp, stats: stats.slice(0, 24), moments: computeReplayMoments(momentGames), styles };
+}
+
+// Momentos do torneio: os destaques que se tiram dos replays (um de cada tipo, o mais extremo). momentGames = [{label, parsed, owner:{p1,p2}}].
+// Guarda DADOS (não texto): quem escreve a frase é momentText(), assim dá para mudar as palavras sem recalcular. Limiares baixos de propósito (um torneio entre amigos tem poucos jogos).
+function computeReplayMoments(momentGames){
+  const out = [];
+  const games = (momentGames || []).filter(g => g && g.parsed);
+  if(!games.length) return out;
+  const nameOf = (g, side) => (g.owner && g.owner[side]) || (g.parsed.players && g.parsed.players[side]) || '?';
+  const opp = side => side === 'p1' ? 'p2' : 'p1';
+  const withWinner = games.filter(g => g.parsed.winnerSide);
+  const longest = games.filter(g => g.parsed.turns >= 12).sort((a, b) => b.parsed.turns - a.parsed.turns)[0];
+  if(longest) out.push({ kind: 'long', label: longest.label, turns: longest.parsed.turns, a: nameOf(longest, 'p1'), b: nameOf(longest, 'p2'), winner: longest.parsed.winnerSide ? nameOf(longest, longest.parsed.winnerSide) : null });
+  const shortest = withWinner.filter(g => g.parsed.turns > 0 && g.parsed.turns <= 8 && (!longest || g !== longest)).sort((a, b) => a.parsed.turns - b.parsed.turns)[0];
+  if(shortest && games.length >= 3) out.push({ kind: 'short', label: shortest.label, turns: shortest.parsed.turns, winner: nameOf(shortest, shortest.parsed.winnerSide), loser: nameOf(shortest, opp(shortest.parsed.winnerSide)) });
+  const comeback = withWinner.filter(g => (g.parsed.deficit[g.parsed.winnerSide] || 0) >= 2).sort((a, b) => b.parsed.deficit[b.parsed.winnerSide] - a.parsed.deficit[a.parsed.winnerSide] || b.parsed.turns - a.parsed.turns)[0];
+  if(comeback){ const w = comeback.parsed.winnerSide; out.push({ kind: 'comeback', label: comeback.label, deficit: comeback.parsed.deficit[w], winner: nameOf(comeback, w), loser: nameOf(comeback, opp(w)) }); }
+  const thread = withWinner.filter(g => { const w = g.parsed.winnerSide, hp = (g.parsed.leftHp && g.parsed.leftHp[w]) || []; return g.parsed.left[w] === 1 && hp.length === 1 && hp[0] <= 20; })
+    .sort((a, b) => a.parsed.leftHp[a.parsed.winnerSide][0] - b.parsed.leftHp[b.parsed.winnerSide][0])[0];
+  if(thread){ const w = thread.parsed.winnerSide, hp = thread.parsed.leftHp[w][0], m = thread.parsed.mons.filter(x => x.side === w && !x.fainted)[0]; out.push({ kind: 'thread', label: thread.label, hp: Math.max(1, hp), species: m ? m.species : null, winner: nameOf(thread, w), loser: nameOf(thread, opp(w)) }); }
+  let sweep = null, tank = null;
+  games.forEach(g => g.parsed.mons.forEach(m => {
+    if(m.kos >= STYLE_SWEEP_KOS && (!sweep || m.kos > sweep.kos)) sweep = { kos: m.kos, species: m.species, side: m.side, g };
+    if(!m.fainted && m.dmgTaken >= STYLE_TANK_DMG && (!tank || m.dmgTaken > tank.dmg)) tank = { dmg: Math.round(m.dmgTaken), species: m.species, side: m.side, g };
+  }));
+  if(sweep) out.push({ kind: 'sweep', label: sweep.g.label, species: sweep.species, n: sweep.kos, owner: nameOf(sweep.g, sweep.side) });
+  if(tank) out.push({ kind: 'tank', label: tank.g.label, species: tank.species, dmg: tank.dmg, owner: nameOf(tank.g, tank.side) });
+  return out;
+}
+// A frase de cada momento (português). Devolve { icon, title, text }.
+function momentText(it){
+  if(!it) return null;
+  const J = x => String(x == null ? '?' : x);
+  const where = it.label ? ` (${it.label})` : '';
+  switch(it.kind){
+    case 'long': return { icon: '⏳', title: 'Jogo mais longo', text: `${J(it.a)} vs ${J(it.b)} durou ${it.turns} turnos${it.winner ? ' — ganhou ' + J(it.winner) : ''}${where}` };
+    case 'short': return { icon: '⚡', title: 'Vitória relâmpago', text: `${J(it.winner)} despachou ${J(it.loser)} em apenas ${it.turns} turnos${where}` };
+    case 'comeback': return { icon: '🔄', title: 'Maior virada', text: `${J(it.winner)} ganhou a ${J(it.loser)} depois de ficar ${it.deficit} Pokémon atrás${where}` };
+    case 'thread': return { icon: '😅', title: 'Por um fio', text: `${J(it.winner)} fechou o jogo contra ${J(it.loser)} só com ${J(it.species)} com ${it.hp}% de vida${where}` };
+    case 'sweep': return { icon: '🧹', title: 'Varredura', text: `${J(it.species)} de ${J(it.owner)} derrubou ${it.n} Pokémon num só jogo${where}` };
+    case 'tank': return { icon: '🧱', title: 'Muralha', text: `${J(it.species)} de ${J(it.owner)} aguentou ${it.dmg}% de dano e continuou de pé${where}` };
+    default: return null;
+  }
 }
 
 // ---------- Votação do "Apelido da Semana" ----------
@@ -3827,15 +4103,20 @@ async function fetchNotifications(supabaseUrl, supabaseAnonKey, me){
   const items = [];
   const isNew = iso => new Date(iso) > new Date(seen);
   const when = iso => { const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
-  const [ev, tours, comments, gifts, trades, weekly] = await Promise.all([
+  const [ev, tours, comments, gifts, trades, weekly, passInfo] = await Promise.all([
     fetchActiveEvent(supabaseUrl, supabaseAnonKey).catch(() => null),
     get(`tournaments?status=eq.em_curso&select=id,tname:data->name,matches:data->matches,info:data->matchinfo&order=created_at.desc&limit=3`),
     get(`profile_comments?target_name=eq.${e(me)}&select=author_name,created_at&order=created_at.desc&limit=15`),
     get(`gifts?to_name=eq.${e(me)}&select=from_name,amount,created_at&order=created_at.desc&limit=15`),
     get(`trade_offers?to_name=eq.${e(me)}&status=eq.pending&select=from_name,created_at&order=created_at.desc&limit=10`),
-    dbFunction(supabaseUrl, supabaseAnonKey, 'weekly_missions_status', { p_name: me, p_weeks_ago: 0 }).then(r => (r.ok && r.data && r.data.ok ? r.data.missions : [])).catch(() => [])
+    dbFunction(supabaseUrl, supabaseAnonKey, 'weekly_missions_status', { p_name: me, p_weeks_ago: 0 }).then(r => (r.ok && r.data && r.data.ok ? r.data.missions : [])).catch(() => []),
+    dbFunction(supabaseUrl, supabaseAnonKey, 'pass_status', { p_name: me }).then(r => (r.ok && r.data && r.data.ok ? r.data : null)).catch(() => null)
   ]);
   const toClaim = (weekly || []).filter(m => m.done && !m.claimed).length;
+  if(passInfo && (passInfo.state === 'active' || passInfo.state === 'ended')){
+    const pm = passInfo.state === 'active' ? (passInfo.missions || []).filter(m => m.done && !m.claimed && !m.locked).length : 0, pr = passInfo.unclaimed || 0;
+    if(pm + pr > 0) items.push({ icon: '🎟️', text: `Passe de Temporada: ${[pr ? `<b>${pr}</b> recompensa${pr === 1 ? '' : 's'}` : '', pm ? `<b>${pm}</b> ${pm === 1 ? 'missão' : 'missões'} do passe` : ''].filter(Boolean).join(' e ')} por reclamar`, href: 'passe.html', hot: true });
+  }
   if(toClaim > 0) items.push({ icon: '📋', text: `Tens <b>${toClaim}</b> ${toClaim === 1 ? 'missão semanal' : 'missões semanais'} por reclamar`, href: 'missoes.html', hot: true });
   if(ev){
     const base = `x1_challenges?event_id=eq.${e(ev.id)}&select=challenger_name,opponent_name,status,reported_by,best_of,stake&status=in.(pending,accepted,reported,disputed)`;
@@ -3963,13 +4244,16 @@ function fetchTierPools(){
 
 // Nomes entre os quais se pode escolher uma escolha livre. Torneio de evento: espécies da região da semana (só a
 // forma original, como no gestor); torneio normal: a pool legal do tier. null = não há lista (não carregou).
-function freePickCandidates(pools, tier, eventInfo){
+function freePickCandidates(pools, tier, eventInfo, rule){
+  let list;
   if(eventInfo && eventInfo.region){
-    return getEventRegionSpeciesNames(eventInfo.region).filter(n => isSpeciesAllowedInEventRegion(n, eventInfo.region));
+    list = getEventRegionSpeciesNames(eventInfo.region).filter(n => isSpeciesAllowedInEventRegion(n, eventInfo.region));
+  } else {
+    if(!pools || !pools.pools) return null;
+    const key = (pools.alias && pools.alias[tier]) || tier;
+    list = pools.pools[key] || null;
   }
-  if(!pools || !pools.pools) return null;
-  const key = (pools.alias && pools.alias[tier]) || tier;
-  return pools.pools[key] || null;
+  return list && rule ? filterSpeciesByRule(list, rule) : list;      // relâmpago com regras: só o que cumpre a regra (tipos, regiões, gimmick)
 }
 
 // Para cada nome: {state:'ok'} | {state:'taken', by, how:'random'|'free'} (de OUTRO jogador) |

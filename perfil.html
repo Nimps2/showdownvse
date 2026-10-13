@@ -5,10 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Perfil do Jogador — Torneio Showdown - VSE</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0c14">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VSE">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261013d">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013e">
 <style>
 .customize-toggle-btn{
   background:var(--bg-card);border:1px solid var(--line);color:var(--tera-cyan);padding:9px 16px;
@@ -101,6 +108,7 @@
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
     <a href="missoes.html">Missões</a>
+    <a href="passe.html">Passe</a>
     <a href="calendario.html">Calendário</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
@@ -119,7 +127,7 @@
   <div class="footer-note">Estatísticas calculadas a partir de todos os torneios guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261013d"></script>
+<script src="assets/js/showdown-utils.js?v=20261013e"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -216,6 +224,7 @@ async function handleDailyBonusClick(){
 }
 
 let allRows = [];
+let flashAll = [];     // todos os torneios (inclui os relâmpagos, que ficam à parte das estatísticas)
 let playerStats = {};
 let playerProfiles = {};
 let currentTrophies = null;
@@ -231,7 +240,8 @@ async function init(){
       fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY),
       fetchCoinTransactions(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName, 30)
     ]);
-    allRows = rows;
+    flashAll = rows;
+    allRows = rowsWithoutFlash(rows);
     setStatus(true, `Ligado — ${allRows.length} torneio(s) encontrados.`);
     playerStats = aggregatePlayers(allRows);
     playerProfiles = profiles;
@@ -276,6 +286,8 @@ async function renderProfile(){
   const seasonComparison = computeSeasonComparison(allRows, name);
   const winrateByTier = computeWinrateByTier(allRows, name);
   const iconicTeam = computeIconicTeam(allRows, name);
+  const flashCount = countFlashTournaments(flashAll, name);
+  const replayStyle = typeof playerReplayStyle === 'function' ? playerReplayStyle(allRows, name) : null;     // estilo de jogo lido dos replays (se a página estiver em cache antiga, não aparece)
   // Conquistas, sets favoritos e comentários do mural pedem-se ao mesmo tempo (eram um a seguir ao outro).
   // Mural: se showdown-utils.js ainda estiver em cache numa versão antiga, o separador some.
   const muralOn = typeof fetchProfileComments === 'function';
@@ -377,6 +389,7 @@ async function renderProfile(){
         <div class="stat-box"><div class="n">${st.wins}</div><div class="l">Vitórias</div></div>
         <div class="stat-box"><div class="n">${st.losses}</div><div class="l">Derrotas</div></div>
         <div class="stat-box"><div class="n">${winrate}%</div><div class="l">Winrate</div></div>
+        ${flashCount.played ? `<div class="stat-box" title="Torneios relâmpago: ficam à parte (não contam para as estatísticas)"><div class="n">⚡ ${flashCount.played}</div><div class="l">Relâmpagos${flashCount.won ? ' (' + flashCount.won + ' 🏆)' : ''}</div></div>` : ''}
       </div>
       ${titleChips ? `<div>${titleChips}</div>` : ''}
       ${isOwnProfile ? `<button class="customize-toggle-btn" onclick="toggleCustomizePanel()">🎨 Customizar</button>` : ''}
@@ -445,6 +458,24 @@ async function renderProfile(){
         ${seasonComparison.slice().reverse().map(s=>`<option value="${s.season}">Temporada ${s.season}</option>`).join('')}
       </select>
       <div id="recapBody" style="margin-top:12px;"></div>
+    </div>
+    ` : ''}
+
+    ${replayStyle ? `
+    <div class="card" id="styleCard">
+      <h2>🎭 Estilo de jogo <span style="font-size:10.5px;color:var(--text-faint);font-weight:400;text-transform:none;">lido dos replays dos torneios</span></h2>
+      ${replayStyle.label
+        ? `<div class="style-badge"><span class="si">${replayStyle.label.icon}</span><div><b>${escapeHtml(replayStyle.label.name)}</b><div class="st">${escapeHtml(replayStyle.label.text)}</div></div></div>`
+        : `<div style="font-size:12px;color:var(--text-faint);margin-bottom:10px;">Só há ${replayStyle.games} jogo${replayStyle.games === 1 ? '' : 's'} lido${replayStyle.games === 1 ? '' : 's'} — com 3 já dá para dizer que estilo tens.</div>`}
+      <div class="stat-grid">
+        <div class="stat-box"><div class="n">${replayStyle.games}</div><div class="l">Jogos lidos</div></div>
+        <div class="stat-box"><div class="n">${replayStyle.avgTurns}</div><div class="l">Turnos por jogo</div></div>
+        <div class="stat-box"><div class="n">${replayStyle.switchesPerGame}</div><div class="l">Trocas por jogo</div></div>
+        <div class="stat-box"><div class="n">${replayStyle.koPerGame}</div><div class="l">KOs por jogo</div></div>
+        <div class="stat-box"><div class="n">${replayStyle.dmgPerTurn}%</div><div class="l">Dano por turno</div></div>
+        <div class="stat-box"><div class="n">${replayStyle.teraPct}%</div><div class="l">Jogos com Tera</div></div>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--text-dim);">🧹 ${replayStyle.sweeps} varredura${replayStyle.sweeps === 1 ? '' : 's'} · 🧱 ${replayStyle.tanks} muralha${replayStyle.tanks === 1 ? '' : 's'} · 🔥 ${replayStyle.comebacks} virada${replayStyle.comebacks === 1 ? '' : 's'}</div>
     </div>
     ` : ''}
 
@@ -957,21 +988,36 @@ function renderCompare(){
   const opponent = document.getElementById('compareSelect').value;
   const resultDiv = document.getElementById('compareResult');
   if(!opponent || !currentH2H){ resultDiv.innerHTML = ''; return; }
-  const rec = currentH2H.opponents[opponent];
-  if(!rec){
+  const myName = getViewedPlayerName();
+  const rv = computeRivalry(allRows, myName, opponent);
+  if(!rv){
     resultDiv.innerHTML = `<div class="empty-state">Ainda não jogaram um contra o outro.</div>`;
     return;
   }
-  const total = rec.wins + rec.losses;
-  const winrate = total ? Math.round((rec.wins/total)*100) : 0;
-  const myName = getViewedPlayerName();
+  const winrate = rv.total ? Math.round((rv.aWins / rv.total) * 100) : 0;
+  const fmtDate = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: '2-digit' }); };
+  const lead = rv.aWins === rv.bWins ? '⚖️ Empatados' : (rv.aWins > rv.bWins ? `👑 ${escapeHtml(myName)} está à frente` : `👑 ${escapeHtml(opponent)} está à frente`);
+  const tierChips = Object.keys(rv.byTier).sort().map(t => `<span class="title-chip" style="font-size:11px;">${escapeHtml(t)} ${rv.byTier[t].a}-${rv.byTier[t].b}</span>`).join(' ');
   resultDiv.innerHTML = `
     <div class="stat-grid">
-      <div class="stat-box"><div class="n">${rec.wins}</div><div class="l">Vitórias</div></div>
-      <div class="stat-box"><div class="n">${rec.losses}</div><div class="l">Derrotas</div></div>
+      <div class="stat-box"><div class="n">${rv.aWins}</div><div class="l">Vitórias</div></div>
+      <div class="stat-box"><div class="n">${rv.bWins}</div><div class="l">Derrotas</div></div>
       <div class="stat-box"><div class="n">${winrate}%</div><div class="l">Winrate</div></div>
     </div>
-    <button class="shop-btn" style="margin-top:10px;width:100%;" onclick="downloadHeadToHeadCard(${jsq(myName)},${jsq(opponent)},${rec.wins},${rec.losses})">📸 Gerar cartão para partilhar</button>
+    <div style="margin-top:10px;font-size:12.5px;color:var(--text-dim);line-height:1.6;">
+      <b style="color:var(--text-main);">${lead}</b>${rv.balanced ? ' · 🔥 rivalidade equilibrada' : ''}<br>
+      ${rv.streak.count >= 2 ? `🔁 ${escapeHtml(rv.streak.who)} ganhou os últimos <b>${rv.streak.count}</b> encontros<br>` : ''}
+      ${rv.decisive.total ? `🏁 Em finais e semifinais: ${escapeHtml(myName)} ${rv.decisive.a} - ${rv.decisive.b} ${escapeHtml(opponent)}<br>` : ''}
+      📅 Primeiro encontro: ${fmtDate(rv.first.date)} (${escapeHtml(rv.first.tournament)}, ${escapeHtml(rv.first.label)}) — ganhou ${escapeHtml(rv.first.winner)}<br>
+      ${tierChips ? `🎚️ Por tier: ${tierChips}` : ''}
+    </div>
+    <details style="margin-top:10px;" open>
+      <summary class="history-toggle">Últimos ${rv.last.length} encontro${rv.last.length === 1 ? '' : 's'}</summary>
+      <div class="history-list">
+        ${rv.last.map(x => `<div class="history-row"><span>${fmtDate(x.date)} · ${escapeHtml(x.tournament)} · ${escapeHtml(x.label)}${x.score ? ' (' + escapeHtml(x.score) + ')' : ''}</span><span class="res">${x.winner === myName ? '✅ ' + escapeHtml(myName) : '❌ ' + escapeHtml(opponent)}</span></div>`).join('')}
+      </div>
+    </details>
+    <button class="shop-btn" style="margin-top:10px;width:100%;" onclick="downloadHeadToHeadCard(${jsq(myName)},${jsq(opponent)},${rv.aWins},${rv.bWins})">📸 Gerar cartão para partilhar</button>
   `;
 }
 

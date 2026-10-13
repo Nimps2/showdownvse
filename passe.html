@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Passe de Temporada — Torneio Showdown - VSE</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0c14">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VSE">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013e">
+</head>
+<body>
+<div id="playerCornerContainer"></div>
+
+<div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
+    <h2>Entrar</h2>
+    <label>Nome</label>
+    <select id="gateNameSelect"><option value="">— carregando jogadores —</option></select>
+    <label>Password</label>
+    <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()">
+    <button class="btn-primary" onclick="doGateLogin()">Entrar</button>
+    <div id="gateError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;"></div>
+  </div>
+</div>
+
+<div id="topbar" class="topbar" style="display:none;">
+  <a href="index.html" class="brand">
+    <div class="brand-mark"></div>
+    <div class="brand-name">Torneio VSE</div>
+  </a>
+  <nav class="topnav">
+    <a href="index.html">Início</a>
+    <a href="viewer.html">Bracket</a>
+    <a href="estatisticas.html">Estatísticas</a>
+    <a href="hall-da-fama.html">Hall da Fama</a>
+    <a href="loja.html">Loja</a>
+    <a href="conquistas.html">Conquistas</a>
+    <a href="palpites.html">Palpiteiro</a>
+    <a href="missoes.html">Missões</a>
+    <a href="passe.html" class="current">Passe</a>
+    <a href="calendario.html">Calendário</a>
+  </nav>
+  <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
+</div>
+
+<div id="mainContent" class="wrap" style="display:none;">
+  <div class="status-strip">
+    <span class="status-dot" id="statusDot"></span>
+    <span class="status-text" id="statusText">Conectando…</span>
+  </div>
+
+  <div class="card" id="psHero"><div class="empty-state">A carregar…</div></div>
+  <div id="psRewardsCard" class="card" style="display:none;">
+    <h2>🎁 Recompensas por nível</h2>
+    <div class="mw-note" style="margin-top:0;margin-bottom:12px;" id="psRewardsNote"></div>
+    <div class="ps-track" id="psTrack"></div>
+  </div>
+  <div id="psMissionsCard" class="card" style="display:none;">
+    <h2>📋 Missões do passe</h2>
+    <div class="mw-note" style="margin-top:0;margin-bottom:12px;">Todas as semanas abrem 3 missões novas. Ficam disponíveis até ao fim do passe, por isso podes fazer as das semanas anteriores mais tarde. Cada uma dá XP uma vez; o progresso conta desde o início da semana em que abriu.</div>
+    <div id="psMissions"></div>
+  </div>
+  <div class="card" id="psHow">
+    <h2>ℹ️ Como funciona</h2>
+    <div class="mw-note" style="margin-top:0;">
+      O passe dura <b>a temporada inteira</b> (13 semanas), é grátis para todos e tem <b>30 níveis de 80 XP</b>. O XP vem de: <b>missões do passe</b> (as da semana), <b>missões semanais</b> reclamadas (+10 XP cada), <b>x1</b> jogados (+12 XP, +8 se ganhares; até 6 por semana),
+      e <b>torneios</b> (+40 XP por participação, +10 por partida ganha, +60 se fores campeão; os relâmpagos dão só +20). Cada nível dá uma recompensa: moedas, cosméticos exclusivos do passe ou vantagens da loja.
+      Quem joga bastante chega ao nível 30; quem joga menos fica pelo meio. Depois de o passe acabar já não ganhas mais XP, mas ainda podes reclamar as recompensas dos níveis que alcançaste.
+    </div>
+  </div>
+
+  <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
+</div>
+
+<script src="assets/js/showdown-utils.js?v=20261013e"></script>
+<script>
+initTheme();
+const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+
+let loggedInPlayerName = null;
+let claimBusy = false;
+
+async function doGateLogin(){
+  const name = document.getElementById('gateNameSelect').value;
+  const password = document.getElementById('gatePassword').value;
+  const errEl = document.getElementById('gateError');
+  errEl.style.display = 'none';
+  if(!name){ errEl.textContent = 'Selecione o seu nome.'; errEl.style.display='block'; return; }
+  if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
+  const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
+  if(!result.ok){
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registrado pelo organizador.'
+      : result.reason==='wrongpass' ? 'Password incorreta.'
+      : 'Erro ao ligar à base de dados.';
+    errEl.style.display = 'block';
+    return;
+  }
+  localStorage.setItem('player_login_name', name);
+  loggedInPlayerName = name;
+  unlockContent();
+}
+
+function unlockContent(){
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('topbar').style.display = 'flex';
+  init();
+}
+
+function doPlayerLogout(){
+  localStorage.removeItem('player_login_name');
+  endPlayerSession(SUPABASE_URL, SUPABASE_ANON_KEY);
+  loggedInPlayerName = null;
+  document.getElementById('gatePassword').value = '';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('topbar').style.display = 'none';
+  document.getElementById('authGate').style.display = 'flex';
+}
+
+async function pageBoot(){
+  const sel = document.getElementById('gateNameSelect');
+  try{
+    const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
+    names.forEach(n=>{
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+    const saved = localStorage.getItem('player_login_name');
+    if(saved && names.includes(saved)){
+      loggedInPlayerName = saved;
+      unlockContent();
+    }
+  } catch(e){
+    sel.innerHTML = '<option value="">— erro ao carregar jogadores —</option>';
+  }
+}
+
+function setStatus(ok, text){
+  document.getElementById('statusDot').className = 'status-dot ' + (ok?'on':'off');
+  document.getElementById('statusText').textContent = text;
+}
+
+let dailyBonusClaimInFlight = false;
+async function handleDailyBonusClick(){
+  if(dailyBonusClaimInFlight) return;
+  dailyBonusClaimInFlight = true;
+  const icon = document.getElementById('dailyBonusIcon');
+  if(icon) icon.classList.remove('available');
+  try{
+    const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+    if(result.awarded){
+      showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
+      loadPass();
+    }
+  } finally {
+    dailyBonusClaimInFlight = false;
+  }
+}
+
+// Passe de Temporada: tudo o que é regra (XP, níveis, recompensas, missões) vem da base de dados (pass_status); aqui só se mostra e se reclama.
+let passState = null, passBusy = false;
+
+function psDate(iso){ const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
+// O fim do passe é exclusivo (meia-noite do dia seguinte): o "último dia" é um instante antes.
+function psLastDay(iso){ return psDate(new Date(new Date(iso).getTime() - 1)); }
+function psLeft(sec){
+  const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600);
+  return d ? `${d} dia${d === 1 ? '' : 's'} e ${h} h` : `${h} h`;
+}
+// A imagem de uma recompensa (consoante o que é): moedas, vantagem, ou o cosmético (insígnia, título, cor, moldura...).
+function psVisual(r){
+  if(r.kind === 'cosmetic'){
+    const it = typeof getCosmeticById === 'function' ? getCosmeticById(r.item) : null;
+    if(it){
+      if(it.effect) return avatarHtml('AB', null, 28, '#ffd166', it.effect);
+      if(it.emoji) return `<span>${escapeHtml(it.emoji)}</span>`;
+      if(it.css) return `<span style="display:inline-block;width:34px;height:34px;border-radius:9px;background:${escapeHtml(it.css)};border:1px solid var(--line);"></span>`;
+      if(it.color) return `<span style="display:inline-block;width:34px;height:34px;border-radius:50%;background:${escapeHtml(it.color)};border:1px solid var(--line);"></span>`;
+      if(it.text) return `<span style="font-size:11px;font-weight:700;color:var(--tera-amber);line-height:1.2;">${escapeHtml(it.text)}</span>`;
+    }
+  }
+  return `<span>${escapeHtml(r.icon || '🎁')}</span>`;
+}
+function psRewardName(r){
+  if(r.kind === 'cosmetic' && typeof getCosmeticById === 'function'){ const it = getCosmeticById(r.item); if(it) return it.name; }
+  return r.label;
+}
+
+async function loadPass(){
+  const hero = document.getElementById('psHero');
+  const r = await dbFunction(SUPABASE_URL, SUPABASE_ANON_KEY, 'pass_status', { p_name: loggedInPlayerName });
+  if(r.status === 404){
+    passState = null; setStatus(false, 'Passe ainda não disponível.');
+    hero.innerHTML = '<h2>🎟️ Passe de Temporada</h2><div class="empty-state">O passe ainda não está ativo (a base de dados vai ser atualizada). Volta daqui a pouco.</div>';
+    return;
+  }
+  if(!r.ok || !r.data || !r.data.ok){
+    setStatus(false, 'Não foi possível carregar o passe.');
+    hero.innerHTML = '<h2>🎟️ Passe de Temporada</h2><div class="empty-state">Não consegui carregar o passe. Tenta atualizar a página.</div>';
+    return;
+  }
+  setStatus(true, 'Ligado.');
+  passState = r.data;
+  renderPass();
+}
+
+function renderPass(){
+  const s = passState, hero = document.getElementById('psHero');
+  const rewardsCard = document.getElementById('psRewardsCard'), missionsCard = document.getElementById('psMissionsCard');
+  if(s.state === 'none'){
+    rewardsCard.style.display = 'none'; missionsCard.style.display = 'none';
+    hero.innerHTML = `<h2>🎟️ Passe de Temporada</h2><div class="empty-state">Ainda não há nenhum passe em vigor. O primeiro começa na <b>Temporada 2</b>: dura a temporada inteira, tem 30 níveis com recompensas e missões novas todas as semanas. Quando o organizador o abrir, aparece aqui.</div>`;
+    return;
+  }
+  const p = s.pass;
+  if(s.state === 'planned'){
+    missionsCard.style.display = 'none';
+    hero.innerHTML = `<h2>🎟️ ${escapeHtml(p.name)}</h2><div class="ps-sub">Começa a <b>${psDate(p.starts_at)}</b> (faltam ${psLeft(p.seconds_to_start)}) e dura até ${psLastDay(p.ends_at)} (${p.weeks} semanas).</div>
+      <div class="mw-note" style="margin-top:6px;">Espreita já as recompensas: sobes de nível a jogar torneios, x1 e missões. As missões abrem quando o passe começar.</div>`;
+    rewardsCard.style.display = '';
+    document.getElementById('psRewardsNote').textContent = 'Cada nível dá uma destas recompensas (30 níveis de 80 XP).';
+    document.getElementById('psTrack').innerHTML = (s.rewards || []).map(r => psRewardHtml(r, false)).join('');
+    return;
+  }
+  const x = s.xp, cfg = s.cfg, maxed = x.level >= cfg.max_level;
+  const pct = maxed ? 100 : Math.round(x.into_level / cfg.level_xp * 100);
+  const sources = [['📋', 'Missões do passe', x.missions], ['🗓️', 'Missões semanais', x.weekly], ['🤝', 'x1', x.x1], ['🏟️', 'Torneios', x.tournaments]];
+  hero.innerHTML = `<h2>🎟️ ${escapeHtml(p.name)}${s.state === 'ended' ? ' <span class="tier-pill">terminado</span>' : ''}</h2>
+    <div class="ps-sub">${s.state === 'ended' ? `Terminou a ${psLastDay(p.ends_at)}. Ainda podes reclamar as recompensas dos níveis que alcançaste.` : `Semana <b>${p.week}</b> de ${p.weeks} · termina a ${psLastDay(p.ends_at)} (faltam ${psLeft(p.seconds_left)})`}</div>
+    <div class="ps-levelrow"><div class="ps-level">Nível ${x.level}<small> / ${cfg.max_level}</small></div><div class="ps-xp">${x.total} XP${maxed ? ' · nível máximo! 🏆' : ` · faltam ${cfg.level_xp - x.into_level} para o nível ${x.level + 1}`}</div></div>
+    <div class="ps-bar"><i style="width:${pct}%"></i></div>
+    <div class="ps-src">${sources.map(([i, l, v]) => `<span class="ps-chip" title="${escapeHtml(l)}">${i} ${escapeHtml(l)}: <b>${v}</b> XP</span>`).join('')}</div>
+    ${s.unclaimed > 0 ? `<div style="margin-top:12px;"><button type="button" class="mw-claim" onclick="claimAllRewards()">🎁 Reclamar ${s.unclaimed} recompensa${s.unclaimed === 1 ? '' : 's'}</button></div>` : ''}`;
+  rewardsCard.style.display = '';
+  document.getElementById('psRewardsNote').textContent = s.state === 'ended' ? 'As recompensas dos níveis que alcançaste continuam por reclamar até as levantares.' : 'Chega ao nível indicado e carrega para reclamar. As cinzentas ainda estão por alcançar.';
+  document.getElementById('psTrack').innerHTML = (s.rewards || []).map(r => psRewardHtml(r, true)).join('');
+  // missões: por semana (as futuras ficam fechadas)
+  if(s.state === 'ended'){ missionsCard.style.display = 'none'; return; }
+  missionsCard.style.display = '';
+  const weeks = {};
+  (s.missions || []).forEach(m => (weeks[m.week] = weeks[m.week] || []).push(m));
+  document.getElementById('psMissions').innerHTML = Object.keys(weeks).map(Number).sort((a, b) => a - b).map(w => {
+    const ms = weeks[w], locked = ms[0].locked, current = w === p.week;
+    const open = !locked && ms.some(m => !m.claimed) || current;
+    return `<details class="ps-wk${locked ? ' locked' : ''}" ${open && !locked ? 'open' : ''}><summary><b>Semana ${w}</b>${current ? ' <span class="tier-pill">esta semana</span>' : ''}
+        ${locked ? `<span class="ps-lock">🔒 abre a ${psDate(ms[0].opens_at)}</span>` : `<span class="ps-lock">${ms.filter(m => m.claimed).length}/${ms.length} reclamadas</span>`}</summary>
+      ${locked ? '' : ms.map(psMissionHtml).join('')}</details>`;
+  }).join('');
+}
+
+function psRewardHtml(r, live){
+  const cls = !live ? '' : (r.claimed ? ' claimed' : (r.reached ? ' ready' : ''));
+  const action = !live ? '' : (r.claimed ? '<div class="ps-ok">✔ Reclamada</div>' : (r.reached ? `<button type="button" class="mw-claim ps-claim" data-level="${r.level}">Reclamar</button>` : '<div class="ps-hint">por alcançar</div>'));
+  return `<div class="ps-rw${cls}"><span class="lv">Nível ${r.level}</span><div class="ico">${psVisual(r)}</div><div class="lb">${escapeHtml(psRewardName(r))}</div>${action}</div>`;
+}
+function psMissionHtml(m){
+  const pct = Math.round(m.value / m.target * 100);
+  const action = m.claimed ? '<span class="mw-ok">✔ Reclamada</span>' : (m.done ? `<button type="button" class="mw-claim ps-mclaim" data-id="${escapeHtml(m.id)}">Reclamar +${m.xp} XP</button>` : '<span class="mw-hint">por fazer</span>');
+  return `<div class="mw-card${m.claimed ? ' claimed' : ''}${m.done && !m.claimed ? ' ready' : ''}">
+    <div class="mw-ico">${escapeHtml(m.icon)}</div>
+    <div class="mw-main"><div class="mw-title">${escapeHtml(m.title)}</div><div class="mw-desc">${escapeHtml(m.desc)}</div><div class="mw-bar"><i style="width:${pct}%"></i></div></div>
+    <div class="mw-side"><div class="mw-reward">+${m.xp} XP</div><div class="mw-prog">${m.value}/${m.target}</div><div class="mw-act">${action}</div></div>
+  </div>`;
+}
+
+async function psClaimReward(level){
+  const r = await dbFunction(SUPABASE_URL, SUPABASE_ANON_KEY, 'claim_pass_reward', { p_name: loggedInPlayerName, p_level: level, p_token: getPlayerToken(loggedInPlayerName) });
+  return r.data || {};
+}
+function psRewardMsg(d){
+  if(d.kind === 'coins') return `+${d.coins} 🪙`;
+  if(d.kind === 'perk') return d.fallback ? `+${d.coins} 🪙 (já tinhas a vantagem)` : escapeHtml(d.label);
+  return escapeHtml(d.label || 'Cosmético novo');
+}
+async function claimAllRewards(){
+  if(passBusy || !passState) return;
+  passBusy = true;
+  try{
+    const todo = (passState.rewards || []).filter(r => r.reached && !r.claimed).map(r => r.level);
+    const msgs = []; let expired = false;
+    for(const lv of todo){
+      const d = await psClaimReward(lv);
+      if(d.reason === 'auth'){ expired = true; break; }
+      if(d.ok) msgs.push(`Nível ${lv}: ${psRewardMsg(d)}`);
+    }
+    if(expired){ handleSessionExpired(); return; }
+    if(msgs.length) showCelebrationToast(`🎁 ${msgs.length} recompensa${msgs.length === 1 ? '' : 's'} do passe!<br><span style="font-size:11px;opacity:0.85;">${msgs.slice(0, 5).join(' · ')}${msgs.length > 5 ? ' · …' : ''}</span>`, 6000);
+  } finally { passBusy = false; }
+  await loadPass();
+}
+
+document.addEventListener('click', async e => {
+  const rw = e.target.closest('.ps-claim'), ms = e.target.closest('.ps-mclaim');
+  if((!rw && !ms) || passBusy) return;
+  passBusy = true; (rw || ms).disabled = true;
+  try{
+    if(rw){
+      const d = await psClaimReward(+rw.dataset.level);
+      if(d.reason === 'auth'){ handleSessionExpired(); return; }
+      if(d.ok) showCelebrationToast(`🎁 Nível ${d.level}: ${psRewardMsg(d)}`, 4500);
+      else alert(d.reason === 'already' ? 'Esta recompensa já foi reclamada.' : d.reason === 'notreached' ? 'Ainda não chegaste a este nível.' : 'Não foi possível reclamar agora. Tenta outra vez.');
+    } else {
+      const before = passState.xp.level;
+      const r = await dbFunction(SUPABASE_URL, SUPABASE_ANON_KEY, 'claim_pass_mission', { p_name: loggedInPlayerName, p_mission: ms.dataset.id, p_token: getPlayerToken(loggedInPlayerName) });
+      const d = r.data || {};
+      if(d.reason === 'auth'){ handleSessionExpired(); return; }
+      if(d.ok){
+        showCelebrationToast(`📋 Missão do passe cumprida! +${d.xp} XP`, 4000);
+      } else alert(d.reason === 'already' ? 'Esta missão já foi reclamada.' : d.reason === 'notdone' ? 'Ainda não cumpriste esta missão.' : d.reason === 'locked' ? 'Esta missão ainda não abriu.' : d.reason === 'ended' ? 'O passe já terminou.' : 'Não foi possível reclamar agora. Tenta outra vez.');
+    }
+  } finally { passBusy = false; }
+  const lvBefore = passState && passState.xp ? passState.xp.level : 0;
+  await loadPass();
+  if(passState && passState.xp && passState.xp.level > lvBefore) showCelebrationToast(`⬆️ Subiste para o nível ${passState.xp.level} do passe!`, 5000);
+});
+
+async function init(){
+  try{
+    const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
+    checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
+      document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
+    });
+    if(typeof mountEventCornerIcon === 'function') mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } catch(e){ /* o canto é só um extra */ }
+  await loadPass();
+}
+
+pageBoot();
+</script>
+</body>
+</html>

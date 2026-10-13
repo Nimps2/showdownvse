@@ -5,10 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Torneio Showdown — Bracket & Sorteio</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0c14">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VSE">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261013d">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013e">
 <style>
 :root{ --bg-code:#0d0f18; }
 body.light-theme{ --bg-code:#e4e7f0; }
@@ -143,6 +150,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
     <a href="missoes.html">Missões</a>
+    <a href="passe.html">Passe</a>
     <a href="calendario.html">Calendário</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
@@ -178,7 +186,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
 
 <div class="hover-card" id="hoverCard"></div>
 
-<script src="assets/js/showdown-utils.js?v=20261013d"></script>
+<script src="assets/js/showdown-utils.js?v=20261013e"></script>
 <script>
 initTheme();
 // SUPABASE_URL e SUPABASE_ANON_KEY são definidos no próximo bloco de script,
@@ -323,15 +331,16 @@ async function init(){
     if(!res.ok) throw new Error('HTTP '+res.status);
     tournaments = await res.json();
     setStatus(true, `Conectado — ${tournaments.length} torneio(s) encontrados.`);
-    playerStats = aggregatePlayers(tournaments);
+    const statRows = rowsWithoutFlash(tournaments);      // os relâmpagos ficam à parte: não contam para as estatísticas, troféus nem Elo
+    playerStats = aggregatePlayers(statRows);
     playerProfiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, playerProfiles[loggedInPlayerName]);
     checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
       document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
     });
     if(typeof mountEventCornerIcon === 'function') mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY); // guarda: showdown-utils.js ainda pode estar em cache numa versão antiga
-    currentTrophies = computeCurrentTrophies(tournaments);
-    eloRatings = computeEloRatings(tournaments);
+    currentTrophies = computeCurrentTrophies(statRows);
+    eloRatings = computeEloRatings(statRows);
     renderTournamentSelect();
     const active = tournaments.find(t=>t.status==='em_curso') || tournaments[0];
     if(active){
@@ -384,9 +393,9 @@ function renderTournamentSelect(){
     opt.value = t.id;
     const d = new Date(t.created_at);
     const name = (t.data && t.data.name) ? t.data.name : null;
-    opt.textContent = name
+    opt.textContent = (isFlashTournament(t) ? '⚡ ' : '') + (name
       ? `${name} — ${t.tier||'?'} (${t.status==='concluido'?'Concluído':'Em curso'})`
-      : `${d.toLocaleDateString('pt-BR')} — ${t.tier||'?'} (${t.status==='concluido'?'Concluído':'Em curso'})`;
+      : `${d.toLocaleDateString('pt-BR')} — ${t.tier||'?'} (${t.status==='concluido'?'Concluído':'Em curso'})`);
     sel.appendChild(opt);
   });
 }
@@ -403,6 +412,7 @@ async function loadTournamentData(id){
   if(!t) return;
   currentTournamentId = id;
   currentData = t.data || {};
+  if(tournamentRule(currentData)) await loadSpeciesInfo();       // a regra (tipos/regiões/gimmick) precisa da tabela de espécies
   if(loggedInPlayerName){
     myRerollCount = await countMyRerollRequests(SUPABASE_URL, SUPABASE_ANON_KEY, currentTournamentId, loggedInPlayerName);
   }
@@ -538,7 +548,7 @@ function renderBracket(){
   }
   const nameLabel = currentData.name ? escapeHtml(currentData.name) + ' ' : '';
   let html = `<h2>${nameLabel}<span class="tier-pill">${currentData.tier||''}</span> <span style="font-size:10.5px;color:var(--text-faint);font-weight:400;text-transform:none;">🔴 ao vivo — atualiza sozinho</span></h2>`;
-  html += eventBannerHtml();
+  html += eventBannerHtml() + flashBannerHtml();
   let lastLabel = null;
   matches.forEach(m=>{
     if(m.label !== lastLabel){
@@ -568,10 +578,28 @@ function eventBannerHtml(){
   return `<div class="event-banner">🌍 <b>${escapeHtml(ev.name || 'Evento')}</b> — Semana ${ev.week}: só Pokémon de <b>${r.label}</b> (${r.dex}), na forma original (sem formas regionais). Vale para o torneio e para os x1 do evento.</div>`;
 }
 
-// Devolve { ok:true } ou { ok:false, short, long } para um nome de espécie num torneio de evento.
+// ---------- Torneios relâmpago (à parte; podem ter regras: tipos, regiões, gimmick; ou ser "livres": sem sorteio) ----------
+function flashBannerHtml(){
+  const d = currentData || {};
+  if(d.kind !== 'relampago') return '';
+  const rule = tournamentRule(d);
+  const parts = [`⚡ <b>Torneio relâmpago</b> — fica à parte: não conta para o Elo, a temporada nem as estatísticas.`];
+  if(d.freeTeams) parts.push(`🎲 <b>Livre</b>: sem sorteio nem regras — cada jogador leva o seu próprio time. Categoria sorteada: <b>${escapeHtml(d.tier || '?')}</b>.`);
+  else if(rule) parts.push(`🎯 Regra: <b>${escapeHtml(ruleSummary(rule))}</b>${rule.gimmick ? ' — ' + escapeHtml(RULE_GIMMICKS[rule.gimmick].hint) : ''}. Vale para o sorteio e para as escolhas livres.`);
+  return `<div class="event-banner">${parts.join('<br>')}</div>`;
+}
+
+// Devolve { ok:true } ou { ok:false, short, long } para um nome de espécie num torneio de evento (ou com a regra de um relâmpago).
 function checkEventRegion(speciesName){
   const ev = currentData && currentData.event;
-  if(!ev || !EVENT_REGIONS[ev.region]) return { ok:true };
+  if(!ev || !EVENT_REGIONS[ev.region]){
+    const rule = tournamentRule(currentData || {});
+    if(rule){
+      const r = speciesAllowedByRule(rule, speciesName);
+      if(!r.ok) return { ok:false, short: `Fora da regra do torneio: ${r.reason}`, long: escapeHtml(r.reason) };
+    }
+    return { ok:true };
+  }
   const found = getEventRegionOfSpecies(speciesName);
   if(isSpeciesAllowedInEventRegion(speciesName, ev.region)) return { ok:true };
   const r = EVENT_REGIONS[ev.region];
@@ -645,6 +673,10 @@ function renderMyDraw(){
   const draws = (currentData && currentData.draws) || {};
   const d = draws[pIdx];
   const playerName = currentData.players[pIdx];
+  if(currentData.freeTeams){
+    card.innerHTML = `<h2>Os seus Pokémon</h2>${flashBannerHtml()}<div class="empty-state">Não há sorteio neste torneio: monta o teu time na categoria <b>${escapeHtml(currentData.tier || '?')}</b> e boa sorte!</div>`;
+    return;
+  }
   if(!d){
     card.innerHTML = `<h2>Os seus Pokémon</h2><div class="empty-state">O sorteio para ${playerName} ainda não foi feito.</div>`;
     return;
@@ -660,7 +692,7 @@ function renderMyDraw(){
       </details>`;
 
   let html = `<h2>Os seus Pokémon</h2>`;
-  html += eventBannerHtml();
+  html += eventBannerHtml() + flashBannerHtml();
   if(locked) html += `<div class="locked-banner">🔒 Este torneio já foi concluído. Os sets ficam bloqueados para consulta — já não é possível alterá-los.</div>`;
   html += `<div class="player-result"><div class="pname">${playerName}</div>`;
 
@@ -931,7 +963,11 @@ async function openFreePick(slot){
   closeFreePick();
   Object.assign(fp, { open:true, slot, names:null, draws:null, q:'', hideBlocked:false, busy:false, why:'' });
   const ev = currentData.event, regionInfo = ev && EVENT_REGIONS[ev.region] ? EVENT_REGIONS[ev.region] : null;
-  const note = regionInfo
+  const rule = tournamentRule(currentData);
+  if(rule) await loadSpeciesInfo();
+  const note = rule && !regionInfo
+    ? `⚡ <b>Torneio relâmpago</b>: ${escapeHtml(ruleSummary(rule))}.`
+    : regionInfo
     ? (regionInfo.exact
       ? `🎃 <b>${escapeHtml(ev.name || 'Evento')}</b> — Semana ${ev.week}: só Pokémon <b>Dark ou Ghost</b>.`
       : `🌍 <b>${escapeHtml(ev.name || 'Evento')}</b> — Semana ${ev.week}: só Pokémon de <b>${regionInfo.label}</b> (${regionInfo.dex}), na forma original.`)
@@ -958,7 +994,7 @@ async function openFreePick(slot){
   setTimeout(() => { const s = document.getElementById('fpSearch'); if(s) s.focus(); }, 50);
 
   const pools = ev ? null : await fetchTierPools();
-  fp.names = freePickCandidates(pools, currentData.tier, ev);
+  fp.names = freePickCandidates(pools, currentData.tier, ev, rule);
   if(!fp.names) fp.why = 'A lista de Pokémon deste tier não está disponível agora. Usa o import do Showdown (caixa mais abaixo).';
   fp.draws = (await fetchFreshDraws()) || currentData.draws;
   if(!fp.open) return;
