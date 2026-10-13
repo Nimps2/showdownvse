@@ -1,0 +1,14 @@
+# Fins de linha: o site e o código ficam sempre com LF (como já estão no GitHub); só os .bat precisam de CRLF para o Windows os correr.
+# Isto faz desaparecer o aviso "LF will be replaced by CRLF" do Git e evita diferenças falsas entre o PC e o GitHub.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+# Ficheiros binários: nunca mexer
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
