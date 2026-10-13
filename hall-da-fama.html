@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261013b">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013c">
 <style>
 .nav-link{color:var(--tera-cyan);font-size:12.5px;text-decoration:none;font-family:'Chakra Petch',sans-serif;}
 .nav-link:hover{text-decoration:underline;}
@@ -84,6 +84,7 @@
     <a href="loja.html">Loja</a>
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
+    <a href="missoes.html">Missões</a>
     <a href="calendario.html">Calendário</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
@@ -143,7 +144,7 @@
   <div class="footer-note">Linha do tempo calculada a partir de todos os torneios concluídos guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261013b"></script>
+<script src="assets/js/showdown-utils.js?v=20261013c"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -420,9 +421,17 @@ function renderTimeline(rows){
         </div>
         ${runnerUp ? `<div class="runner-up">🥈 Vice-campeão: <a href="perfil.html?jogador=${encodeURIComponent(runnerUp)}">${displayName(runnerUp)}</a></div>` : ''}
         ${bronzePlayers.length ? `<div class="runner-up">🥉 3º lugar: ${bronzePlayers.map(p=>`<a href="perfil.html?jogador=${encodeURIComponent(p)}">${displayName(p)}</a>`).join(' e ')}</div>` : ''}
+        ${mvpLine(data)}
       </div>
     </div>`;
   }).join('') + `</div>`;
+}
+
+// O Pokémon MVP do torneio (calculado pelo gestor a partir dos replays: data.mvp).
+function mvpLine(data){
+  const m = data && data.mvp && data.mvp.mvp;
+  if(!m) return '';
+  return `<div class="runner-up mvp-line" title="Pontos: KO x10, dano causado /20, jogo sobrevivido x3, jogo ganho x2 (lido dos replays)">🏅 Pokémon MVP: ${pokeSpriteHtml(m.species, 32)} <a href="pokemon.html?especie=${encodeURIComponent(m.species)}">${escapeHtml(m.species)}</a> de <a href="perfil.html?jogador=${encodeURIComponent(m.owner)}">${displayName(m.owner)}</a> <small style="color:var(--text-faint);">· ${m.kos} KO${m.kos === 1 ? '' : 's'}, ${m.dmgDealt}% de dano, ${m.score} pts</small></div>`;
 }
 
 function renderFeaturedMatches(rows){

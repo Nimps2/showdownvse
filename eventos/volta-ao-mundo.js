@@ -459,6 +459,16 @@
     </details>`;
   }
 
+  // O que aconteceu às moedas de um duelo com aposta (as regras estão na base: o vencedor leva os dois valores; recusado, cancelado ou anulado devolve).
+  function stakeLine(r){
+    if(!(r.stake > 0)) return '';
+    const w = EventCore.x1.winnerOf(r), done = r.status === 'confirmed' || r.status === 'resolved';
+    if(done && w) return `<div class="vm-duel-verdict soft">🪙 <b>${escapeHtml(w)}</b> levou os 🪙${2 * r.stake} da aposta</div>`;
+    if((done && !w) || r.status === 'declined' || r.status === 'cancelled') return `<div class="vm-duel-verdict soft">🪙 Aposta devolvida (🪙${r.stake} a cada um)</div>`;
+    if(r.status === 'pending') return `<div class="vm-duel-verdict soft">🪙 Aposta de ${r.stake}: ${escapeHtml(r.challenger_name)} já deixou o valor retido; o adversário só o deixa se aceitar</div>`;
+    return `<div class="vm-duel-verdict soft">🪙 Retidos: 🪙${r.stake} de cada um (o vencedor leva 🪙${2 * r.stake})</div>`;
+  }
+
   function duelHtml(r, ctx, api){
     const st = X1_STATUS[r.status] || { label: r.status, step: 0 };
     const w = EventCore.x1.winnerOf(r);
@@ -497,13 +507,14 @@
           <small>Os links novos <b>substituem</b> os antigos. «Tirar» apaga o replay deste duelo (podes juntar outro depois).</small></details>` : '';
     const modeKey = r.team_mode || 'free';
     const fmt =`<span class="vm-duel-fmt${bestOf > 1 ? ' long' : ''}" title="Melhor de ${bestOf}: ganha quem chegar primeiro a ${EventCore.x1.winsNeeded(bestOf)} vitória${EventCore.x1.winsNeeded(bestOf) > 1 ? 's' : ''}">${EventCore.x1.formatLabel(bestOf)}</span>`
+      + (r.stake > 0 ? `<span class="vm-duel-fmt long" title="Cada um aposta 🪙${r.stake}; o vencedor leva 🪙${2 * r.stake}">🪙 ${r.stake} em jogo</span>` : '')
       + `<span class="vm-duel-fmt${modeKey === 'random' ? ' long' : ''}" title="${modeKey === 'random' ? 'Times aleatórios: o sistema sorteia 6 Pokémon para cada um ao aceitar' : 'Times livres: cada um leva os seus 6 Pokémon'}">${EventCore.x1.teamModeLabel(modeKey)}</span>`;
     const regionKey = r.week >= 1 && r.week <= mod.weeks.length ? mod.weeks[r.week - 1].region : null;
     return `<div class="vm-duel s-${r.status}${acts.length ? ' mine' : ''}">
       <div class="vm-duel-top"><span>⚔️ Semana ${r.week}${region ? ' · ' + region : ''} ${fmt}</span><span class="vm-duel-status">${st.label}</span></div>
       <div class="vm-duel-vs">${side(r.challenger_name)}<span class="vm-duel-x">VS</span>${side(r.opponent_name)}</div>
       <ol class="vm-steps">${steps}</ol>
-      ${verdict}${r.status === 'disputed' && r.note ? `<div class="vm-duel-note">“${escapeHtml(r.note)}”</div>` : ''}
+      ${verdict}${stakeLine(r)}${r.status === 'disputed' && r.note ? `<div class="vm-duel-note">“${escapeHtml(r.note)}”</div>` : ''}
       ${teamsHtml(r, ctx, api, sid, regionKey)}
       ${scoreSelect}${replayField}
       ${shownActs.length ? `<div class="vm-duel-actions">${shownActs.map(a => `<button class="vm-x1btn ${X1_BTN[a].cls}" onclick="doX1Act('${sid}','${a}',this)">${X1_BTN[a].text}</button>`).join('')}</div>` : ''}
@@ -534,8 +545,11 @@
         <select id="x1Teams" class="vm-x1format" title="Times do duelo" onchange="ui.x1Teams=this.value" ${q.left === 0 ? 'disabled' : ''}>
           <option value="free"${(api.ui.x1Teams || 'free') === 'free' ? ' selected' : ''}>✋ Times livres (cada um leva os seus 6)</option>
           <option value="random"${api.ui.x1Teams === 'random' ? ' selected' : ''}>🎲 Times aleatórios (sorteio de 6 para cada um)</option></select>
+        <select id="x1Stake" class="vm-x1format" title="Aposta opcional: cada um deixa este valor retido e o vencedor leva os dois" onchange="ui.x1Stake=+this.value" ${q.left === 0 ? 'disabled' : ''}>
+          <option value="0"${!api.ui.x1Stake ? ' selected' : ''}>🪙 Sem aposta</option>${EventCore.x1.STAKES.map(v => `<option value="${v}"${api.ui.x1Stake === v ? ' selected' : ''}>🪙 Aposta ${v} (o vencedor leva ${2 * v})</option>`).join('')}</select>
         <button class="vm-send" onclick="doX1Send(this)" ${q.left === 0 ? 'disabled' : ''}>⚔️ Desafiar</button></div>
       ${q.left === 0 ? `<small>Já enviaste os ${q.max} desafios desta semana — voltas a poder na próxima.</small>` : `<small>Máximo ${q.max} desafios enviados por semana, a jogadores diferentes. Recusados e cancelados não contam. Tu escolhes o formato (md1, md3 ou md5: ganha quem chegar primeiro a 1, 2 ou 3 vitórias); o adversário pode aceitar ou recusar. Escolhes também os <b>times</b>: livres, ou aleatórios (o sistema sorteia 6 Pokémon da região para cada um quando o adversário aceita). Um duelo conta como UM x1 nas missões, seja qual for o formato.</small>`}
+      <small style="display:block;margin-top:6px;">🪙 <b>Apostas (opcional):</b> quem desafia escolhe o valor e ele fica retido; o adversário só o deixa retido se aceitar. Quem ganhar leva os dois valores (ganha o que o outro perde — as moedas só trocam de mãos). Se o desafio for recusado, cancelado ou anulado pelo organizador, devolve-se tudo a cada um.</small>
     </div>`;
     const rows = ctx.x1;
     const forMe = rows.filter(r2 => (r2.status === 'pending' && r2.opponent_name === ctx.me) || (r2.status === 'reported' && r2.reported_by !== ctx.me && (r2.challenger_name === ctx.me || r2.opponent_name === ctx.me)));

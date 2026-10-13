@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@600;700&family=Special+Elite&family=Caveat:wght@500;600&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261013b">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013c">
 <style>
 /* O visual de cada evento vive em eventos/<slug>.css (carregado dinamicamente). */
 #eventRoot{min-height:240px;}
@@ -64,6 +64,7 @@
     <a href="loja.html">Loja</a>
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
+    <a href="missoes.html">Missões</a>
     <a href="calendario.html">Calendário</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
@@ -83,8 +84,8 @@
   <div class="footer-note">As missões são calculadas a partir do que já fizeste no site — clica em "Reclamar" para receber os prémios.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261013b"></script>
-<script src="assets/js/eventos-core.js?v=20261013b"></script>
+<script src="assets/js/showdown-utils.js?v=20261013c"></script>
+<script src="assets/js/eventos-core.js?v=20261013c"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -194,7 +195,7 @@ const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && 
 // Versão dos ficheiros do evento (showdown-utils.js, eventos-core.js e eventos/<slug>.*): MUDAR (aqui e nas
 // duas <script src="...?v="> lá em cima) sempre que algum deles mudar, para o browser não misturar ficheiros
 // novos com versões antigas em cache.
-const EV_ASSET_VERSION = '20261013b';
+const EV_ASSET_VERSION = '20261013c';
 
 // Carrega o CSS e o JS do evento ativo (cada evento tem o seu par). O slug só pode ter a-z, 0-9 e "-".
 function loadEventAssets(slug){
@@ -449,10 +450,15 @@ async function doX1Send(btn){
   const bestOf = fsel ? +fsel.value : 1;
   const tsel = document.getElementById('x1Teams');
   const teamMode = tsel ? tsel.value : 'free';
+  const ssel = document.getElementById('x1Stake');
+  const stake = ssel ? +ssel.value || 0 : 0;
+  if(stake > 0 && !confirm(`Apostar 🪙${stake} contra ${opp}?\n\nO valor fica retido até haver resultado. Se ganhares, levas os 🪙${2 * stake} (ganhas 🪙${stake}); se perderes, perdes os 🪙${stake}. Se ${opp} recusar (ou se cancelares, ou o organizador anular), devolvo-te tudo.`)) return;
   if(btn) btn.disabled = true;
-  const r = await EventCore.x1.send(ctx, opp, bestOf, teamMode);
+  const r = await EventCore.x1.send(ctx, opp, bestOf, teamMode, stake);
   if(r.ok){
-    showCelebrationToast(`⚔️ Desafio ${EventCore.x1.formatLabel(r.bestOf)} ${r.teamMode === 'random' ? 'com times aleatórios ' : ''}enviado a <b>${escapeHtml(opp)}</b>! Quando aceitar, combinem o jogo no Showdown.`, 5000);
+    showCelebrationToast(`⚔️ Desafio ${EventCore.x1.formatLabel(r.bestOf)} ${r.teamMode === 'random' ? 'com times aleatórios ' : ''}${r.stake ? `(aposta de 🪙${r.stake} retida) ` : ''}enviado a <b>${escapeHtml(opp)}</b>! Quando aceitar, combinem o jogo no Showdown.`, 5000);
+    if(r.stake) refreshMyCoins();
+  } else if(r.reason === 'auth'){ return;
   } else {
     const msg = r.reason === 'quota' ? `Já enviaste os ${EventCore.x1.MAX_PER_WEEK} desafios desta semana.`
       : r.reason === 'noformat' ? 'Os formatos melhor de 3 e melhor de 5 ainda não estão disponíveis (a base de dados vai ser atualizada). Escolhe melhor de 1 por agora.'
@@ -460,6 +466,8 @@ async function doX1Send(btn){
       : r.reason === 'dup' ? 'Já desafiaste este jogador esta semana — escolhe outro.'
       : r.reason === 'noweek' ? 'Os desafios abrem com o torneio da Semana 1.'
       : r.reason === 'self' ? 'Não te podes desafiar a ti próprio.'
+      : r.reason === 'insufficient' ? `Não tens moedas para esta aposta${r.balance != null ? ` (tens 🪙${r.balance})` : ''}. Escolhe um valor menor ou desafia sem aposta.`
+      : r.reason === 'nostake' ? 'As apostas ainda não estão disponíveis (a base de dados vai ser atualizada). Desafia sem aposta por agora.'
       : r.reason === 'noname' ? 'Escolhe o adversário.' : 'Não foi possível enviar agora. Tenta outra vez.';
     alert(msg);
   }
@@ -480,9 +488,13 @@ async function doX1Act(id, act, btn){
   if(!row) return;
   const other = row.challenger_name === loggedInPlayerName ? row.opponent_name : row.challenger_name;
   let r, regScore = null;
-  if(act === 'accept')       r = await EventCore.x1.respond(ctx, id, true, row.week >= 1 && row.week <= mod.weeks.length ? mod.weeks[row.week - 1].region : null);
-  else if(act === 'decline'){ if(!confirm(`Recusar o desafio de ${other}?`)) return; r = await EventCore.x1.respond(ctx, id, false); }
-  else if(act === 'cancel'){  if(!confirm(`Cancelar o desafio a ${other}?`)) return;  r = await EventCore.x1.cancel(ctx, id); }
+  const bet = row.stake > 0 ? row.stake : 0;
+  if(act === 'accept'){
+    if(bet && !confirm(`Aceitar e apostar 🪙${bet} contra ${other}?\n\nO teu 🪙${bet} fica retido até haver resultado. Se ganhares, levas os 🪙${2 * bet} (ganhas 🪙${bet}); se perderes, perdes os 🪙${bet}. Se o organizador anular o duelo, devolve-se tudo.`)) return;
+    r = await EventCore.x1.respond(ctx, id, true, row.week >= 1 && row.week <= mod.weeks.length ? mod.weeks[row.week - 1].region : null);
+  }
+  else if(act === 'decline'){ if(!confirm(`Recusar o desafio de ${other}?${bet ? ` (devolvo os 🪙${bet} que ele deixou retidos)` : ''}`)) return; r = await EventCore.x1.respond(ctx, id, false); }
+  else if(act === 'cancel'){  if(!confirm(`Cancelar o desafio a ${other}?${bet ? ` (devolvo-te os 🪙${bet} retidos)` : ''}`)) return;  r = await EventCore.x1.cancel(ctx, id); }
   else if(act === 'win' || act === 'lose' || act === 'score'){
     const bestOf = row.best_of || 1;
     const rpInput = document.getElementById('x1rp-' + id);
@@ -509,13 +521,19 @@ async function doX1Act(id, act, btn){
   else if(act === 'dispute'){ const note = prompt(`Porque contestas o resultado de ${row.reported_by}? (opcional — o organizador vai decidir)`); if(note === null) return; r = await EventCore.x1.dispute(ctx, id, note); }
   else return;
   if(btn) btn.disabled = true;
+  if(bet && (r.ok || r.reason === 'changed')) refreshMyCoins();
+  if(r.reason === 'auth') return;      // a página recarrega sozinha para entrar outra vez
   if(r.ok){
     const t = { accept:'✔ Desafio aceite — combinem o jogo e registem o resultado.', decline:'Desafio recusado.', cancel:'Desafio cancelado.',
                 win:`🏆 Vitória registada — falta ${other} confirmar.`, lose:`Resultado registado — falta ${other} confirmar.`,
-                confirm:'✔ Resultado confirmado!', dispute:'⚠ Contestado — o organizador vai decidir.' }[act];
+                confirm: bet ? `✔ Resultado confirmado! O vencedor leva os 🪙${2 * bet} da aposta.` : '✔ Resultado confirmado!', dispute:'⚠ Contestado — o organizador vai decidir (as moedas ficam retidas até lá).' }[act];
     showCelebrationToast(t, 4500);
   } else if(r.reason === 'changed'){
     alert('Este desafio foi alterado entretanto (a outra pessoa foi mais rápida). Atualizei a lista.');
+  } else if(r.reason === 'insufficient'){
+    alert(`Não tens moedas para esta aposta${r.balance != null ? ` (tens 🪙${r.balance})` : ''}. Quando as tiveres, aceita outra vez (ou recusa o desafio).`);
+  } else if(r.reason === 'nostake'){
+    alert('As apostas ainda não estão disponíveis (a base de dados vai ser atualizada).');
   } else if(r.reason === 'badscore'){
     alert('O resultado escolhido não é válido para este formato. Escolhe outro.');
   } else if(r.reason === 'nodraw'){

@@ -74,7 +74,7 @@ const EventCore = (function(){
   function signature(ctx){
     const tour = ctx.tournaments.map(t => t.id + ':' + t.status + ':' + ((t.data && t.data.matches) || []).map(m => m.winner || '').join(',')).join('|');
     const board = (ctx.board.messages || []).map(m => m.id).join(',') + '/' + (ctx.board.reactions || []).map(r => r.id + r.emoji).join(',');
-    const x1 = (ctx.x1 || []).map(r => [r.id, r.status, r.replay_path || '', r.reported_winner || '', r.best_of || 1, r.score_challenger == null ? '' : r.score_challenger + '-' + r.score_opponent, r.team_mode || 'free', (r.team_challenger || []).length, (r.team_opponent || []).length, (r.teams_challenger || []).map(t => t ? t.length : 0).join('.'), (r.teams_opponent || []).map(t => t ? t.length : 0).join('.')].join(':')).join(',');
+    const x1 = (ctx.x1 || []).map(r => [r.id, r.status, r.replay_path || '', r.reported_winner || '', r.best_of || 1, r.score_challenger == null ? '' : r.score_challenger + '-' + r.score_opponent, r.team_mode || 'free', (r.team_challenger || []).length, (r.team_opponent || []).length, (r.teams_challenger || []).map(t => t ? t.length : 0).join('.'), (r.teams_opponent || []).map(t => t ? t.length : 0).join('.'), r.stake || 0].join(':')).join(',');
     const shop = ctx.shop ? ctx.shop.purchases.map(p => p.item_id).join(',') : '';
     const duels = (ctx.x1Board || []).map(x => x.reported_winner + x.challenger_name + x.opponent_name).join(',');
     return [tour, ctx.claims.length, ctx.tx.length, ctx.gifts.length, ctx.lottery.length, ctx.nick.length, ctx.preds.length, board, x1, shop, duels].join('#');
@@ -382,6 +382,21 @@ const EventCore = (function(){
     },
     // ---- Formato (melhor de 1, 3 ou 5): o desafiante escolhe ao enviar; quem ganha chega primeiro a `winsNeeded` vitórias. Conta UMA vez nas missões. ----
     FORMATS: [1, 3, 5],
+    // ---- Apostas (moedas retidas na base): quem desafia escolhe o valor; o vencedor leva os dois valores. Os valores oferecidos; a base aceita qualquer inteiro de 1 a 100. ----
+    STAKES: [10, 20, 50, 100],
+    // Chama uma função x1_stake_* da base (exigem o bilhete de login de quem age). Devolve {ok, row?, balance?} ou {ok:false, reason, balance?}; reason: auth | changed | notyours | insufficient |
+    // badscore | badwinner | notfound | quota | dup | self | noweek | nostake (a base ainda não tem as apostas) | error
+    async _stake(ctx, fn, args, logText){
+      const r = await dbFunction(URL_, KEY_, fn, Object.assign({}, args, { p_token: getPlayerToken(ctx.me) }));
+      if(r.status === 404) return { ok:false, reason:'nostake' };
+      const d = r.data;
+      if(!r.ok || !d || typeof d !== 'object') return { ok:false, reason:'error' };
+      if(d.reason === 'auth'){ handleSessionExpired(); return { ok:false, reason:'auth' }; }
+      await x1.refresh(ctx);
+      if(!d.ok) return { ok:false, reason: d.reason || 'error', balance: d.balance };
+      if(logText) logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', logText);
+      return { ok:true, balance: d.balance, id: d.id, row: x1.get(ctx, args.p_id || d.id) };
+    },
     winsNeeded(bestOf){ return Math.floor((bestOf || 1) / 2) + 1; },
     formatLabel(bestOf){ return `Md${bestOf || 1}`; },
     // Placar válido para o formato: o vencedor chega às vitórias necessárias e o outro fica abaixo.
@@ -499,12 +514,18 @@ const EventCore = (function(){
       logActivity(URL_, KEY_, 'jogador', ctx.me, 'evento', `Registou o time${x1.perGame(r) ? ' do jogo ' + g : ''} do x1 ${r.challenger_name} vs ${r.opponent_name}`);
       return { ok:true };
     },
-    async send(ctx, opponent, bestOf, teamMode){
+    async send(ctx, opponent, bestOf, teamMode, stake){
       await x1.refresh(ctx); // quota com dados frescos
       const why = x1.cannotSend(ctx, opponent);
       if(why) return { ok:false, reason: why };
       const fmt = x1.FORMATS.includes(+bestOf) ? +bestOf : 1;
       const mode = x1.TEAM_MODES.includes(teamMode) ? teamMode : 'free';
+      const bet = Math.max(0, Math.min(100, parseInt(stake, 10) || 0));
+      if(bet > 0){        // com aposta: uma função da base guarda o desafio e retém o valor, de uma só vez
+        const r = await x1._stake(ctx, 'x1_send_staked', { p_event: ctx.ev.id, p_challenger: ctx.me, p_opponent: opponent, p_best_of: fmt, p_team_mode: mode, p_stake: bet },
+          `Desafiou ${opponent} para um x1 ${x1.formatLabel(fmt)}${mode === 'random' ? ' com times aleatórios' : ''} apostando 🪙${bet} (semana ${ctx.ev.current_week})`);
+        return r.ok ? { ok:true, bestOf: fmt, teamMode: mode, stake: bet, balance: r.balance } : r;
+      }
       const row = { event_id: ctx.ev.id, week: ctx.ev.current_week, challenger_name: ctx.me, opponent_name: opponent, status: 'pending' };
       if(fmt > 1) row.best_of = fmt;     // melhor de 1 não envia o campo: continua a funcionar mesmo que a base ainda não tenha a coluna
       if(mode === 'random') row.team_mode = mode;     // idem: times livres é o valor por defeito
@@ -561,12 +582,18 @@ const EventCore = (function(){
         if(!t) return { ok:false, reason:'nodraw' };
         patch.team_challenger = t.challenger; patch.team_opponent = t.opponent;     // aceitar + sortear numa só gravação (só se ainda estiver pendente)
       }
+      if(r.stake > 0){      // com aposta: a base retém o valor do adversário e muda o estado (ou devolve ao desafiante, se recusar)
+        return accept
+          ? x1._stake(ctx, 'x1_stake_accept', { p_id: id, p_name: ctx.me, p_team_c: patch.team_challenger || null, p_team_o: patch.team_opponent || null }, `Aceitou o desafio x1 de ${r.challenger_name} (aposta de 🪙${r.stake})`)
+          : x1._stake(ctx, 'x1_stake_cancel', { p_id: id, p_name: ctx.me, p_action: 'decline' }, `Recusou o desafio x1 de ${r.challenger_name}`);
+      }
       return x1._go(ctx, id, 'pending', patch, `${accept ? 'Aceitou' : 'Recusou'} o desafio x1 de ${r.challenger_name}`);
     },
     // Quem enviou pode cancelar enquanto ninguém respondeu
     cancel(ctx, id){
       const r = x1.get(ctx, id);
       if(!r || r.challenger_name !== ctx.me) return Promise.resolve({ ok:false, reason:'notyours' });
+      if(r.stake > 0) return x1._stake(ctx, 'x1_stake_cancel', { p_id: id, p_name: ctx.me, p_action: 'cancel' }, `Cancelou o desafio x1 a ${r.opponent_name}`);
       return x1._go(ctx, id, 'pending', { status:'cancelled' }, `Cancelou o desafio x1 a ${r.opponent_name}`);
     },
     // Qualquer um dos dois regista quem ganhou (só depois de aceite). `replayText` = link(s) do replay (um por jogo, no máximo o nº de jogos do formato);
@@ -590,6 +617,11 @@ const EventCore = (function(){
         if(bestOf > 1) scoreTxt = ` (${patch.score_challenger}-${patch.score_opponent})`;
       }
       if(links.length) patch.replay_path = joinReplayPaths(links);
+      if(r.stake > 0){
+        return x1._stake(ctx, 'x1_stake_report', { p_id: id, p_name: ctx.me, p_winner: winner, p_score_c: patch.score_challenger === undefined ? null : patch.score_challenger,
+          p_score_o: patch.score_opponent === undefined ? null : patch.score_opponent, p_replay: patch.replay_path || null },
+          `Registou o resultado do x1 ${r.challenger_name} vs ${r.opponent_name}: vitória de ${winner}${scoreTxt} (aposta de 🪙${r.stake})`);
+      }
       return x1._go(ctx, id, 'accepted', patch,
         `Registou o resultado do x1 ${r.challenger_name} vs ${r.opponent_name}: vitória de ${winner}${scoreTxt}`);
     },
@@ -628,12 +660,14 @@ const EventCore = (function(){
     confirm(ctx, id){
       const r = x1.get(ctx, id);
       if(!r || (r.challenger_name !== ctx.me && r.opponent_name !== ctx.me) || r.reported_by === ctx.me) return Promise.resolve({ ok:false, reason:'notyours' });
+      if(r.stake > 0) return x1._stake(ctx, 'x1_stake_confirm', { p_id: id, p_name: ctx.me }, `Confirmou o resultado do x1 ${r.challenger_name} vs ${r.opponent_name} (aposta de 🪙${r.stake})`);
       return x1._go(ctx, id, 'reported', { status:'confirmed', confirmed_at: new Date().toISOString() },
         `Confirmou o resultado do x1 ${r.challenger_name} vs ${r.opponent_name}`);
     },
     dispute(ctx, id, note){
       const r = x1.get(ctx, id);
       if(!r || (r.challenger_name !== ctx.me && r.opponent_name !== ctx.me) || r.reported_by === ctx.me) return Promise.resolve({ ok:false, reason:'notyours' });
+      if(r.stake > 0) return x1._stake(ctx, 'x1_stake_dispute', { p_id: id, p_name: ctx.me, p_note: String(note || '').slice(0, 200) }, `Contestou o resultado do x1 ${r.challenger_name} vs ${r.opponent_name}`);
       return x1._go(ctx, id, 'reported', { status:'disputed', note: String(note || '').slice(0, 200) || null },
         `Contestou o resultado do x1 ${r.challenger_name} vs ${r.opponent_name}`);
     },

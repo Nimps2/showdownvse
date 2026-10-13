@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Missões da semana — Torneio Showdown - VSE</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013c">
+</head>
+<body>
+<div id="playerCornerContainer"></div>
+
+<div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
+    <h2>Entrar</h2>
+    <label>Nome</label>
+    <select id="gateNameSelect"><option value="">— carregando jogadores —</option></select>
+    <label>Password</label>
+    <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()">
+    <button class="btn-primary" onclick="doGateLogin()">Entrar</button>
+    <div id="gateError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;"></div>
+  </div>
+</div>
+
+<div id="topbar" class="topbar" style="display:none;">
+  <a href="index.html" class="brand">
+    <div class="brand-mark"></div>
+    <div class="brand-name">Torneio VSE</div>
+  </a>
+  <nav class="topnav">
+    <a href="index.html">Início</a>
+    <a href="viewer.html">Bracket</a>
+    <a href="estatisticas.html">Estatísticas</a>
+    <a href="hall-da-fama.html">Hall da Fama</a>
+    <a href="loja.html">Loja</a>
+    <a href="conquistas.html">Conquistas</a>
+    <a href="palpites.html">Palpiteiro</a>
+    <a href="missoes.html" class="current">Missões</a>
+    <a href="calendario.html">Calendário</a>
+  </nav>
+  <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
+</div>
+
+<div id="mainContent" class="wrap" style="display:none;">
+  <div class="status-strip">
+    <span class="status-dot" id="statusDot"></span>
+    <span class="status-text" id="statusText">Conectando…</span>
+  </div>
+
+  <div class="card">
+    <h2>📋 Missões da semana</h2>
+    <div class="mw-tabs">
+      <button type="button" class="mw-tab active" id="mwTab0" onclick="loadWeek(0)">Esta semana</button>
+      <button type="button" class="mw-tab" id="mwTab1" onclick="loadWeek(1)">Semana passada</button>
+    </div>
+    <div class="mw-head" id="mwHead"></div>
+    <div id="mwList"><div class="empty-state">A carregar…</div></div>
+    <div class="mw-note">Missões simples, que pagam pouco, e funcionam sempre (haja evento ou não). A semana vai de segunda a domingo (hora UTC, como o bónus diário). Cada missão só se reclama <b>uma vez por semana</b>, e ainda podes reclamar as da semana passada.</div>
+  </div>
+
+  <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
+</div>
+
+<script src="assets/js/showdown-utils.js?v=20261013c"></script>
+<script>
+initTheme();
+const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+
+let loggedInPlayerName = null;
+let currentWeek = 0;
+let claimBusy = false;
+
+async function doGateLogin(){
+  const name = document.getElementById('gateNameSelect').value;
+  const password = document.getElementById('gatePassword').value;
+  const errEl = document.getElementById('gateError');
+  errEl.style.display = 'none';
+  if(!name){ errEl.textContent = 'Selecione o seu nome.'; errEl.style.display='block'; return; }
+  if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
+  const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
+  if(!result.ok){
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registrado pelo organizador.'
+      : result.reason==='wrongpass' ? 'Password incorreta.'
+      : 'Erro ao ligar à base de dados.';
+    errEl.style.display = 'block';
+    return;
+  }
+  localStorage.setItem('player_login_name', name);
+  loggedInPlayerName = name;
+  unlockContent();
+}
+
+function unlockContent(){
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('topbar').style.display = 'flex';
+  init();
+}
+
+function doPlayerLogout(){
+  localStorage.removeItem('player_login_name');
+  endPlayerSession(SUPABASE_URL, SUPABASE_ANON_KEY);
+  loggedInPlayerName = null;
+  document.getElementById('gatePassword').value = '';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('topbar').style.display = 'none';
+  document.getElementById('authGate').style.display = 'flex';
+}
+
+async function pageBoot(){
+  const sel = document.getElementById('gateNameSelect');
+  try{
+    const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
+    names.forEach(n=>{
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+    const saved = localStorage.getItem('player_login_name');
+    if(saved && names.includes(saved)){
+      loggedInPlayerName = saved;
+      unlockContent();
+    }
+  } catch(e){
+    sel.innerHTML = '<option value="">— erro ao carregar jogadores —</option>';
+  }
+}
+
+function setStatus(ok, text){
+  document.getElementById('statusDot').className = 'status-dot ' + (ok?'on':'off');
+  document.getElementById('statusText').textContent = text;
+}
+
+let dailyBonusClaimInFlight = false;
+async function handleDailyBonusClick(){
+  if(dailyBonusClaimInFlight) return;
+  dailyBonusClaimInFlight = true;
+  const icon = document.getElementById('dailyBonusIcon');
+  if(icon) icon.classList.remove('available');
+  try{
+    const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+    if(result.awarded){
+      showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
+      loadWeek(currentWeek);
+    }
+  } finally {
+    dailyBonusClaimInFlight = false;
+  }
+}
+
+// Para onde ir fazer cada missão
+const MISSION_LINKS = { nickvote: ['palpites.html', 'Ir ao Palpiteiro'], play: ['viewer.html', 'Ver o bracket'], predict: ['palpites.html', 'Ir ao Palpiteiro'],
+  roulette: ['loja.html', 'Ir à loja'], mural: ['perfil.html', 'Ir aos perfis'], daily4: [null, 'Usa o 🎁 no canto do ecrã'], daily7: [null, 'Usa o 🎁 no canto do ecrã'] };
+
+async function init(){
+  try{
+    const profiles = await fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
+    checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
+      document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
+    });
+    if(typeof mountEventCornerIcon === 'function') mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } catch(e){ /* o canto é só um extra */ }
+  await loadWeek(0);
+}
+
+function fmtDay(iso){ return new Date(iso + 'T12:00:00Z').toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', timeZone: 'UTC' }); }
+function leftText(sec){
+  if(sec <= 0) return 'terminou';
+  const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60);
+  return d ? `faltam ${d} dia${d === 1 ? '' : 's'} e ${h} h` : (h ? `faltam ${h} h e ${m} min` : `faltam ${m} min`);
+}
+
+async function loadWeek(weeksAgo){
+  currentWeek = weeksAgo;
+  document.getElementById('mwTab0').classList.toggle('active', weeksAgo === 0);
+  document.getElementById('mwTab1').classList.toggle('active', weeksAgo === 1);
+  const list = document.getElementById('mwList'), head = document.getElementById('mwHead');
+  const r = await dbFunction(SUPABASE_URL, SUPABASE_ANON_KEY, 'weekly_missions_status', { p_name: loggedInPlayerName, p_weeks_ago: weeksAgo });
+  if(r.status === 404){
+    setStatus(false, 'Missões ainda não disponíveis.');
+    head.innerHTML = '';
+    list.innerHTML = '<div class="empty-state">As missões semanais ainda não estão ativas (a base de dados vai ser atualizada). Volta daqui a pouco.</div>';
+    return;
+  }
+  const d = r.data;
+  if(!r.ok || !d || !d.ok){
+    setStatus(false, 'Não foi possível carregar as missões.');
+    list.innerHTML = '<div class="empty-state">Não consegui carregar as missões. Tenta atualizar a página.</div>';
+    return;
+  }
+  setStatus(true, 'Ligado.');
+  const ms = d.missions || [];
+  const earned = ms.filter(m => m.claimed).reduce((s, m) => s + m.coins, 0), total = ms.reduce((s, m) => s + m.coins, 0);
+  const claimable = ms.filter(m => m.done && !m.claimed).length;
+  head.innerHTML = `<div class="mw-week"><b>${weeksAgo ? 'Semana passada' : 'Esta semana'}</b> · ${fmtDay(d.week_start)} → ${fmtDay(d.week_end)}${weeksAgo ? '' : ` · <span>${leftText(d.seconds_left)}</span>`}</div>
+    <div class="mw-sum">🪙 ${earned} de ${total} ganhas${claimable ? ` · <b>${claimable} por reclamar</b>` : ''}</div>`;
+  list.innerHTML = ms.map(m => {
+    const pct = Math.round(m.value / m.target * 100);
+    const link = MISSION_LINKS[m.id];
+    const action = m.claimed ? '<span class="mw-ok">✔ Reclamada</span>'
+      : m.done ? `<button type="button" class="mw-claim" data-id="${escapeHtml(m.id)}">Reclamar 🪙${m.coins}</button>`
+      : (link && link[0] ? `<a class="mw-go" href="${escapeHtml(link[0])}">${escapeHtml(link[1])} →</a>` : `<span class="mw-hint">${escapeHtml(link ? link[1] : '')}</span>`);
+    return `<div class="mw-card${m.claimed ? ' claimed' : ''}${m.done && !m.claimed ? ' ready' : ''}">
+      <div class="mw-ico">${escapeHtml(m.icon)}</div>
+      <div class="mw-main"><div class="mw-title">${escapeHtml(m.title)}</div><div class="mw-desc">${escapeHtml(m.desc)}</div>
+        <div class="mw-bar"><i style="width:${pct}%"></i></div></div>
+      <div class="mw-side"><div class="mw-reward">🪙 ${m.coins}</div><div class="mw-prog">${m.value}/${m.target}</div><div class="mw-act">${action}</div></div>
+    </div>`;
+  }).join('') || '<div class="empty-state">Sem missões.</div>';
+}
+
+document.getElementById('mwList').addEventListener('click', async e => {
+  const b = e.target.closest('.mw-claim'); if(!b || claimBusy) return;
+  claimBusy = true; b.disabled = true;
+  try{
+    const r = await dbFunction(SUPABASE_URL, SUPABASE_ANON_KEY, 'claim_weekly_mission', { p_name: loggedInPlayerName, p_mission: b.dataset.id, p_weeks_ago: currentWeek, p_token: getPlayerToken(loggedInPlayerName) });
+    const d = r.data || {};
+    if(d.reason === 'auth'){ handleSessionExpired(); return; }
+    if(d.ok) showCelebrationToast(`📋 Missão cumprida! +${d.coins} 🪙`, 4500);
+    else alert(d.reason === 'already' ? 'Esta missão já tinha sido reclamada.' : d.reason === 'notdone' ? 'Ainda não cumpriste esta missão.' : 'Não foi possível reclamar agora. Tenta outra vez.');
+  } finally { claimBusy = false; }
+  await loadWeek(currentWeek);
+});
+
+pageBoot();
+</script>
+</body>
+</html>

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261013b">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013c">
 </head>
 <body>
 <div id="playerCornerContainer"></div>
@@ -38,6 +38,7 @@
     <a href="loja.html">Loja</a>
     <a href="conquistas.html">Conquistas</a>
     <a href="palpites.html">Palpiteiro</a>
+    <a href="missoes.html">Missões</a>
     <a href="calendario.html">Calendário</a>
   </nav>
   <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
@@ -64,7 +65,7 @@
   <div class="footer-note">*O winrate é o do time do jogador nesse torneio (não sabemos qual Pokémon jogou cada partida), por isso é só uma aproximação. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261013b"></script>
+<script src="assets/js/showdown-utils.js?v=20261013c"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -223,8 +224,17 @@ function renderSpecies(name){
       <div class="pk-set"><div class="pk-lab">Golpes</div>${chipsHtml(st.moves, 10)}</div>
       <div class="pk-set"><div class="pk-lab">Tera Type</div>${chipsHtml(st.tera, 6)}</div>
       <div class="pk-set"><div class="pk-lab">Natureza</div>${chipsHtml(st.natures, 6)}</div></div>`;
+  const R = st.replay;
+  const replays = R.games ? `<div class="card"><h2>🎬 Nos replays <small style="font-weight:400;color:var(--text-faint);">(${R.tournaments} torneio${R.tournaments === 1 ? '' : 's'} com replays lidos)</small></h2>
+      <div class="pk-boxes" style="margin-top:0;">
+        <div class="pk-box"><div class="l">Jogos vistos</div><div class="v">${R.games}</div><div class="s">${R.winGames} ganhos pelo seu lado</div></div>
+        <div class="pk-box"><div class="l">KOs</div><div class="v">${R.kos}</div><div class="s">${R.directKos} diretos · ${R.kos - R.directKos} indiretos</div></div>
+        <div class="pk-box"><div class="l">Dano causado</div><div class="v">${R.dmgDealt}%</div><div class="s">sofreu ${R.dmgTaken}%</div></div>
+        <div class="pk-box"><div class="l">Sobreviveu</div><div class="v">${R.survived}/${R.games}</div><div class="s">${R.teraGames ? 'Tera em ' + R.teraGames + ' jogo' + (R.teraGames === 1 ? '' : 's') : 'sem Tera'}</div></div>
+        <div class="pk-box"><div class="l">🏅 Pokémon MVP</div><div class="v">${R.mvpTitles}</div><div class="s">torneio${R.mvpTitles === 1 ? '' : 's'} em que foi o MVP</div></div>
+      </div></div>` : '';
   const hist = `<div class="card"><h2>🗂️ Histórico</h2>${st.appearances.slice(0, 40).map(a => `<div class="pk-row"><span class="pk-date">${fmtDate(a.date)}</span><span class="pk-who2">${escapeHtml(a.player)} <small>${a.free ? '(escolha livre)' : '(sorteado)'}</small></span><span class="pk-tn">${escapeHtml(a.tournament)}</span><span class="pk-rec">${a.wins + a.losses ? a.wins + 'V-' + a.losses + 'D' : '—'}</span><span class="pk-t">${a.champion ? '🏆' : ''}</span></div>`).join('')}${st.appearances.length > 40 ? `<div class="pk-none" style="margin-top:8px;">+ ${st.appearances.length - 40} aparições mais antigas.</div>` : ''}</div>`;
-  body.innerHTML = head + `<div class="pk-cols">${players}${sets}</div>` + hist;
+  body.innerHTML = head + replays + `<div class="pk-cols">${players}${sets}</div>` + hist;
 }
 
 function goSearch(){

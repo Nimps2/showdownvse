@@ -873,9 +873,11 @@ function ensureAvatarFxStyles(){
       .avatar-fx-balloon span:nth-child(2){top:52%!important;left:96%!important;}
       .avatar-fx-balloon span:nth-child(3){top:66%!important;left:8%!important;}
     }
+    /* "Reduzir movimento": como as outras molduras que rodam (Rota Aérea, Esquadrilha), a volta lenta à volta do avatar CONTINUA (é o objetivo da moldura e é lenta); só param os movimentos
+       rápidos (baloiçar, subir/descer, chama). Se a lista de animações fica só com a primeira, as durações/atrasos/sentidos da lista também ficam só com o primeiro valor, que é o da volta. */
     @media (prefers-reduced-motion:reduce){
-      .avatar-fx-balloon span,.avatar-fx-balloon span::after{animation:none!important;}
-      .avatar-fx-balloon span:nth-child(1){offset-distance:0%;} .avatar-fx-balloon span:nth-child(2){offset-distance:38%;} .avatar-fx-balloon span:nth-child(3){offset-distance:71%;}
+      .avatar-fx-balloon span{animation-name:vseBalloonFly!important;}
+      .avatar-fx-balloon span::after{animation:none!important;}
     }
 
     /* Revoada de Morcegos (evento Halloween, nível 7): 3 morcegos a rodar em órbitas diferentes (um em sentido contrário) e a bater as asas.
@@ -903,7 +905,8 @@ function ensureAvatarFxStyles(){
       clip-path:polygon(50% 0%,70% 6%,84% 20%,92% 40%,92% 100%,82% 88%,72% 100%,62% 88%,50% 100%,38% 88%,28% 100%,18% 88%,8% 100%,8% 40%,16% 20%,30% 6%);
       animation:vseGhostUpright 14s linear infinite,vseGhostBob 2.8s ease-in-out infinite;}
     .avatar-fx-ghosts span:nth-child(2)::before{animation-duration:19s,3.3s;animation-direction:reverse,normal;opacity:0.85;}
-    @media (prefers-reduced-motion:reduce){.avatar-fx-bats span,.avatar-fx-bats span::before,.avatar-fx-ghosts span,.avatar-fx-ghosts span::before{animation:none!important;}}
+    /* "Reduzir movimento": a volta lenta continua (como na Esquadrilha); param as asas a bater e o subir/descer dos fantasmas. */
+    @media (prefers-reduced-motion:reduce){.avatar-fx-bats span::before{animation:none!important;}.avatar-fx-ghosts span::before{animation-name:vseGhostUpright!important;}}
 
     @keyframes vseFxHueRotate{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
     .avatar-fx-layer.avatar-fx-multicolor{animation:vseFxHueRotate 5s linear infinite;}
@@ -1939,6 +1942,8 @@ const ACHIEVEMENTS = [
   { id:'eternal_rival',         name:'Rival Eterno',        emoji:'🗡️', desc:'Venceu o mesmo adversário pelo menos 5 vezes', tier:'silver' },
   { id:'serial_underdog',       name:'Zebra em Série',      emoji:'🦓', desc:'Venceu como underdog (Elo pelo menos 100 pontos mais baixo) pelo menos 3 vezes', tier:'gold' },
   { id:'recognized_mvp',        name:'MVP Reconhecido',     emoji:'🌠', desc:'Foi eleito MVP de um bloco de 3 torneios pelo menos uma vez', tier:'silver' },
+  { id:'mvp_owner',             name:'Dono do Pokémon MVP', emoji:'🏅', desc:'Um Pokémon teu foi eleito Pokémon MVP de um torneio (pelos replays)', tier:'silver' },
+  { id:'mvp_trio',              name:'Treinador Estrela',   emoji:'⭐', desc:'Tiveste o Pokémon MVP em 3 torneios', tier:'gold' },
   { id:'back_to_back',          name:'Bicampeão',           emoji:'🏛️', desc:'Foi campeão em pelo menos 2 temporadas diferentes', tier:'gold' },
   { id:'lucky_streak_bettor',   name:'Apostador Nato',      emoji:'🎟️', desc:'Acertou 3 palpites seguidos no Palpiteiro', tier:'bronze' },
   { id:'voice_of_the_people',   name:'Voz do Povo',         emoji:'📣', desc:'Venceu a votação de Apelido da Semana pelo menos uma vez', tier:'bronze' },
@@ -2082,6 +2087,8 @@ function computeMatchPathAchievements(name, allRows, profile){
   if(computeUpsetWins(allRows, name, 200) >= 1) earned.add('impossible_hunt');
 
   if(computeMvpBatches(allRows).some(b => b.mvp && b.mvp.name === name)) earned.add('recognized_mvp');
+
+  { const n = countOwnedPokemonMvps(allRows, name); if(n >= 1) earned.add('mvp_owner'); if(n >= 3) earned.add('mvp_trio'); }
 
   if(computeChampionSeasonsCount(allRows, name) >= 2) earned.add('back_to_back');
 
@@ -2988,7 +2995,8 @@ function aggregateSpecies(rows, species){
   const want = String(species || '').trim().toLowerCase();
   if(!want) return null;
   const out = { name: null, total: 0, random: 0, free: 0, wins: 0, losses: 0, champions: 0, tournaments: 0,
-    players: {}, abilities: {}, items: {}, moves: {}, tera: {}, natures: {}, nicknames: [], appearances: [], totalSlots: 0 };
+    players: {}, abilities: {}, items: {}, moves: {}, tera: {}, natures: {}, nicknames: [], appearances: [], totalSlots: 0,
+    replay: { tournaments: 0, games: 0, kos: 0, directKos: 0, deaths: 0, survived: 0, dmgDealt: 0, dmgTaken: 0, winGames: 0, teraGames: 0, mvpTitles: 0 } };
   const bump = (map, k) => { if(k) map[k] = (map[k] || 0) + 1; };
   (rows || []).forEach(r => {
     const data = r.data || {};
@@ -3026,11 +3034,25 @@ function aggregateSpecies(rows, species){
       });
     });
     if(seenHere) out.tournaments++;
+    // o que os replays dizem desta espécie neste torneio (calculado pelo gestor: data.mvp)
+    const mv = data.mvp;
+    if(mv && mv.stats){
+      const rs = mv.stats.find(x => eventSpeciesId(x.species) === eventSpeciesId(species));
+      if(rs){
+        const R = out.replay; R.tournaments++;
+        ['games', 'kos', 'directKos', 'deaths', 'survived', 'dmgDealt', 'dmgTaken', 'winGames', 'teraGames'].forEach(k => { R[k] += rs[k] || 0; });
+        if(mv.mvp && eventSpeciesId(mv.mvp.species) === eventSpeciesId(species)) R.mvpTitles++;
+      }
+    }
   });
   if(!out.total) return null;
   out.appearances.sort((a, b) => new Date(b.date) - new Date(a.date));
   out.playerList = Object.values(out.players).sort((a, b) => b.count - a.count || b.wins - a.wins || a.name.localeCompare(b.name));
   return out;
+}
+// Em quantos torneios o Pokémon MVP (eleito pelos replays, guardado em data.mvp pelo gestor) era deste jogador.
+function countOwnedPokemonMvps(allRows, name){
+  return (allRows || []).filter(r => r && r.data && r.data.mvp && r.data.mvp.mvp && r.data.mvp.mvp.owner === name).length;
 }
 // Os nomes de todas as espécies que já saíram (para a pesquisa), ordenados A-Z.
 function listSeenSpecies(rows){
@@ -3088,6 +3110,113 @@ function seasonRecapText(rc, displayName){
   if(rc.victim) lines.push(`🎯 Freguês: ${rc.victim.name} (${rc.victim.wins}V)`);
   if(rc.nemesis) lines.push(`😈 Nemesis: ${rc.nemesis.name} (${rc.nemesis.losses}D)`);
   return lines.join('\n');
+}
+
+// ---------- Análise de replays do Showdown: Pokémon MVP ----------
+// Lê o registo ("log") de um replay do Showdown e conta, por Pokémon: KOs (diretos e indiretos), dano causado e sofrido (em % de HP), se desmaiou, Tera usado, golpes e turnos em campo.
+// Vem de um ficheiro de replay (replayLogFromHtml) ou do JSON do replay.pokemonshowdown.com (campo "log"). Corre no gestor (que grava o resultado no torneio: data.mvp); o site só lê esse resultado.
+// Regras de atribuição de KOs: um golpe que tira vida credita o Pokémon que o usou; o veneno/queimadura/pedras/areia/etc. credita quem o atingiu por último (KO "indireto");
+// o dano a si próprio (recuo, item, habilidade do próprio) e os KOs sem culpado não contam para ninguém.
+function replayLogFromHtml(html){
+  const m = /<script type="text\/plain" class="battle-log-data">([\s\S]*?)<\/script>/.exec(String(html || ''));
+  return m ? m[1].split('\\/').join('/') : null;      // nos ficheiros de replay as barras vêm como "\/" (para não fecharem o <script>)
+}
+function parseReplayLog(log){
+  const res = { players: {}, winnerName: null, winnerSide: null, turns: 0, mons: [] };
+  const byKey = {}, active = {};
+  const posOf = s => { const m = /^(p[1-4][a-c]?)(?::|$)/.exec(String(s || '')); return m ? m[1] : null; };
+  const parseHp = (s, fallback) => {
+    s = String(s || '');
+    if(/^0 fnt/.test(s)) return 0;
+    const m = /^(\d+(?:\.\d+)?)\/(\d+)/.exec(s);
+    return m && +m[2] > 0 ? (+m[1] / +m[2]) * 100 : fallback;
+  };
+  const mon = (side, species) => {
+    const k = side + '|' + species;
+    if(!byKey[k]) byKey[k] = { side, species, nickname: null, appeared: false, kos: 0, directKos: 0, fainted: false, dmgDealt: 0, dmgTaken: 0, tera: null, turnsActive: 0, moves: 0, hp: 100, lastHit: null, lastIndirect: false, lastSelf: false };
+    return byKey[k];
+  };
+  let actor = null;
+  String(log || '').split('\n').forEach(raw => {
+    if(raw.charAt(0) !== '|') return;
+    const p = raw.split('|'), cmd = p[1];
+    if(cmd === 'player'){ if(p[2] && p[3]) res.players[p[2]] = p[3]; return; }
+    if(cmd === 'switch' || cmd === 'drag'){
+      const pos = posOf(p[2]); if(!pos) return;
+      const species = String(p[3] || '').split(',')[0].trim(), m = mon(pos.slice(0, 2), species);
+      m.appeared = true;
+      const nick = String(p[2]).slice(String(p[2]).indexOf(':') + 1).trim();
+      if(nick && nick !== species) m.nickname = nick;
+      m.hp = parseHp(p[4], m.hp);
+      active[pos] = m; return;
+    }
+    if(cmd === 'move'){ const m = active[posOf(p[2])]; actor = m || null; if(m) m.moves++; return; }
+    if(cmd === '-damage'){
+      const t = active[posOf(p[2])]; if(!t) return;
+      const nh = parseHp(p[3], t.hp), drop = Math.max(0, t.hp - nh);
+      const rest = p.slice(4), from = rest.find(x => x.indexOf('[from]') === 0), of = rest.find(x => x.indexOf('[of]') === 0);
+      let src = null, indirect = false, self = false;
+      if(of){ src = active[posOf(of.slice(4).trim())] || null; }
+      else if(from){
+        const f = from.slice(6).trim();
+        if(/^(item:|Recoil|Struggle|Substitute|ability:)/i.test(f)) self = true;      // dano a si próprio: ninguém é culpado
+        else { src = t.lastHit; indirect = true; }                                      // veneno, pedras, areia...: o último que o atingiu
+      } else { src = actor; }
+      if(src && (src === t || src.side === t.side)) src = null;
+      t.hp = nh; t.dmgTaken += drop;
+      if(src && !indirect){ src.dmgDealt += drop; t.lastHit = src; }
+      t.lastIndirect = indirect; t.lastSelf = self || (!src && !indirect);
+      return;
+    }
+    if(cmd === '-heal' || cmd === '-sethp'){ const t = active[posOf(p[2])]; if(t) t.hp = parseHp(p[3], t.hp); return; }
+    if(cmd === 'faint'){
+      const t = active[posOf(p[2])]; if(!t || t.fainted) return;
+      t.fainted = true; t.hp = 0;
+      const by = t.lastSelf ? null : t.lastHit;
+      if(by && by.side !== t.side){ by.kos++; if(!t.lastIndirect) by.directKos++; }
+      return;
+    }
+    if(cmd === '-terastallize'){ const m = active[posOf(p[2])]; if(m) m.tera = p[3] || true; return; }
+    if(cmd === 'turn'){ res.turns = +p[2] || res.turns; Object.keys(active).forEach(k => { if(!active[k].fainted) active[k].turnsActive++; }); return; }
+    if(cmd === 'win'){ res.winnerName = p[2] || null; }
+  });
+  Object.keys(res.players).forEach(side => { if(res.winnerName && res.players[side] === res.winnerName) res.winnerSide = side; });
+  res.mons = Object.keys(byKey).map(k => { const m = byKey[k]; delete m.hp; delete m.lastHit; delete m.lastIndirect; delete m.lastSelf; return m; }).filter(m => m.appeared);
+  return res;
+}
+
+// Junta os jogos de um torneio por ESPÉCIE e escolhe o MVP. games = [{label, parsed}] (parsed vem de parseReplayLog). O dono da espécie vem dos sorteios (data.draws + data.players):
+// num torneio cada Pokémon é de um só jogador. Pontuação: KO 10, dano causado /20 (100% de HP = 5), jogo em que sobreviveu 3, jogo ganho pelo seu lado 2. Desempate: mais KOs, mais dano, nome.
+const MVP_POINTS = { ko: 10, damagePerPoint: 20, survived: 3, win: 2 };
+function mvpScore(s){ return Math.round((s.kos * MVP_POINTS.ko + s.dmgDealt / MVP_POINTS.damagePerPoint + s.survived * MVP_POINTS.survived + s.winGames * MVP_POINTS.win) * 10) / 10; }
+function aggregateReplayMvp(games, draws, players){
+  const id = s => eventSpeciesId(s), ownerById = {}, ownerByBase = {};
+  Object.keys(draws || {}).forEach(idx => {
+    const owner = (players || [])[parseInt(idx, 10)], e = draws[idx] || {};
+    if(!owner) return;
+    [].concat((e.random || []).map(x => x && x.mon), (e.free || []).map(x => x && x.name)).forEach(n => {
+      if(!n) return;
+      ownerById[id(n)] = owner; ownerByBase[id(getBaseSpecies(n))] = ownerByBase[id(getBaseSpecies(n))] || owner;
+    });
+  });
+  const per = {}, skipped = [];
+  let used = 0;
+  (games || []).forEach(g => {
+    if(!g || !g.parsed || !g.parsed.mons || !g.parsed.mons.length){ skipped.push(g && g.label || '?'); return; }
+    used++;
+    g.parsed.mons.forEach(m => {
+      const k = id(m.species);
+      const st = per[k] || (per[k] = { species: m.species, owner: ownerById[k] || ownerByBase[id(getBaseSpecies(m.species))] || null, games: 0, kos: 0, directKos: 0, deaths: 0, survived: 0, dmgDealt: 0, dmgTaken: 0, teraGames: 0, winGames: 0, moves: 0 });
+      st.games++; st.kos += m.kos; st.directKos += m.directKos; st.dmgDealt += m.dmgDealt; st.dmgTaken += m.dmgTaken; st.moves += m.moves;
+      if(m.fainted) st.deaths++; else st.survived++;
+      if(m.tera) st.teraGames++;
+      if(g.parsed.winnerSide && g.parsed.winnerSide === m.side) st.winGames++;
+    });
+  });
+  const stats = Object.values(per).map(s => { s.dmgDealt = Math.round(s.dmgDealt); s.dmgTaken = Math.round(s.dmgTaken); s.score = mvpScore(s); return s; })
+    .sort((a, b) => b.score - a.score || b.kos - a.kos || b.dmgDealt - a.dmgDealt || a.species.localeCompare(b.species));
+  const mvp = stats.find(s => s.owner) || null;
+  return { v: 1, computedAt: new Date().toISOString(), replays: used, skipped, mvp, stats: stats.slice(0, 24) };
 }
 
 // ---------- Votação do "Apelido da Semana" ----------
@@ -3698,17 +3827,20 @@ async function fetchNotifications(supabaseUrl, supabaseAnonKey, me){
   const items = [];
   const isNew = iso => new Date(iso) > new Date(seen);
   const when = iso => { const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
-  const [ev, tours, comments, gifts, trades] = await Promise.all([
+  const [ev, tours, comments, gifts, trades, weekly] = await Promise.all([
     fetchActiveEvent(supabaseUrl, supabaseAnonKey).catch(() => null),
     get(`tournaments?status=eq.em_curso&select=id,tname:data->name,matches:data->matches,info:data->matchinfo&order=created_at.desc&limit=3`),
     get(`profile_comments?target_name=eq.${e(me)}&select=author_name,created_at&order=created_at.desc&limit=15`),
     get(`gifts?to_name=eq.${e(me)}&select=from_name,amount,created_at&order=created_at.desc&limit=15`),
-    get(`trade_offers?to_name=eq.${e(me)}&status=eq.pending&select=from_name,created_at&order=created_at.desc&limit=10`)
+    get(`trade_offers?to_name=eq.${e(me)}&status=eq.pending&select=from_name,created_at&order=created_at.desc&limit=10`),
+    Promise.all([0, 1].map(w => dbFunction(supabaseUrl, supabaseAnonKey, 'weekly_missions_status', { p_name: me, p_weeks_ago: w }).then(r => (r.ok && r.data && r.data.ok ? r.data.missions : [])).catch(() => [])))
   ]);
+  const toClaim = (weekly || []).reduce((n, ms) => n + (ms || []).filter(m => m.done && !m.claimed).length, 0);
+  if(toClaim > 0) items.push({ icon: '📋', text: `Tens <b>${toClaim}</b> ${toClaim === 1 ? 'missão semanal' : 'missões semanais'} por reclamar`, href: 'missoes.html', hot: true });
   if(ev){
-    const base = `x1_challenges?event_id=eq.${e(ev.id)}&select=challenger_name,opponent_name,status,reported_by,best_of&status=in.(pending,accepted,reported,disputed)`;
+    const base = `x1_challenges?event_id=eq.${e(ev.id)}&select=challenger_name,opponent_name,status,reported_by,best_of,stake&status=in.(pending,accepted,reported,disputed)`;
     const [a, b] = await Promise.all([get(`${base}&opponent_name=eq.${e(me)}`), get(`${base}&challenger_name=eq.${e(me)}`)]);
-    const fmt = r => (r.best_of || 1) > 1 ? ` em melhor de ${r.best_of}` : '';
+    const fmt = r => ((r.best_of || 1) > 1 ? ` em melhor de ${r.best_of}` : '') + (r.stake > 0 ? ` apostando 🪙${r.stake}` : '');
     a.concat(b).forEach(r => {
       const other = r.challenger_name === me ? r.opponent_name : r.challenger_name;
       if(r.status === 'pending' && r.opponent_name === me) items.push({ icon: '⚔️', text: `<b>${escapeHtml(r.challenger_name)}</b> desafiou-te para um x1${fmt(r)}`, href: 'eventos.html', hot: true });
