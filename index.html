@@ -25,26 +25,38 @@ body{display:flex;align-items:center;justify-content:center;}
 .player-corner-badge{top:16px;}
 .daily-bonus-icon{top:82px;}
 .event-corner-icon{top:128px;}
-.wrap{max-width:480px;width:100%;padding:32px 20px;text-align:center;}
+.wrap{max-width:780px;width:100%;padding:28px 20px;text-align:center;}
 .crystal{
-  width:56px;height:56px;margin:0 auto 20px auto;
+  width:44px;height:44px;margin:0 auto 14px auto;
   background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));
   clip-path:polygon(50% 0%, 100% 30%, 82% 100%, 18% 100%, 0% 30%);
 }
 h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0 0 8px 0;letter-spacing:0.5px;}
-.subtitle{color:var(--text-dim);font-size:14px;margin-bottom:32px;}
+.subtitle{color:var(--text-dim);font-size:14px;margin-bottom:22px;}
+.nav-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px;}
 .nav-card{
-  display:flex;align-items:center;gap:16px;background:var(--bg-panel);border:1px solid var(--line);
-  border-radius:12px;padding:20px 22px;margin-bottom:14px;text-decoration:none;color:var(--text-main);
+  display:flex;align-items:center;gap:12px;background:var(--bg-panel);border:1px solid var(--line);
+  border-radius:12px;padding:14px 16px;text-decoration:none;color:var(--text-main);
   transition:border-color .15s, transform .15s;text-align:left;box-shadow:var(--shadow);
 }
 .nav-card:hover{border-color:var(--tera-cyan);transform:translateY(-2px);}
 .nav-icon{
-  width:40px;height:40px;flex-shrink:0;border-radius:10px;display:flex;align-items:center;justify-content:center;
-  font-size:20px;background:var(--bg-card);border:1px solid var(--line);
+  width:38px;height:38px;flex-shrink:0;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-size:19px;background:var(--bg-card);border:1px solid var(--line);
 }
-.nav-text h2{font-family:'Chakra Petch',sans-serif;font-size:15px;margin:0 0 3px 0;}
-.nav-text p{font-size:12.5px;color:var(--text-dim);margin:0;}
+.nav-text{min-width:0;}
+.nav-text h2{font-family:'Chakra Petch',sans-serif;font-size:14.5px;margin:0 0 2px 0;}
+.nav-text p{font-size:12px;line-height:1.35;color:var(--text-dim);margin:0;}
+@media (max-width:640px){
+  .wrap{padding:22px 14px;}
+  .nav-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+  .nav-card{display:grid;grid-template-columns:32px minmax(0,1fr);gap:4px 8px;align-items:center;padding:10px;}
+  .nav-icon{width:32px;height:32px;font-size:16px;border-radius:8px;}
+  .nav-text{display:contents;}
+  .nav-text h2{grid-column:2;margin:0;font-size:13.5px;line-height:1.2;}
+  .nav-text p{grid-column:1 / -1;margin:2px 0 0;font-size:11.5px;}
+  .nav-grid .nav-card:last-child{grid-column:1 / -1;}
+}
 .install-row{display:none;align-items:center;gap:10px;justify-content:space-between;background:var(--bg-panel);border:1px dashed var(--line);border-radius:12px;padding:12px 14px;margin:6px 0 14px;text-align:left;font-size:12.5px;color:var(--text-dim);}
 .install-row b{color:var(--text-main);}
 .install-row .install-go{background:linear-gradient(135deg,var(--tera-cyan),var(--tera-violet));color:#0a0c14;border:none;border-radius:9px;padding:8px 12px;font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap;}
@@ -59,11 +71,12 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
   <h1>Torneio Showdown - VSE</h1>
   <div class="subtitle">Escolha o que quer ver</div>
 
+  <div class="nav-grid">
   <a class="nav-card" href="viewer.html">
     <div class="nav-icon">⬡</div>
     <div class="nav-text">
       <h2>Bracket & Sorteio</h2>
-      <p>Acompanha o torneio desta semana ao vivo e os seus Pokémon sorteados.</p>
+      <p>O torneio desta semana ao vivo e os teus Pokémon.</p>
     </div>
   </a>
 
@@ -71,7 +84,7 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
     <div class="nav-icon">📊</div>
     <div class="nav-text">
       <h2>Estatísticas</h2>
-      <p>Rankings e histórico de todos os torneios já disputados.</p>
+      <p>Rankings e histórico de todos os torneios.</p>
     </div>
   </a>
 
@@ -79,7 +92,7 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
     <div class="nav-icon">🏆</div>
     <div class="nav-text">
       <h2>Hall da Fama</h2>
-      <p>A linha do tempo de todos os campeões, torneio a torneio.</p>
+      <p>Todos os campeões, torneio a torneio.</p>
     </div>
   </a>
 
@@ -87,7 +100,7 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
     <div class="nav-icon">🔮</div>
     <div class="nav-text">
       <h2>Palpiteiro</h2>
-      <p>Aposte moedas em quem vai vencer cada partida e suba no ranking.</p>
+      <p>Aposta moedas em quem vence cada partida.</p>
     </div>
   </a>
 
@@ -95,7 +108,7 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
     <div class="nav-icon">🔎</div>
     <div class="nav-text">
       <h2>Pokémon</h2>
-      <p>A ficha de cada Pokémon: quem o usou, sets mais comuns e resultados dos times.</p>
+      <p>A ficha de cada Pokémon: usos, sets e resultados.</p>
     </div>
   </a>
 
@@ -103,7 +116,7 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
     <div class="nav-icon">📋</div>
     <div class="nav-text">
       <h2>Missões da semana</h2>
-      <p>Pequenas missões semanais com moedas (vota no apelido, faz um palpite, reclama o bónus…) e o desafio diário "Quem é este Pokémon?".</p>
+      <p>Missões semanais com moedas e o desafio do dia.</p>
     </div>
   </a>
 
@@ -111,7 +124,7 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
     <div class="nav-icon">🎟️</div>
     <div class="nav-text">
       <h2>Passe de Temporada</h2>
-      <p>30 níveis de recompensas durante a temporada: XP por torneios, x1 e missões. Começa na Temporada 2.</p>
+      <p>30 níveis de recompensas por temporada.</p>
     </div>
   </a>
 
@@ -119,7 +132,7 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
     <div class="nav-icon">📅</div>
     <div class="nav-text">
       <h2>Calendário</h2>
-      <p>Quando começam e acabam as temporadas e os eventos, e os torneios do mês.</p>
+      <p>Temporadas, eventos e torneios do mês.</p>
     </div>
   </a>
 
@@ -127,9 +140,10 @@ h1{font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:700;margin:0
     <div class="nav-icon">🛍️</div>
     <div class="nav-text">
       <h2>Loja</h2>
-      <p>Gaste as suas moedas em personalizações, vantagens e sorte.</p>
+      <p>Personalizações, vantagens e sorte.</p>
     </div>
   </a>
+  </div>
 
   <div class="install-row" id="installRow"><span id="installText"></span><span style="display:flex;gap:6px;align-items:center;"><button class="install-go" id="installGo" type="button" onclick="doInstall()" style="display:none;">Instalar</button><button class="install-x" type="button" onclick="dismissInstall()" title="Esconder">×</button></span></div>
 
