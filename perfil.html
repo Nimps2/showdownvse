@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261013a">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013b">
 <style>
 .customize-toggle-btn{
   background:var(--bg-card);border:1px solid var(--line);color:var(--tera-cyan);padding:9px 16px;
@@ -118,7 +118,7 @@
   <div class="footer-note">Estatísticas calculadas a partir de todos os torneios guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261013a"></script>
+<script src="assets/js/showdown-utils.js?v=20261013b"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -436,6 +436,17 @@ async function renderProfile(){
     </div>
     ` : ''}
 
+    ${seasonComparison.length ? `
+    <div class="card" id="recapCard">
+      <h2>🎞️ Retrospectiva da temporada</h2>
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px;">O resumo de uma temporada para partilhares: copia o texto para o Discord ou guarda uma imagem.</div>
+      <select id="recapSeason" onchange="renderRecap()" style="max-width:260px;">
+        ${seasonComparison.slice().reverse().map(s=>`<option value="${s.season}">Temporada ${s.season}</option>`).join('')}
+      </select>
+      <div id="recapBody" style="margin-top:12px;"></div>
+    </div>
+    ` : ''}
+
     <div class="card">
       <h2>Confrontos & Sequências</h2>
       <div class="stat-grid">
@@ -608,6 +619,7 @@ async function renderProfile(){
     </div>
     ` : ''}
   `;
+  renderRecap();
 }
 
 function switchProfileTab(tab){
@@ -869,6 +881,75 @@ async function doSaveSiteBgUrl(){
   } else {
     alert('Não foi possível guardar o fundo. Tente novamente.');
   }
+}
+
+// ---------- Retrospectiva da temporada ----------
+let currentRecap = null;
+function recapDisplayName(name){ const p = playerProfiles[name] || {}; return p.nickname ? p.nickname : name; }
+function renderRecap(){
+  const sel = document.getElementById('recapSeason'), body = document.getElementById('recapBody');
+  if(!sel || !body) return;
+  const name = getViewedPlayerName();
+  const rc = computeSeasonRecap(allRows, name, parseInt(sel.value, 10));
+  currentRecap = rc;
+  if(!rc){ body.innerHTML = '<div class="empty-state">Sem torneios nesta temporada.</div>'; return; }
+  const f = d => d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const box = (n, l) => `<div class="stat-box"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+  body.innerHTML = `<div class="recap-card">
+      <div class="recap-top"><b>Temporada ${rc.season}</b><span>${f(rc.start)} → ${f(rc.end)}</span></div>
+      <div class="recap-name">${escapeHtml(recapDisplayName(name))}</div>
+      <div class="stat-grid">${box(rc.tournaments, 'Torneios')}${box(rc.wins + 'V-' + rc.losses + 'D', 'Resultado')}${box(rc.winrate !== null ? rc.winrate + '%' : '—', 'Winrate')}${box(rc.titles ? '🏆 ' + rc.titles : '0', 'Títulos')}${box(rc.finals, 'Finais')}${box(rc.bestStreak, 'Maior sequência')}</div>
+      ${rc.topMons.length ? `<div class="recap-mons">${rc.topMons.map(m => `<span class="recap-mon">${pokeSpriteHtml(m.name, 48)}<b>${escapeHtml(m.name)}</b><small>${m.count}x</small></span>`).join('')}</div>` : ''}
+      <div class="recap-lines">
+        ${rc.topMove ? `<div>⚔️ Golpe preferido: <b>${escapeHtml(rc.topMove.name)}</b> (${rc.topMove.count}x)</div>` : ''}
+        ${rc.victim ? `<div>🎯 Freguês: <b>${escapeHtml(rc.victim.name)}</b> (${rc.victim.wins}V)</div>` : ''}
+        ${rc.nemesis ? `<div>😈 Nemesis: <b>${escapeHtml(rc.nemesis.name)}</b> (${rc.nemesis.losses}D)</div>` : ''}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+      <button class="page-btn" onclick="copyRecapText(this)">📋 Copiar texto</button>
+      <button class="page-btn" onclick="downloadRecapImage()">🖼️ Guardar imagem</button>
+    </div>`;
+}
+async function copyRecapText(btn){
+  if(!currentRecap) return;
+  const txt = seasonRecapText(currentRecap, recapDisplayName(currentRecap.name));
+  try{ await navigator.clipboard.writeText(txt); btn.textContent = '✔ Copiado!'; } catch(e){ prompt('Copia o texto:', txt); }
+  setTimeout(() => { btn.textContent = '📋 Copiar texto'; }, 2000);
+}
+// Imagem 900x540 desenhada à mão (sem os sprites: o servidor do Showdown não deixa desenhá-los num canvas exportável).
+function downloadRecapImage(){
+  const rc = currentRecap; if(!rc) return;
+  const W = 900, H = 540, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, W, H); grad.addColorStop(0, '#15122b'); grad.addColorStop(0.55, '#1d1a3f'); grad.addColorStop(1, '#0d2b33');
+  g.fillStyle = grad; g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(79,216,208,0.5)'; g.lineWidth = 3; g.strokeRect(14, 14, W - 28, H - 28);
+  const font = (px, w) => `${w || 600} ${px}px "Chakra Petch", "Segoe UI", sans-serif`;
+  const f = d => d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  g.textBaseline = 'alphabetic'; g.fillStyle = '#4fd8d0'; g.font = font(22, 700); g.fillText('🎞️ RETROSPECTIVA · TEMPORADA ' + rc.season, 44, 70);
+  g.fillStyle = '#9aa3bf'; g.font = font(16, 400); g.fillText(f(rc.start) + ' → ' + f(rc.end) + ' · Torneio Showdown VSE', 44, 98);
+  g.fillStyle = '#ffffff'; g.font = font(44, 700); g.fillText(recapDisplayName(rc.name), 44, 160, W - 88);
+  const stats = [[String(rc.tournaments), 'Torneios'], [rc.wins + 'V-' + rc.losses + 'D', 'Resultado'], [rc.winrate !== null ? rc.winrate + '%' : '—', 'Winrate'], [rc.titles ? '🏆 ' + rc.titles : '0', 'Títulos'], [String(rc.finals), 'Finais'], [String(rc.bestStreak), 'Maior sequência']];
+  stats.forEach((s, i) => {
+    const x = 44 + (i % 3) * 270, y = 200 + Math.floor(i / 3) * 100;
+    g.fillStyle = 'rgba(255,255,255,0.06)'; g.fillRect(x, y, 250, 82);
+    g.fillStyle = '#f0b64f'; g.font = font(34, 700); g.fillText(s[0], x + 16, y + 44, 220);
+    g.fillStyle = '#9aa3bf'; g.font = font(14, 500); g.fillText(s[1].toUpperCase(), x + 16, y + 68);
+  });
+  g.fillStyle = '#e8ebf5'; g.font = font(20, 500);
+  const lines = [];
+  if(rc.topMons.length) lines.push('⭐ ' + rc.topMons.map(m => m.name + ' (' + m.count + 'x)').join(' · '));
+  if(rc.victim) lines.push('🎯 Freguês: ' + rc.victim.name + ' (' + rc.victim.wins + 'V)    😈 Nemesis: ' + (rc.nemesis ? rc.nemesis.name + ' (' + rc.nemesis.losses + 'D)' : '—'));
+  else if(rc.nemesis) lines.push('😈 Nemesis: ' + rc.nemesis.name + ' (' + rc.nemesis.losses + 'D)');
+  if(rc.topMove) lines.push('⚔️ Golpe preferido: ' + rc.topMove.name + ' (' + rc.topMove.count + 'x)');
+  lines.forEach((t, i) => g.fillText(t, 44, 424 + i * 32, W - 88));
+  g.fillStyle = '#5b6482'; g.font = font(13, 400); g.fillText('gerado em ' + new Date().toLocaleDateString('pt-PT'), W - 190, H - 30);
+  c.toBlob(b => {
+    if(!b){ alert('Não consegui criar a imagem neste browser.'); return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `retrospectiva-temporada-${rc.season}-${String(rc.name).replace(/[^A-Za-z0-9_-]+/g, '_')}.png`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }, 'image/png');
 }
 
 function renderCompare(){

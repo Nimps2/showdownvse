@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pokémon — Torneio Showdown - VSE</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013b">
+</head>
+<body>
+<div id="playerCornerContainer"></div>
+
+<div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
+    <h2>Entrar</h2>
+    <label>Nome</label>
+    <select id="gateNameSelect"><option value="">— carregando jogadores —</option></select>
+    <label>Password</label>
+    <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()">
+    <button class="btn-primary" onclick="doGateLogin()">Entrar</button>
+    <div id="gateError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;"></div>
+  </div>
+</div>
+
+<div id="topbar" class="topbar" style="display:none;">
+  <a href="index.html" class="brand">
+    <div class="brand-mark"></div>
+    <div class="brand-name">Torneio VSE</div>
+  </a>
+  <nav class="topnav">
+    <a href="index.html">Início</a>
+    <a href="viewer.html">Bracket</a>
+    <a href="estatisticas.html" class="current">Estatísticas</a>
+    <a href="hall-da-fama.html">Hall da Fama</a>
+    <a href="loja.html">Loja</a>
+    <a href="conquistas.html">Conquistas</a>
+    <a href="palpites.html">Palpiteiro</a>
+    <a href="calendario.html">Calendário</a>
+  </nav>
+  <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
+</div>
+
+<div id="mainContent" class="wrap" style="display:none;">
+  <div class="status-strip">
+    <span class="status-dot" id="statusDot"></span>
+    <span class="status-text" id="statusText">Conectando…</span>
+  </div>
+
+  <div class="card">
+    <h2>🔎 Escolher Pokémon</h2>
+    <div class="pk-search">
+      <input type="text" id="pkSearch" list="pkSpeciesList" placeholder="Escreve o nome (ex: Landorus-Therian)" autocomplete="off">
+      <button type="button" class="page-btn" id="pkGo">Ver</button>
+      <a class="page-btn pk-back" href="estatisticas.html">← Estatísticas</a>
+    </div>
+    <datalist id="pkSpeciesList"></datalist>
+  </div>
+
+  <div id="pkBody"><div class="card"><div class="empty-state">A carregar…</div></div></div>
+
+  <div class="footer-note">*O winrate é o do time do jogador nesse torneio (não sabemos qual Pokémon jogou cada partida), por isso é só uma aproximação. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
+</div>
+
+<script src="assets/js/showdown-utils.js?v=20261013b"></script>
+<script>
+initTheme();
+const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+
+let loggedInPlayerName = null;
+let allRows = [];
+let seenSpecies = [];
+
+async function doGateLogin(){
+  const name = document.getElementById('gateNameSelect').value;
+  const password = document.getElementById('gatePassword').value;
+  const errEl = document.getElementById('gateError');
+  errEl.style.display = 'none';
+  if(!name){ errEl.textContent = 'Selecione o seu nome.'; errEl.style.display='block'; return; }
+  if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
+  const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
+  if(!result.ok){
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registrado pelo organizador.'
+      : result.reason==='wrongpass' ? 'Password incorreta.'
+      : 'Erro ao ligar à base de dados.';
+    errEl.style.display = 'block';
+    return;
+  }
+  localStorage.setItem('player_login_name', name);
+  loggedInPlayerName = name;
+  unlockContent();
+}
+
+function unlockContent(){
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('topbar').style.display = 'flex';
+  init();
+}
+
+function doPlayerLogout(){
+  localStorage.removeItem('player_login_name');
+  endPlayerSession(SUPABASE_URL, SUPABASE_ANON_KEY);
+  loggedInPlayerName = null;
+  document.getElementById('gatePassword').value = '';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('topbar').style.display = 'none';
+  document.getElementById('authGate').style.display = 'flex';
+}
+
+async function pageBoot(){
+  const sel = document.getElementById('gateNameSelect');
+  try{
+    const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
+    names.forEach(n=>{
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+    const saved = localStorage.getItem('player_login_name');
+    if(saved && names.includes(saved)){
+      loggedInPlayerName = saved;
+      unlockContent();
+    }
+  } catch(e){
+    sel.innerHTML = '<option value="">— erro ao carregar jogadores —</option>';
+  }
+}
+
+function setStatus(ok, text){
+  document.getElementById('statusDot').className = 'status-dot ' + (ok?'on':'off');
+  document.getElementById('statusText').textContent = text;
+}
+
+let dailyBonusClaimInFlight = false;
+async function handleDailyBonusClick(){
+  if(dailyBonusClaimInFlight) return;
+  dailyBonusClaimInFlight = true;
+  const icon = document.getElementById('dailyBonusIcon');
+  if(icon) icon.classList.remove('available');
+  try{
+    const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
+    if(result.awarded){
+      showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
+    }
+  } finally {
+    dailyBonusClaimInFlight = false;
+  }
+}
+
+// O Pokémon pedido no endereço (?especie=Gengar)
+function requestedSpecies(){
+  return (new URLSearchParams(window.location.search).get('especie') || '').trim();
+}
+
+async function init(){
+  if(typeof aggregateSpecies !== 'function' || typeof listSeenSpecies !== 'function'){
+    setStatus(false, 'Ficheiros antigos em cache.');
+    document.getElementById('pkBody').innerHTML = '<div class="card"><div class="empty-state">O teu browser ainda tem ficheiros antigos do site em cache. Faz <b>Ctrl+F5</b> para atualizar e abre esta página outra vez.</div></div>';
+    return;
+  }
+  try{
+    const [rows, profiles] = await Promise.all([
+      sbFetchAll(`${SUPABASE_URL}/rest/v1/tournaments?select=id,tier,status,created_at,data&order=created_at.desc,id`, SUPABASE_ANON_KEY),
+      fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY)
+    ]);
+    allRows = rows;
+    seenSpecies = listSeenSpecies(rows);
+    document.getElementById('pkSpeciesList').innerHTML = seenSpecies.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+    document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
+    checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
+      document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
+    });
+    if(typeof mountEventCornerIcon === 'function') mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY);
+    setStatus(true, `Ligado — ${rows.length} torneio(s) e ${seenSpecies.length} Pokémon diferentes.`);
+    renderSpecies(requestedSpecies());
+  } catch(e){
+    setStatus(false, 'Não foi possível ligar à base de dados.');
+    document.getElementById('pkBody').innerHTML = '<div class="card"><div class="empty-state">Não consegui carregar os torneios. Tenta atualizar a página.</div></div>';
+  }
+}
+
+function chipsHtml(map, max, suffix){
+  const list = Object.entries(map).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, max);
+  return list.length ? list.map(([k, c]) => `<span class="pk-chip">${escapeHtml(k)} <b>${c}${suffix || 'x'}</b></span>`).join('') : '<span class="pk-none">Sem dados</span>';
+}
+
+function renderSpecies(name){
+  const body = document.getElementById('pkBody');
+  document.getElementById('pkSearch').value = name || '';
+  if(!name){
+    body.innerHTML = `<div class="card"><h2>📚 Todos os Pokémon que já saíram</h2><div class="pk-all">${seenSpecies.map(n => `<a class="pk-pick" href="pokemon.html?especie=${encodeURIComponent(n)}">${pokeSpriteHtml(n, 40)}<span>${escapeHtml(n)}</span></a>`).join('') || '<div class="empty-state">Ainda não há torneios com Pokémon sorteados.</div>'}</div></div>`;
+    document.title = 'Pokémon — Torneio Showdown - VSE';
+    return;
+  }
+  const st = aggregateSpecies(allRows, name);
+  if(!st){
+    body.innerHTML = `<div class="card"><div class="empty-state">${pokeSpriteHtml(name, 64)}<br>Ainda não saiu nenhum <b>${escapeHtml(name)}</b> em torneios guardados (ou o nome está diferente). Escolhe outro Pokémon em cima.</div></div>`;
+    return;
+  }
+  document.title = `${st.name} — Torneio Showdown - VSE`;
+  const games = st.wins + st.losses, wr = games ? Math.round(st.wins / games * 100) : null;
+  const pctSlots = st.totalSlots ? (st.total / st.totalSlots * 100).toFixed(1) : '0';
+  const fmtDate = d => new Date(d).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const head = `<div class="card pk-head">
+      <div class="pk-sprite">${pokeSpriteHtml(st.name, 96)}</div>
+      <div class="pk-title"><h1>${escapeHtml(st.name)}</h1>
+        ${st.nicknames.length ? `<div class="pk-nicks">Apelidos: ${st.nicknames.slice(0, 6).map(n => escapeHtml(n)).join(', ')}</div>` : ''}</div>
+      <div class="pk-boxes">
+        <div class="pk-box"><div class="l">Apareceu</div><div class="v">${st.total}x</div><div class="s">${pctSlots}% dos sorteios · ${st.tournaments} torneio(s)</div></div>
+        <div class="pk-box"><div class="l">Sorteado / livre</div><div class="v">${st.random} / ${st.free}</div><div class="s">${Math.round(st.free / st.total * 100)}% como escolha livre</div></div>
+        <div class="pk-box"><div class="l">Winrate do time*</div><div class="v">${wr !== null ? wr + '%' : '—'}</div><div class="s">${games ? st.wins + 'V-' + st.losses + 'D' : 'sem partidas'}</div></div>
+        <div class="pk-box"><div class="l">Campeões com ele</div><div class="v">${st.champions}</div><div class="s">torneios ganhos por quem o tinha</div></div>
+      </div></div>`;
+  const players = `<div class="card"><h2>👥 Quem o usou</h2>${st.playerList.map(p => `<div class="pk-row"><a class="pk-who" href="perfil.html?jogador=${encodeURIComponent(p.name)}">${escapeHtml(p.name)}</a><span class="pk-n">${p.count}x</span><span class="pk-rec">${p.wins + p.losses ? p.wins + 'V-' + p.losses + 'D' : '—'}</span><span class="pk-t">${p.titles ? '🏆 ' + p.titles : ''}</span></div>`).join('')}</div>`;
+  const sets = `<div class="card"><h2>🧩 Sets mais comuns</h2>
+      <div class="pk-set"><div class="pk-lab">Habilidades</div>${chipsHtml(st.abilities, 6)}</div>
+      <div class="pk-set"><div class="pk-lab">Itens</div>${chipsHtml(st.items, 6)}</div>
+      <div class="pk-set"><div class="pk-lab">Golpes</div>${chipsHtml(st.moves, 10)}</div>
+      <div class="pk-set"><div class="pk-lab">Tera Type</div>${chipsHtml(st.tera, 6)}</div>
+      <div class="pk-set"><div class="pk-lab">Natureza</div>${chipsHtml(st.natures, 6)}</div></div>`;
+  const hist = `<div class="card"><h2>🗂️ Histórico</h2>${st.appearances.slice(0, 40).map(a => `<div class="pk-row"><span class="pk-date">${fmtDate(a.date)}</span><span class="pk-who2">${escapeHtml(a.player)} <small>${a.free ? '(escolha livre)' : '(sorteado)'}</small></span><span class="pk-tn">${escapeHtml(a.tournament)}</span><span class="pk-rec">${a.wins + a.losses ? a.wins + 'V-' + a.losses + 'D' : '—'}</span><span class="pk-t">${a.champion ? '🏆' : ''}</span></div>`).join('')}${st.appearances.length > 40 ? `<div class="pk-none" style="margin-top:8px;">+ ${st.appearances.length - 40} aparições mais antigas.</div>` : ''}</div>`;
+  body.innerHTML = head + `<div class="pk-cols">${players}${sets}</div>` + hist;
+}
+
+function goSearch(){
+  const v = document.getElementById('pkSearch').value.trim();
+  const exact = seenSpecies.find(n => n.toLowerCase() === v.toLowerCase());
+  const target = exact || v;
+  history.replaceState(null, '', target ? `pokemon.html?especie=${encodeURIComponent(target)}` : 'pokemon.html');
+  renderSpecies(target);
+}
+document.getElementById('pkGo').addEventListener('click', goSearch);
+document.getElementById('pkSearch').addEventListener('keydown', e => { if(e.key === 'Enter') goSearch(); });
+document.getElementById('pkSearch').addEventListener('change', goSearch);
+
+pageBoot();
+</script>
+</body>
+</html>

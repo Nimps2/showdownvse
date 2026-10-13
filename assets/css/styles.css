@@ -303,3 +303,57 @@ label{display:block;font-size:11px;color:var(--text-faint);text-transform:upperc
   .cal-chip .t{display:none;}
   .cal-weekdays span{font-size:10px;}
 }
+
+/* Página de um Pokémon (pokemon.html) */
+.pk-search{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.pk-search input{flex:1;min-width:200px;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);border-radius:8px;color:var(--text-main);font-family:'Inter',sans-serif;font-size:14px;margin:0;}
+.pk-search input:focus{outline:none;border-color:var(--tera-cyan);}
+.pk-back{text-decoration:none;display:inline-flex;align-items:center;}
+.pk-head{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;align-items:center;}
+.pk-sprite{grid-row:1/3;display:flex;align-items:center;justify-content:center;width:110px;height:110px;border-radius:16px;background:var(--bg-card);border:1px solid var(--line);}
+.pk-title h1{font-family:'Chakra Petch',sans-serif;font-size:26px;margin:0;color:var(--text-main);}
+.pk-nicks{font-size:12px;color:var(--text-dim);margin-top:4px;}
+.pk-boxes{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px;}
+.pk-box{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;}
+.pk-box .l{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.pk-box .v{font-family:'Chakra Petch',sans-serif;font-size:20px;font-weight:700;color:var(--tera-cyan);}
+.pk-box .s{font-size:11.5px;color:var(--text-dim);margin-top:2px;}
+.pk-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;}
+.pk-cols .card{margin-bottom:0;}
+.pk-row{display:flex;align-items:center;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line);font-size:13px;color:var(--text-dim);flex-wrap:wrap;}
+.pk-row:last-child{border-bottom:0;}
+.pk-who{flex:1;min-width:110px;color:var(--text-main);font-weight:600;text-decoration:none;}
+.pk-who:hover{color:var(--tera-cyan);}
+.pk-who2{flex:1;min-width:150px;color:var(--text-main);font-weight:600;}
+.pk-who2 small{font-weight:400;color:var(--text-faint);}
+.pk-n{font-family:'Chakra Petch',sans-serif;color:var(--tera-amber);min-width:34px;text-align:right;}
+.pk-rec{min-width:64px;text-align:right;font-family:'Chakra Petch',sans-serif;}
+.pk-t{min-width:34px;text-align:right;}
+.pk-date{min-width:84px;color:var(--text-faint);font-size:12px;}
+.pk-tn{flex:1;min-width:120px;font-size:12px;}
+.pk-set{margin-bottom:12px;}
+.pk-lab{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.pk-chip{display:inline-block;margin:0 5px 5px 0;padding:3px 10px;border-radius:99px;border:1px solid var(--line);background:var(--bg-card);font-size:12px;color:var(--text-main);}
+.pk-chip b{color:var(--tera-cyan);font-weight:600;}
+.pk-none{font-size:12px;color:var(--text-faint);}
+.pk-all{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+.pk-pick{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:10px;background:var(--bg-card);border:1px solid var(--line);text-decoration:none;color:var(--text-main);font-size:12.5px;}
+.pk-pick:hover{border-color:var(--tera-cyan);}
+@media (max-width:560px){.pk-head{grid-template-columns:1fr;justify-items:center;text-align:center;}.pk-sprite{grid-row:auto;}}
+
+/* Retrospectiva da temporada (perfil.html) */
+.recap-card{padding:16px 18px;border-radius:14px;border:1px solid color-mix(in srgb,var(--tera-cyan) 40%,var(--line));
+  background:linear-gradient(135deg,color-mix(in srgb,var(--tera-violet) 14%,var(--bg-card)),color-mix(in srgb,var(--tera-cyan) 10%,var(--bg-card)));}
+.recap-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--text-dim);}
+.recap-top b{font-family:'Chakra Petch',sans-serif;color:var(--tera-cyan);text-transform:uppercase;letter-spacing:.06em;}
+.recap-name{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:26px;color:var(--text-main);margin:4px 0 12px;}
+.recap-mons{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}
+.recap-mon{display:inline-flex;align-items:center;gap:6px;padding:4px 12px 4px 4px;border-radius:12px;background:var(--bg-card);border:1px solid var(--line);font-size:12.5px;}
+.recap-mon small{color:var(--text-faint);}
+.recap-lines{margin-top:12px;font-size:13px;color:var(--text-dim);display:grid;gap:4px;}
+.recap-lines b{color:var(--text-main);}
+
+/* Aviso de ligação (showdown-utils.js, installNetworkGuard) */
+.net-banner{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:9999;max-width:min(92vw,520px);padding:10px 16px;border-radius:10px;cursor:pointer;
+  background:color-mix(in srgb,var(--danger) 22%,var(--bg-panel));border:1px solid color-mix(in srgb,var(--danger) 60%,transparent);color:var(--text-main);font-size:13px;box-shadow:var(--shadow);}
+

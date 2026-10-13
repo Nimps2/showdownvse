@@ -26,6 +26,30 @@ function safeCssUrl(u){
   if(!/^https?:\/\/[^\s"\\<>]+$/i.test(u)) return '';
   return u.replace(/'/g, '%27').replace(/\(/g, '%28').replace(/\)/g, '%29');
 }
+// ---------- Aviso de ligação (todas as páginas e o gestor) ----------
+// Se a internet cai, ou um pedido ao servidor falha sem ninguém o apanhar ("Failed to fetch"), mostra um aviso discreto em baixo (fecha ao clicar, ou sozinho ao voltar a ligação),
+// em vez de a página ficar parada sem explicação. Não substitui os try/catch de cada função (esses dizem o que correu mal); é a rede de segurança para o que escapa.
+(function installNetworkGuard(){
+  if(typeof window === 'undefined' || window.__vseNetGuard) return;
+  window.__vseNetGuard = true;
+  let timer = null;
+  const hide = () => { const e = document.getElementById('vseNetBanner'); if(e) e.remove(); clearTimeout(timer); };
+  const show = msg => {
+    if(!document.body) return;
+    let e = document.getElementById('vseNetBanner');
+    if(!e){ e = document.createElement('div'); e.id = 'vseNetBanner'; e.className = 'net-banner'; e.setAttribute('role', 'status'); e.title = 'Clica para fechar'; e.addEventListener('click', hide); document.body.appendChild(e); }
+    e.textContent = '⚠️ ' + msg;
+    clearTimeout(timer); timer = setTimeout(hide, 12000);
+  };
+  window.__vseNetShow = show;
+  window.addEventListener('offline', () => show('Sem ligação à internet — o que vês pode estar desatualizado.'));
+  window.addEventListener('online', hide);
+  window.addEventListener('unhandledrejection', ev => {
+    const r = ev && ev.reason, msg = String((r && r.message) || r || '');
+    if(/Failed to fetch|NetworkError|Load failed|Network request failed/i.test(msg)) show('Problema de ligação ao servidor — tenta outra vez ou atualiza a página.');
+  });
+})();
+
 // Lê TODAS as linhas de uma consulta REST. O Supabase devolve no máximo 1000 por pedido (mesmo com limit=5000, o excesso é cortado em silêncio),
 // por isso lê em páginas. `url` = consulta completa; para a paginação ser estável deve ter `order=<campo>,id` (desempate pelo id). Lança erro se um pedido falhar.
 async function sbFetchAll(url, anonKey, pageSize){
@@ -808,22 +832,51 @@ function ensureAvatarFxStyles(){
     .avatar-fx-fleet span:nth-child(2)::before{top:9%;opacity:0.85;transform:translate(-50%,0) rotate(-90deg);}
     .avatar-fx-fleet span:nth-child(3)::before{top:16%;opacity:0.7;}
 
-    /* Balão de Ar Quente (evento Volta ao Mundo, loja de Milhas): um balão que dá a volta ao avatar e sobe e desce devagar. É UMA só peça (clip-path:
-       balão com listas na cor da moldura + pescoço + cesto castanho); o <span> ocupa a camada toda e RODA (como a Rota Aérea) e o balão roda ao
-       contrário à mesma velocidade para ficar sempre na vertical. */
-    @keyframes vseBalloonOrbit{to{transform:rotate(360deg);}}
-    @keyframes vseBalloonUpright{from{transform:translate(-50%,0) rotate(0deg);}to{transform:translate(-50%,0) rotate(-360deg);}}
-    @keyframes vseBalloonBob{0%,100%{top:1%;}50%{top:4%;}}
-    .avatar-fx-balloon span{top:0!important;left:0!important;width:100%;height:100%;animation:vseBalloonOrbit 18s linear infinite;animation-delay:0s!important;
-      filter:drop-shadow(0 0 3px color-mix(in srgb,var(--fx-color) 55%,transparent));}
-    .avatar-fx-balloon span::before{content:'';position:absolute;top:1%;left:50%;width:calc(var(--fx-gem,9px)*1.25);height:calc(var(--fx-gem,9px)*1.62);
-      transform:translate(-50%,0);
-      background:linear-gradient(#7b4f27,#7b4f27) 50% 100%/34% 21% no-repeat,
-        radial-gradient(circle at 34% 26%,rgba(255,255,255,0.55) 0,transparent 30%),
-        repeating-linear-gradient(90deg,var(--fx-color) 0 12%,color-mix(in srgb,var(--fx-color) 38%,#fff) 12% 24%);
-      clip-path:polygon(50.0% 1.5%,58.2% 2.1%,66.1% 3.6%,73.5% 6.1%,80.2% 9.5%,86.0% 13.6%,90.7% 18.5%,94.2% 23.8%,96.3% 29.5%,97.0% 35.4%,95.7% 39.4%,93.2% 43.5%,89.7% 47.5%,85.5% 51.5%,80.5% 55.6%,74.9% 59.6%,68.7% 63.7%,62.0% 67.7%,58.0% 76.9%,64.0% 76.9%,64.0% 96.9%,36.0% 96.9%,36.0% 76.9%,42.0% 76.9%,38.0% 67.7%,31.3% 63.7%,25.1% 59.6%,19.5% 55.6%,14.5% 51.5%,10.3% 47.5%,6.8% 43.5%,4.3% 39.4%,3.0% 35.4%,3.7% 29.5%,5.8% 23.8%,9.3% 18.5%,14.0% 13.6%,19.8% 9.5%,26.5% 6.1%,33.9% 3.6%,41.8% 2.1%);
-      animation:vseBalloonUpright 18s linear infinite,vseBalloonBob 3.4s ease-in-out infinite;}
-    @media (prefers-reduced-motion:reduce){.avatar-fx-balloon span,.avatar-fx-balloon span::before{animation:none!important;}}
+    /* Balão de Ar Quente (evento Volta ao Mundo, loja de Milhas) — versão 2: uma pequena FROTA de 3 balões (grande, médio e pequeno/distante) que voam em círculo à volta do avatar
+       (caminho de movimento "offset-path", por isso ficam sempre na vertical), baloiçam como um pêndulo e sobem/descem devagar. Cada balão tem gomos e uma faixa clara, brilho e sombra,
+       cordas, cesto e uma chama que treme debaixo do balão. A cor é a "Cor da moldura"; os dois mais pequenos rodam o tom para dar variedade. O <span> é o balão inteiro:
+       ::before = o balão (envelope), ::after = a chama. Sem "offset-path" (browsers antigos) ficam parados à volta do avatar a baloiçar. */
+    @keyframes vseBalloonFly{to{offset-distance:100%;}}
+    @keyframes vseBalloonSway{0%,100%{rotate:-7deg;}50%{rotate:7deg;}}
+    @keyframes vseBalloonBob{0%,100%{translate:0 -7%;}50%{translate:0 7%;}}
+    @keyframes vseBalloonFlame{0%,100%{transform:translateX(-50%) scale(1,1);opacity:0.95;}25%{transform:translateX(-50%) scale(0.75,1.35);opacity:1;}55%{transform:translateX(-50%) scale(1.2,0.8);opacity:0.75;}80%{transform:translateX(-50%) scale(0.9,1.18);opacity:1;}}
+    .avatar-fx-balloon span{--b:calc(var(--fx-gem,9px)*1.7);top:0!important;left:0!important;position:absolute;width:var(--b);height:calc(var(--b)*1.32);
+      offset-path:circle(44% at 50% 50%);offset-anchor:50% 38%;offset-rotate:0deg;transform-origin:50% 12%;
+      animation:vseBalloonFly 17s linear infinite,vseBalloonSway 3.7s ease-in-out infinite,vseBalloonBob 5.3s ease-in-out infinite;animation-delay:0s,-1.2s,-2.4s!important;
+      filter:drop-shadow(0 1px 2px rgba(0,0,0,0.45));
+      background:
+        linear-gradient(90deg,transparent 37%,#4d311a 37% 41%,transparent 41% 59%,#4d311a 59% 63%,transparent 63%) 0 76%/100% 7% no-repeat,
+        linear-gradient(180deg,#a8743a,#5b3a1b) 50% 100%/34% 18% no-repeat;}
+    .avatar-fx-balloon span::before{content:'';position:absolute;left:0;top:0;width:100%;height:77%;
+      background:
+        radial-gradient(ellipse 30% 24% at 31% 24%,rgba(255,255,255,0.7),transparent 70%),
+        radial-gradient(ellipse 62% 62% at 84% 88%,rgba(0,0,0,0.36),transparent 72%),
+        linear-gradient(180deg,transparent 39%,rgba(255,255,255,0.92) 39% 49%,transparent 49%),
+        repeating-linear-gradient(90deg,var(--fx-color) 0 12.5%,color-mix(in srgb,var(--fx-color) 36%,#fff) 12.5% 25%);
+      clip-path:polygon(50% 0%,66% 4%,80% 13%,92% 28%,98% 44%,94% 62%,82% 78%,67% 92%,61% 100%,39% 100%,33% 92%,18% 78%,6% 62%,2% 44%,8% 28%,20% 13%,34% 4%);}
+    .avatar-fx-balloon span::after{content:'';position:absolute;left:50%;top:66%;width:20%;height:24%;transform:translateX(-50%);transform-origin:50% 100%;
+      border-radius:50% 50% 50% 50%/64% 64% 36% 36%;
+      background:radial-gradient(ellipse at 50% 72%,#fff6c8 0 20%,#ffb347 42%,#ff6a1f 70%,transparent 74%);
+      filter:drop-shadow(0 0 2px #ff9a2e);animation:vseBalloonFlame 0.55s ease-in-out infinite;}
+    /* o segundo (médio) voa ao contrário, por fora; o terceiro (pequeno, mais "longe") é mais rápido e mais discreto */
+    .avatar-fx-balloon span:nth-child(2){scale:0.72;offset-path:circle(50% at 50% 50%);animation-direction:reverse,normal,normal;
+      animation-duration:23s,4.3s,6.1s;animation-delay:-9s,-0.4s,-3.1s!important;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));}
+    .avatar-fx-balloon span:nth-child(2)::before{filter:hue-rotate(58deg);}
+    .avatar-fx-balloon span:nth-child(3){scale:0.5;offset-path:circle(36% at 50% 50%);opacity:0.85;
+      animation-duration:13s,3.1s,4.4s;animation-delay:-4s,-2s,-1s!important;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.35));}
+    .avatar-fx-balloon span:nth-child(3)::before{filter:hue-rotate(-62deg);}
+    .avatar-fx-balloon span:nth-child(2)::after{animation-delay:-0.2s;}
+    .avatar-fx-balloon span:nth-child(3)::after{animation-delay:-0.35s;}
+    @supports not (offset-path:circle(10% at 50% 50%)){
+      .avatar-fx-balloon span{animation:vseBalloonSway 3.7s ease-in-out infinite,vseBalloonBob 5.3s ease-in-out infinite;animation-delay:-1.2s,-2.4s!important;margin:calc(var(--b)*-0.5) 0 0 calc(var(--b)*-0.5);}
+      .avatar-fx-balloon span:nth-child(1){top:4%!important;left:52%!important;}
+      .avatar-fx-balloon span:nth-child(2){top:52%!important;left:96%!important;}
+      .avatar-fx-balloon span:nth-child(3){top:66%!important;left:8%!important;}
+    }
+    @media (prefers-reduced-motion:reduce){
+      .avatar-fx-balloon span,.avatar-fx-balloon span::after{animation:none!important;}
+      .avatar-fx-balloon span:nth-child(1){offset-distance:0%;} .avatar-fx-balloon span:nth-child(2){offset-distance:38%;} .avatar-fx-balloon span:nth-child(3){offset-distance:71%;}
+    }
 
     /* Revoada de Morcegos (evento Halloween, nível 7): 3 morcegos a rodar em órbitas diferentes (um em sentido contrário) e a bater as asas.
        Mesma técnica da Esquadrilha: cada <span> ocupa a camada toda e RODA; o morcego é o ::before. */
@@ -932,11 +985,11 @@ function nameEffectPreviewHtml(item, profile){
   return `<div class="shop-swatch" style="height:44px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg-panel);color:${color};font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:15px;"><span class="${nameFxClass(item)}">Abc</span></div>`;
 }
 
-const AVATAR_FX_COUNTS = { sparks:10, starry:6, blossom:5, diamond:4, plane:1, fleet:3, balloon:1, bats:3, ghosts:2 };
+const AVATAR_FX_COUNTS = { sparks:10, starry:6, blossom:5, diamond:4, plane:1, fleet:3, balloon:3, bats:3, ghosts:2 };
 // Efeitos que não usam os primeiros N ângulos da lista acima — o Diamante
 // quer as 4 gemas espalhadas pelos pontos cardeais (direita, baixo, esquerda,
 // cima), pela ordem em que o anel as "visita" ao rodar.
-const AVATAR_FX_ANGLE_OVERRIDES = { diamond:[0, 90, 180, 270], plane:[0], fleet:[0, 0, 0], balloon:[0], bats:[0, 0, 0], ghosts:[0, 0] };
+const AVATAR_FX_ANGLE_OVERRIDES = { diamond:[0, 90, 180, 270], plane:[0], fleet:[0, 0, 0], balloon:[0, 0, 0], bats:[0, 0, 0], ghosts:[0, 0] };
 // Duração (s) do ciclo de cada efeito, para espaçar o atraso de cada partícula.
 const AVATAR_FX_PERIODS = { sparks:1.4, starry:2.4, blossom:3.6, diamond:4 };
 
@@ -2925,6 +2978,116 @@ function aggregateNicknames(rows){
     });
   });
   return results;
+}
+
+// ---------- Página de um Pokémon (pokemon.html) ----------
+// Tudo o que os torneios guardados sabem de UMA espécie (nome comparado sem maiúsculas/minúsculas): quantas vezes saiu (sorteada ou escolha livre), quem a teve, o resultado
+// do time desse jogador nesse torneio (não sabemos qual Pokémon jogou cada partida — é uma aproximação, como em estatisticas.html), campeões, e os sets (habilidades, itens,
+// golpes, Tera, naturezas) lidos dos textos de import do Showdown. Devolve null se a espécie nunca saiu.
+function aggregateSpecies(rows, species){
+  const want = String(species || '').trim().toLowerCase();
+  if(!want) return null;
+  const out = { name: null, total: 0, random: 0, free: 0, wins: 0, losses: 0, champions: 0, tournaments: 0,
+    players: {}, abilities: {}, items: {}, moves: {}, tera: {}, natures: {}, nicknames: [], appearances: [], totalSlots: 0 };
+  const bump = (map, k) => { if(k) map[k] = (map[k] || 0) + 1; };
+  (rows || []).forEach(r => {
+    const data = r.data || {};
+    const players = data.players || [];
+    out.totalSlots += players.length * 6;
+    const rec = {};
+    (data.matches || []).forEach(m => {
+      if(!m.winner || !m.p1 || !m.p2) return;
+      const loser = m.winner === m.p1 ? m.p2 : m.p1;
+      (rec[m.winner] = rec[m.winner] || { wins: 0, losses: 0 }).wins++;
+      (rec[loser] = rec[loser] || { wins: 0, losses: 0 }).losses++;
+    });
+    let seenHere = false;
+    Object.entries(data.draws || {}).forEach(([idx, entry]) => {
+      const player = players[parseInt(idx, 10)];
+      if(!player || !entry) return;
+      const slots = [].concat((entry.random || []).map(x => ({ x, name: x && x.mon, free: false })), (entry.free || []).map(x => ({ x, name: x && x.name, free: true })));
+      slots.forEach(({ x, name, free }) => {
+        if(!x || !name || String(name).toLowerCase() !== want) return;
+        seenHere = true;
+        if(!out.name) out.name = name;
+        out.total++; if(free) out.free++; else out.random++;
+        const rr = rec[player] || { wins: 0, losses: 0 };
+        out.wins += rr.wins; out.losses += rr.losses;
+        const champ = !!data.champion && data.champion === player;
+        if(champ) out.champions++;
+        const p = out.players[player] || (out.players[player] = { name: player, count: 0, wins: 0, losses: 0, titles: 0 });
+        p.count++; p.wins += rr.wins; p.losses += rr.losses; if(champ) p.titles++;
+        out.appearances.push({ tournamentId: r.id || null, tournament: data.name || ('Torneio ' + (r.tier || '')), tier: data.tier || r.tier || '', date: r.created_at, player, free, wins: rr.wins, losses: rr.losses, champion: champ });
+        const parsed = x.text ? parseShowdownImport(x.text) : null;
+        const ability = x.ability || (parsed && parsed.ability), moves = (x.moves && x.moves.length) ? x.moves : (parsed ? parsed.moves : []);
+        bump(out.abilities, ability);
+        if(parsed){ bump(out.items, parsed.item); bump(out.tera, parsed.teraType); bump(out.natures, parsed.nature); if(parsed.nickname && out.nicknames.indexOf(parsed.nickname) === -1) out.nicknames.push(parsed.nickname); }
+        (moves || []).forEach(mv => bump(out.moves, mv));
+      });
+    });
+    if(seenHere) out.tournaments++;
+  });
+  if(!out.total) return null;
+  out.appearances.sort((a, b) => new Date(b.date) - new Date(a.date));
+  out.playerList = Object.values(out.players).sort((a, b) => b.count - a.count || b.wins - a.wins || a.name.localeCompare(b.name));
+  return out;
+}
+// Os nomes de todas as espécies que já saíram (para a pesquisa), ordenados A-Z.
+function listSeenSpecies(rows){
+  const set = {};
+  (rows || []).forEach(r => Object.values((r.data || {}).draws || {}).forEach(e => {
+    ((e && e.random) || []).forEach(x => { if(x && x.mon) set[x.mon] = 1; });
+    ((e && e.free) || []).forEach(x => { if(x && x.name) set[x.name] = 1; });
+  }));
+  return Object.keys(set).sort((a, b) => a.localeCompare(b));
+}
+
+// ---------- Retrospectiva da temporada (perfil.html) ----------
+// Resumo de UM jogador numa temporada: torneios, vitórias/derrotas, títulos, finais, maior sequência de vitórias, Pokémon mais usados, golpe mais usado, freguês e nemesis.
+// Só conta partidas com vencedor (desistências incluídas, como no resto das estatísticas). Devolve null se o jogador não jogou nessa temporada.
+function computeSeasonRecap(allRows, name, season){
+  const anchor = getSeasonAnchor(allRows);
+  if(!anchor || !name) return null;
+  const rows = filterRowsBySeason(allRows, season).filter(r => ((r.data || {}).players || []).includes(name))
+    .slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  if(!rows.length) return null;
+  const range = getSeasonDateRange(anchor, season);
+  let wins = 0, losses = 0, titles = 0, finals = 0, streak = 0, bestStreak = 0;
+  const opp = {};
+  rows.forEach(r => {
+    const d = r.data || {};
+    if(d.champion === name) titles++;
+    (d.matches || []).forEach(m => {
+      if(m.next === null && (m.p1 === name || m.p2 === name) && m.p1 && m.p2) finals++;
+      if(!m.winner || !m.p1 || !m.p2 || (m.p1 !== name && m.p2 !== name)) return;
+      const other = m.p1 === name ? m.p2 : m.p1, won = m.winner === name;
+      const o = opp[other] || (opp[other] = { name: other, wins: 0, losses: 0 });
+      if(won){ wins++; o.wins++; streak++; if(streak > bestStreak) bestStreak = streak; }
+      else { losses++; o.losses++; streak = 0; }
+    });
+  });
+  const pk = aggregatePlayerPokemon(rows, name);
+  const topMons = Object.entries(pk.mons).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 3).map(([n, c]) => ({ name: n, count: c }));
+  const topMoveE = Object.entries(pk.moves).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+  const list = Object.values(opp);
+  const victim = list.filter(o => o.wins > 0).sort((a, b) => b.wins - a.wins || a.losses - b.losses || a.name.localeCompare(b.name))[0] || null;
+  const nemesis = list.filter(o => o.losses > 0).sort((a, b) => b.losses - a.losses || a.wins - b.wins || a.name.localeCompare(b.name))[0] || null;
+  const games = wins + losses;
+  return { season, name, start: range.start, end: range.end, tournaments: rows.length, wins, losses, winrate: games ? Math.round(wins / games * 100) : null,
+    titles, finals, bestStreak, topMons, topMove: topMoveE ? { name: topMoveE[0], count: topMoveE[1] } : null, victim, nemesis };
+}
+// Texto pronto a colar no Discord.
+function seasonRecapText(rc, displayName){
+  if(!rc) return '';
+  const f = d => d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' });
+  const lines = [`🎞️ **Retrospectiva da Temporada ${rc.season}** — ${displayName || rc.name} (${f(rc.start)}–${f(rc.end)})`,
+    `🏟️ ${rc.tournaments} torneio${rc.tournaments === 1 ? '' : 's'} · ${rc.wins}V-${rc.losses}D${rc.winrate !== null ? ' (' + rc.winrate + '%)' : ''}${rc.titles ? ' · 🏆 ' + rc.titles + ' título' + (rc.titles === 1 ? '' : 's') : ''}${rc.finals ? ' · ' + rc.finals + ' final' + (rc.finals === 1 ? '' : 'is') : ''}`];
+  if(rc.bestStreak >= 2) lines.push(`🔥 Maior sequência: ${rc.bestStreak} vitórias seguidas`);
+  if(rc.topMons.length) lines.push(`⭐ Pokémon mais usados: ${rc.topMons.map(m => m.name + ' (' + m.count + 'x)').join(', ')}`);
+  if(rc.topMove) lines.push(`⚔️ Golpe preferido: ${rc.topMove.name} (${rc.topMove.count}x)`);
+  if(rc.victim) lines.push(`🎯 Freguês: ${rc.victim.name} (${rc.victim.wins}V)`);
+  if(rc.nemesis) lines.push(`😈 Nemesis: ${rc.nemesis.name} (${rc.nemesis.losses}D)`);
+  return lines.join('\n');
 }
 
 // ---------- Votação do "Apelido da Semana" ----------
