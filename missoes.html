@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261013c">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261013d">
 </head>
 <body>
 <div id="playerCornerContainer"></div>
@@ -52,26 +52,21 @@
 
   <div class="card">
     <h2>📋 Missões da semana</h2>
-    <div class="mw-tabs">
-      <button type="button" class="mw-tab active" id="mwTab0" onclick="loadWeek(0)">Esta semana</button>
-      <button type="button" class="mw-tab" id="mwTab1" onclick="loadWeek(1)">Semana passada</button>
-    </div>
     <div class="mw-head" id="mwHead"></div>
     <div id="mwList"><div class="empty-state">A carregar…</div></div>
-    <div class="mw-note">Missões simples, que pagam pouco, e funcionam sempre (haja evento ou não). A semana vai de segunda a domingo (hora UTC, como o bónus diário). Cada missão só se reclama <b>uma vez por semana</b>, e ainda podes reclamar as da semana passada.</div>
+    <div class="mw-note">Missões simples, que pagam pouco, e funcionam sempre (haja evento ou não). A semana vai de segunda a domingo (hora UTC, como o bónus diário). Cada missão só se reclama <b>uma vez por semana</b>. Na segunda-feira as missões <b>recomeçam do zero</b>: o que não reclamares até domingo perde-se.</div>
   </div>
 
   <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261013c"></script>
+<script src="assets/js/showdown-utils.js?v=20261013d"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
 
 let loggedInPlayerName = null;
-let currentWeek = 0;
 let claimBusy = false;
 
 async function doGateLogin(){
@@ -146,7 +141,7 @@ async function handleDailyBonusClick(){
     const result = await claimDailyBonus(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName);
     if(result.awarded){
       showCelebrationToast(`🎁 Bônus diário de login: +${result.amount} 🪙<br><span style="font-size:11px;opacity:0.85;">Sequência: dia ${result.streak}${result.streak>=7?' (máximo)':''}</span>`);
-      loadWeek(currentWeek);
+      loadWeek();
     }
   } finally {
     dailyBonusClaimInFlight = false;
@@ -166,7 +161,7 @@ async function init(){
     });
     if(typeof mountEventCornerIcon === 'function') mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY);
   } catch(e){ /* o canto é só um extra */ }
-  await loadWeek(0);
+  await loadWeek();
 }
 
 function fmtDay(iso){ return new Date(iso + 'T12:00:00Z').toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', timeZone: 'UTC' }); }
@@ -176,12 +171,10 @@ function leftText(sec){
   return d ? `faltam ${d} dia${d === 1 ? '' : 's'} e ${h} h` : (h ? `faltam ${h} h e ${m} min` : `faltam ${m} min`);
 }
 
-async function loadWeek(weeksAgo){
-  currentWeek = weeksAgo;
-  document.getElementById('mwTab0').classList.toggle('active', weeksAgo === 0);
-  document.getElementById('mwTab1').classList.toggle('active', weeksAgo === 1);
+// Só existe a semana atual (a base recusa qualquer outra): na segunda-feira tudo recomeça.
+async function loadWeek(){
   const list = document.getElementById('mwList'), head = document.getElementById('mwHead');
-  const r = await dbFunction(SUPABASE_URL, SUPABASE_ANON_KEY, 'weekly_missions_status', { p_name: loggedInPlayerName, p_weeks_ago: weeksAgo });
+  const r = await dbFunction(SUPABASE_URL, SUPABASE_ANON_KEY, 'weekly_missions_status', { p_name: loggedInPlayerName, p_weeks_ago: 0 });
   if(r.status === 404){
     setStatus(false, 'Missões ainda não disponíveis.');
     head.innerHTML = '';
@@ -198,7 +191,7 @@ async function loadWeek(weeksAgo){
   const ms = d.missions || [];
   const earned = ms.filter(m => m.claimed).reduce((s, m) => s + m.coins, 0), total = ms.reduce((s, m) => s + m.coins, 0);
   const claimable = ms.filter(m => m.done && !m.claimed).length;
-  head.innerHTML = `<div class="mw-week"><b>${weeksAgo ? 'Semana passada' : 'Esta semana'}</b> · ${fmtDay(d.week_start)} → ${fmtDay(d.week_end)}${weeksAgo ? '' : ` · <span>${leftText(d.seconds_left)}</span>`}</div>
+  head.innerHTML = `<div class="mw-week"><b>Esta semana</b> · ${fmtDay(d.week_start)} → ${fmtDay(d.week_end)} · <span>${leftText(d.seconds_left)}</span></div>
     <div class="mw-sum">🪙 ${earned} de ${total} ganhas${claimable ? ` · <b>${claimable} por reclamar</b>` : ''}</div>`;
   list.innerHTML = ms.map(m => {
     const pct = Math.round(m.value / m.target * 100);
@@ -219,13 +212,13 @@ document.getElementById('mwList').addEventListener('click', async e => {
   const b = e.target.closest('.mw-claim'); if(!b || claimBusy) return;
   claimBusy = true; b.disabled = true;
   try{
-    const r = await dbFunction(SUPABASE_URL, SUPABASE_ANON_KEY, 'claim_weekly_mission', { p_name: loggedInPlayerName, p_mission: b.dataset.id, p_weeks_ago: currentWeek, p_token: getPlayerToken(loggedInPlayerName) });
+    const r = await dbFunction(SUPABASE_URL, SUPABASE_ANON_KEY, 'claim_weekly_mission', { p_name: loggedInPlayerName, p_mission: b.dataset.id, p_weeks_ago: 0, p_token: getPlayerToken(loggedInPlayerName) });
     const d = r.data || {};
     if(d.reason === 'auth'){ handleSessionExpired(); return; }
     if(d.ok) showCelebrationToast(`📋 Missão cumprida! +${d.coins} 🪙`, 4500);
     else alert(d.reason === 'already' ? 'Esta missão já tinha sido reclamada.' : d.reason === 'notdone' ? 'Ainda não cumpriste esta missão.' : 'Não foi possível reclamar agora. Tenta outra vez.');
   } finally { claimBusy = false; }
-  await loadWeek(currentWeek);
+  await loadWeek();
 });
 
 pageBoot();

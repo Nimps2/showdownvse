@@ -758,7 +758,7 @@ function ensureAvatarFxStyles(){
        cintilar; Florescer = pétalas em órbita lenta que respiram. Um anel suave comum dá presença à cor mesmo a meio
        do ciclo. Sem filtros SVG (rasterizavam mal): só gradientes, clip-path, sombras e drop-shadow de HTML. */
     @keyframes vseRingBreath{0%,100%{opacity:0.55;transform:scale(1);}50%{opacity:1;transform:scale(1.035);}}
-    .avatar-fx-sparks::before,.avatar-fx-starry::before,.avatar-fx-blossom::before{content:'';position:absolute;inset:calc(var(--fx-pad,10px)*0.72);border-radius:calc(var(--fx-wrap,60px)*0.2);
+    .avatar-fx-sparks::before,.avatar-fx-starry::before,.avatar-fx-blossom::before,.avatar-fx-plane::before,.avatar-fx-fleet::before,.avatar-fx-balloon::before,.avatar-fx-bats::before,.avatar-fx-ghosts::before{content:'';position:absolute;inset:calc(var(--fx-pad,10px)*0.72);border-radius:calc(var(--fx-wrap,60px)*0.2);
       box-shadow:0 0 0 1.5px color-mix(in srgb,var(--fx-color) 44%,transparent),0 0 12px color-mix(in srgb,var(--fx-color) 36%,transparent),inset 0 0 10px color-mix(in srgb,var(--fx-color) 20%,transparent);
       animation:vseRingBreath 3.2s ease-in-out infinite;}
 
@@ -3833,9 +3833,9 @@ async function fetchNotifications(supabaseUrl, supabaseAnonKey, me){
     get(`profile_comments?target_name=eq.${e(me)}&select=author_name,created_at&order=created_at.desc&limit=15`),
     get(`gifts?to_name=eq.${e(me)}&select=from_name,amount,created_at&order=created_at.desc&limit=15`),
     get(`trade_offers?to_name=eq.${e(me)}&status=eq.pending&select=from_name,created_at&order=created_at.desc&limit=10`),
-    Promise.all([0, 1].map(w => dbFunction(supabaseUrl, supabaseAnonKey, 'weekly_missions_status', { p_name: me, p_weeks_ago: w }).then(r => (r.ok && r.data && r.data.ok ? r.data.missions : [])).catch(() => [])))
+    dbFunction(supabaseUrl, supabaseAnonKey, 'weekly_missions_status', { p_name: me, p_weeks_ago: 0 }).then(r => (r.ok && r.data && r.data.ok ? r.data.missions : [])).catch(() => [])
   ]);
-  const toClaim = (weekly || []).reduce((n, ms) => n + (ms || []).filter(m => m.done && !m.claimed).length, 0);
+  const toClaim = (weekly || []).filter(m => m.done && !m.claimed).length;
   if(toClaim > 0) items.push({ icon: '📋', text: `Tens <b>${toClaim}</b> ${toClaim === 1 ? 'missão semanal' : 'missões semanais'} por reclamar`, href: 'missoes.html', hot: true });
   if(ev){
     const base = `x1_challenges?event_id=eq.${e(ev.id)}&select=challenger_name,opponent_name,status,reported_by,best_of,stake&status=in.(pending,accepted,reported,disputed)`;
