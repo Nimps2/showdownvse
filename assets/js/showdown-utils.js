@@ -3077,14 +3077,14 @@ function getSeasonDateRange(anchor, n){
 }
 
 // Um evento visto pelo calendário: {id, slug, name, status, start, end, endIsForecast, emoji, color, weeks, week}. Datas em dias locais (inclusive).
-//  - terminado: fim = ends_at real · agendado: fim = ends_at previsto (ou início + semanas) · ativo: fim PREVISTO = início + semanas (nunca antes de hoje).
+//  - terminado: fim = ends_at real · agendado: fim = ends_at previsto (ou início + semanas) · ativo: fim PREVISTO = o ends_at que o organizador definiu no gestor ("Fim previsto"), senão início + semanas (nunca antes de hoje).
 function calendarEventFrom(ev, today){
   const start = startOfLocalDay(new Date(ev.starts_at || ev.created_at));
   const weeks = ev.total_weeks > 0 ? ev.total_weeks : 1;
   const forecast = addLocalDays(start, weeks * 7);
   let end, forecastEnd = false;
   if(ev.status === 'ended') end = ev.ends_at ? startOfLocalDay(new Date(ev.ends_at)) : start;   // terminado sem data de fim (eventos de teste antigos): só o dia de início
-  else if(ev.status === 'planned' && ev.ends_at) { end = startOfLocalDay(new Date(ev.ends_at)); forecastEnd = true; }
+  else if((ev.status === 'planned' || ev.status === 'active') && ev.ends_at) { end = startOfLocalDay(new Date(ev.ends_at)); forecastEnd = true; }   // (num evento ativo, ends_at é o fim PREVISTO que o organizador escolheu; ao terminar passa a ser o real)
   else { end = forecast; forecastEnd = true; }
   if(ev.status === 'active' && today && end < today) end = today;     // passou da data prevista e ainda não foi terminado
   if(end < start) end = start;
