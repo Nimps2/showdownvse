@@ -218,8 +218,24 @@ let reopenedNicknameTournaments = [];   // votações do Apelido da Semana REABE
 let myPredictionsForActive = {}; // match_id -> prediction row
 let playerCoins = 0;
 
+// Palpites e apostas no campeão de torneios que já foram APAGADOS nunca se resolvem (as moedas já tinham sido retiradas ao apostar): a base devolve o valor apostado
+// (refund_orphan_bets, SQL v33; é ela que decide o que é "de um torneio apagado") e remove essas apostas. Uma vez por abertura da página; antes de ler o saldo.
+let orphanRefundDone = false;
+async function refundOrphanBets(){
+  if(orphanRefundDone) return;
+  orphanRefundDone = true;
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/refund_orphan_bets`, { method:'POST', headers: Object.assign(sbHeaders(), {'Content-Type':'application/json'}), body: '{}' });
+    if(!res.ok) return;      // 404 = a base ainda não tem a função: ignora
+    const r = await res.json();
+    const mine = r && r.by_player && loggedInPlayerName ? r.by_player[loggedInPlayerName] : 0;
+    if(mine > 0) showCelebrationToast(`↩️ Devolvemos 🪙${mine} de apostas tuas feitas em torneios que já não existem.`);
+  } catch(e){ /* não crítico */ }
+}
+
 async function init(){
   try{
+    await refundOrphanBets();
     // Torneios e perfis ao mesmo tempo (eram um a seguir ao outro).
     const profilesPromise = fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=id,tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
