@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261013e">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261014a">
 <style>
 .nav-link{color:var(--tera-cyan);font-size:12.5px;text-decoration:none;font-family:'Chakra Petch',sans-serif;}
 .nav-link:hover{text-decoration:underline;}
@@ -152,7 +152,7 @@
   <div class="footer-note">Linha do tempo calculada a partir de todos os torneios concluídos guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261013e"></script>
+<script src="assets/js/showdown-utils.js?v=20261014a"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -250,6 +250,7 @@ async function handleDailyBonusClick(){
 }
 
 let allTournamentRows = [];
+let voteWinnersByTournament = {};   // vencedor do Apelido da Semana calculado a partir dos votos que ainda existem (torneios sem data.nicknameWinner)
 let allNicknames = [];
 let nicknamePage = 1;
 const NICKNAMES_PER_PAGE = 12;
@@ -266,10 +267,18 @@ async function init(){
   try{
     // Torneios (com sorteios: aqui contam os apelidos) e perfis ao mesmo tempo.
     const profilesPromise = fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data,featured_match_title,featured_match_replay_path&order=created_at.desc`, {headers: sbHeaders()});
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=id,tier,status,created_at,data,featured_match_title,featured_match_replay_path&order=created_at.desc`, {headers: sbHeaders()});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows = rowsWithoutFlash(await res.json());      // os relâmpagos ficam à parte (não entram no Hall da Fama)
     allTournamentRows = rows;
+    // Torneios antigos (de antes de o gestor guardar o vencedor): calcula-o a partir dos votos que ainda estão na base, pela mesma regra do gestor.
+    try{
+      const votes = await sbFetchAll(`${SUPABASE_URL}/rest/v1/nickname_votes?select=tournament_id,owner_name,nickname,species,id&order=created_at,id`, SUPABASE_ANON_KEY);
+      const byT = {};
+      votes.forEach(v => { (byT[v.tournament_id] = byT[v.tournament_id] || []).push(v); });
+      voteWinnersByTournament = {};
+      Object.keys(byT).forEach(id => { voteWinnersByTournament[id] = computeNicknameWinner(byT[id]); });
+    } catch(e){ voteWinnersByTournament = {}; }
     setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
     playerProfiles = await profilesPromise;
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, playerProfiles[loggedInPlayerName]);
@@ -321,8 +330,8 @@ function onHofFilterChange(){
       const finalMatch = matches.find(m => m.next === null);
       const runnerUp = finalMatch ? ((finalMatch.winner === finalMatch.p1 ? finalMatch.p2 : finalMatch.p1) || '') : '';
       const nicknameMatch = tournamentsWithMatchingNickname.has(data.name || `Torneio ${r.tier||''}`);
-      const nw = data.nicknameWinner || {};
-      const weekNick = `${nw.nickname || ''} ${nw.species || ''}`.toLowerCase().includes(search) && !!nw.nickname;
+      const nw = nicknameWinnerOf(r) || {};
+      const weekNick = !!nw.nickname && `${nw.nickname} ${nw.species || ''}`.toLowerCase().includes(search);
       return title.includes(search) || champion.includes(search) || runnerUp.toLowerCase().includes(search) || nicknameMatch || weekNick;
     });
   }
@@ -432,7 +441,7 @@ function renderTimeline(rows){
         ${runnerUp ? `<div class="runner-up">🥈 Vice-campeão: <a href="perfil.html?jogador=${encodeURIComponent(runnerUp)}">${displayName(runnerUp)}</a></div>` : ''}
         ${bronzePlayers.length ? `<div class="runner-up">🥉 3º lugar: ${bronzePlayers.map(p=>`<a href="perfil.html?jogador=${encodeURIComponent(p)}">${displayName(p)}</a>`).join(' e ')}</div>` : ''}
         ${mvpLine(data)}
-        ${nicknameLine(data)}
+        ${nicknameLine(r)}
         ${momentsLine(data)}
       </div>
     </div>`;
@@ -446,9 +455,18 @@ function mvpLine(data){
   return `<div class="runner-up mvp-line" title="Pontos: KO x10, dano causado /20, jogo sobrevivido x3, jogo ganho x2 (lido dos replays)">🏅 Pokémon MVP: ${pokeSpriteHtml(m.species, 32)} <a href="pokemon.html?especie=${encodeURIComponent(m.species)}">${escapeHtml(m.species)}</a> de <a href="perfil.html?jogador=${encodeURIComponent(m.owner)}">${displayName(m.owner)}</a> <small style="color:var(--text-faint);">· ${m.kos} KO${m.kos === 1 ? '' : 's'}, ${m.dmgDealt}% de dano, ${m.score} pts</small></div>`;
 }
 
-// O Pokémon que ganhou a votação do "Apelido da Semana" desse torneio (data.nicknameWinner, guardado pelo gestor quando apura o vencedor).
-function nicknameLine(data){
-  const n = data && data.nicknameWinner;
+// O vencedor do "Apelido da Semana" de um torneio: o que o gestor guardou (data.nicknameWinner) ou, nos antigos, o calculado dos votos que ainda existem.
+// O torneio mais recente fica de fora do cálculo: a votação dele está aberta até se criar o seguinte (o gestor apura e guarda nessa altura).
+function nicknameWinnerOf(r){
+  const saved = r && r.data && r.data.nicknameWinner;
+  if(saved && saved.nickname && saved.species) return saved;
+  if(!r || !r.id || (allTournamentRows[0] && allTournamentRows[0].id === r.id)) return null;
+  return voteWinnersByTournament[r.id] || null;
+}
+
+// O Pokémon que ganhou a votação do "Apelido da Semana" desse torneio.
+function nicknameLine(r){
+  const n = nicknameWinnerOf(r);
   if(!n || !n.nickname || !n.species) return '';
   const votes = Number(n.votes) || 0;
   return `<div class="runner-up mvp-line" title="Vencedor da votação do Apelido da Semana deste torneio">😂 Apelido da semana: ${pokeSpriteHtml(n.species, 32)} <b>${escapeHtml(n.nickname)}</b> <a href="pokemon.html?especie=${encodeURIComponent(n.species)}">(${escapeHtml(n.species)})</a>${n.owner ? ` de <a href="perfil.html?jogador=${encodeURIComponent(n.owner)}">${displayName(n.owner)}</a>` : ''}${votes ? ` <small style="color:var(--text-faint);">· ${votes} voto${votes === 1 ? '' : 's'}</small>` : ''}</div>`;

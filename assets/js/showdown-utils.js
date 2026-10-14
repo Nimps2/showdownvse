@@ -3528,6 +3528,24 @@ async function castNicknameVote(supabaseUrl, supabaseAnonKey, tournamentId, vote
   }
 }
 
+// O vencedor da votação do "Apelido da Semana" a partir das linhas de votos [{owner_name, nickname, species}] (por ordem de criação):
+// decide o DONO com mais votos no total (soma de todos os apelidos dele; empate: o que apareceu primeiro) e, dentro dele, o apelido mais votado.
+// Usado pelo gestor (resolveNicknameVoteWinner, ao apurar) e pelo Hall da Fama (torneios ainda sem data.nicknameWinner). Devolve {nickname, species, owner, votes, total} ou null.
+function computeNicknameWinner(rows){
+  if(!rows || !rows.length) return null;
+  const ownerTally = {};
+  rows.forEach(r => { ownerTally[r.owner_name] = (ownerTally[r.owner_name] || 0) + 1; });
+  let owner = null, total = 0;
+  Object.entries(ownerTally).forEach(([o, c]) => { if(c > total){ owner = o; total = c; } });
+  if(!owner) return null;
+  const tally = {};
+  rows.filter(r => r.owner_name === owner).forEach(r => { const k = JSON.stringify([r.nickname, r.species]); tally[k] = (tally[k] || 0) + 1; });
+  let best = null, votes = 0;
+  Object.entries(tally).forEach(([k, c]) => { if(c > votes){ best = k; votes = c; } });
+  const pair = JSON.parse(best);
+  return { nickname: pair[0], species: pair[1], owner, votes, total };
+}
+
 async function fetchNicknameVoteStandings(supabaseUrl, supabaseAnonKey, tournamentId){
   const res = await fetch(`${supabaseUrl}/rest/v1/nickname_votes?tournament_id=eq.${tournamentId}&select=*`, {headers: sbAuthHeaders(supabaseAnonKey)});
   if(!res.ok) return [];
