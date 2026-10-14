@@ -321,7 +321,9 @@ function onHofFilterChange(){
       const finalMatch = matches.find(m => m.next === null);
       const runnerUp = finalMatch ? ((finalMatch.winner === finalMatch.p1 ? finalMatch.p2 : finalMatch.p1) || '') : '';
       const nicknameMatch = tournamentsWithMatchingNickname.has(data.name || `Torneio ${r.tier||''}`);
-      return title.includes(search) || champion.includes(search) || runnerUp.toLowerCase().includes(search) || nicknameMatch;
+      const nw = data.nicknameWinner || {};
+      const weekNick = `${nw.nickname || ''} ${nw.species || ''}`.toLowerCase().includes(search) && !!nw.nickname;
+      return title.includes(search) || champion.includes(search) || runnerUp.toLowerCase().includes(search) || nicknameMatch || weekNick;
     });
   }
   renderTimeline(filtered);
@@ -430,6 +432,7 @@ function renderTimeline(rows){
         ${runnerUp ? `<div class="runner-up">🥈 Vice-campeão: <a href="perfil.html?jogador=${encodeURIComponent(runnerUp)}">${displayName(runnerUp)}</a></div>` : ''}
         ${bronzePlayers.length ? `<div class="runner-up">🥉 3º lugar: ${bronzePlayers.map(p=>`<a href="perfil.html?jogador=${encodeURIComponent(p)}">${displayName(p)}</a>`).join(' e ')}</div>` : ''}
         ${mvpLine(data)}
+        ${nicknameLine(data)}
         ${momentsLine(data)}
       </div>
     </div>`;
@@ -441,6 +444,14 @@ function mvpLine(data){
   const m = data && data.mvp && data.mvp.mvp;
   if(!m) return '';
   return `<div class="runner-up mvp-line" title="Pontos: KO x10, dano causado /20, jogo sobrevivido x3, jogo ganho x2 (lido dos replays)">🏅 Pokémon MVP: ${pokeSpriteHtml(m.species, 32)} <a href="pokemon.html?especie=${encodeURIComponent(m.species)}">${escapeHtml(m.species)}</a> de <a href="perfil.html?jogador=${encodeURIComponent(m.owner)}">${displayName(m.owner)}</a> <small style="color:var(--text-faint);">· ${m.kos} KO${m.kos === 1 ? '' : 's'}, ${m.dmgDealt}% de dano, ${m.score} pts</small></div>`;
+}
+
+// O Pokémon que ganhou a votação do "Apelido da Semana" desse torneio (data.nicknameWinner, guardado pelo gestor quando apura o vencedor).
+function nicknameLine(data){
+  const n = data && data.nicknameWinner;
+  if(!n || !n.nickname || !n.species) return '';
+  const votes = Number(n.votes) || 0;
+  return `<div class="runner-up mvp-line" title="Vencedor da votação do Apelido da Semana deste torneio">😂 Apelido da semana: ${pokeSpriteHtml(n.species, 32)} <b>${escapeHtml(n.nickname)}</b> <a href="pokemon.html?especie=${encodeURIComponent(n.species)}">(${escapeHtml(n.species)})</a>${n.owner ? ` de <a href="perfil.html?jogador=${encodeURIComponent(n.owner)}">${displayName(n.owner)}</a>` : ''}${votes ? ` <small style="color:var(--text-faint);">· ${votes} voto${votes === 1 ? '' : 's'}</small>` : ''}</div>`;
 }
 
 // Os destaques tirados dos replays (data.mvp.moments, calculados pelo gestor): jogo mais longo, maior virada, varredura...
