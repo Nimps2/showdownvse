@@ -92,6 +92,7 @@
     <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Vote no apelido mais engraçado/criativo usado neste torneio. Quem vencer ganha 🪙<span id="nicknamePrizeLabel">?</span> quando o próximo torneio for criado.</div>
     <div id="nicknameVoteContainer"><div class="empty-state">A carregar…</div></div>
   </div>
+  <div id="nicknameReopenedContainer"></div>
 
   <div class="card">
     <h2>Palpites abertos</h2>
@@ -213,6 +214,7 @@ async function handleDailyBonusClick(){
 }
 
 let activeTournament = null; // {id, tier, data}
+let reopenedNicknameTournaments = [];   // votações do Apelido da Semana REABERTAS pelo organizador (torneios antigos: data.nicknameVoteOpen): [{id, tier, name, data}]
 let myPredictionsForActive = {}; // match_id -> prediction row
 let playerCoins = 0;
 
@@ -240,11 +242,13 @@ async function init(){
 
     const active = rows.find(r=>r.status==='em_curso') || rows[0] || null;
     activeTournament = active ? { id: active.id, tier: active.tier, data: active.data || {} } : null;
+    reopenedNicknameTournaments = rows.filter(r => r.data && r.data.nicknameVoteOpen === true && (!activeTournament || r.id !== activeTournament.id))
+      .map(r => ({ id: r.id, tier: r.tier, name: (r.data && r.data.name) || `Torneio ${r.tier || ''}`, data: r.data || {} }));
 
     await loadMyPredictions();
     renderOpenMatches();
     // Cada cartão desenha-se no seu próprio contentor e consulta a BD à parte: em paralelo.
-    await Promise.all([renderMyPredictions(), renderRanking(), renderChampionBetCard(), renderChampionBetHistory(), renderNicknameVoteCard()]);
+    await Promise.all([renderMyPredictions(), renderRanking(), renderChampionBetCard(), renderChampionBetHistory(), renderNicknameVoteCard(), renderReopenedNicknameVotes()]);
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
   }
@@ -480,24 +484,43 @@ async function renderNicknameVoteCard(){
     el.innerHTML = '<div class="empty-state">Não há torneio em curso agora.</div>';
     return;
   }
-  const allNicknamesData = aggregateNicknames([{ id: activeTournament.id, tier: activeTournament.tier, data: activeTournament.data, created_at: new Date().toISOString() }]);
+  await renderNicknameVoteInto(el, activeTournament);
+}
+
+// Um cartão por votação reaberta pelo organizador (torneios antigos), além da votação do torneio atual.
+async function renderReopenedNicknameVotes(){
+  const host = document.getElementById('nicknameReopenedContainer');
+  if(!reopenedNicknameTournaments.length){ host.innerHTML = ''; return; }
+  host.innerHTML = reopenedNicknameTournaments.map(t => `<div class="card">
+    <h2>😂 Apelido da Semana reaberto — ${escapeHtml(t.name)} <span class="tier-pill">${escapeHtml(t.tier || '?')}</span></h2>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">O organizador reabriu a votação deste torneio antigo. Vote no apelido mais engraçado/criativo usado nele. Quem vencer ganha 🪙${NICKNAME_VOTE_PRIZE} quando o organizador a fechar.</div>
+    <div id="nicknameVoteContainer-${escapeHtml(t.id)}"><div class="empty-state">A carregar…</div></div>
+  </div>`).join('');
+  await Promise.all(reopenedNicknameTournaments.map(t => renderNicknameVoteInto(document.getElementById('nicknameVoteContainer-' + t.id), t)));
+}
+
+// Desenha a votação do torneio t ({id, tier, data}) dentro de el: lista de apelidos dos OUTROS jogadores, o meu voto e a votação atual.
+async function renderNicknameVoteInto(el, t){
+  if(!el) return;
+  const allNicknamesData = aggregateNicknames([{ id: t.id, tier: t.tier, data: t.data, created_at: new Date().toISOString() }]);
   const votable = allNicknamesData.filter(n=>n.playerName !== loggedInPlayerName);
   if(!votable.length){
     el.innerHTML = '<div class="empty-state">Ainda não há apelidos de outros jogadores neste torneio para votar.</div>';
     return;
   }
 
-  const myVote = await fetchMyNicknameVote(SUPABASE_URL, SUPABASE_ANON_KEY, activeTournament.id, loggedInPlayerName);
-  const standings = await fetchNicknameVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY, activeTournament.id);
+  const myVote = await fetchMyNicknameVote(SUPABASE_URL, SUPABASE_ANON_KEY, t.id, loggedInPlayerName);
+  const standings = await fetchNicknameVoteStandings(SUPABASE_URL, SUPABASE_ANON_KEY, t.id);
+  const selId = `nicknameVoteSelect-${t.id}`;
 
   let html = '';
   if(myVote){
     html += `<div class="bet-placed">Você votou em <b>${escapeHtml(myVote.nickname)}</b> (${escapeHtml(myVote.species)}) de ${escapeHtml(myVote.owner_name)}. Pode trocar o voto abaixo, se mudar de ideias.</div>`;
   }
-  html += `<select id="nicknameVoteSelect">`;
-  html += votable.map(n=>`<option value="${escapeHtml(n.playerName)}|${escapeHtml(n.nickname)}|${escapeHtml(n.species)}" ${myVote && myVote.nickname===n.nickname && myVote.owner_name===n.playerName ? 'selected' : ''}>${escapeHtml(n.nickname)} (${escapeHtml(n.species)}) — de ${escapeHtml(n.playerName)}</option>`).join('');
+  html += `<select id="${escapeHtml(selId)}">`;
+  html += votable.map(n=>`<option value="${escapeHtml(encodeURIComponent(JSON.stringify([n.playerName, n.nickname, n.species])))}" ${myVote && myVote.nickname===n.nickname && myVote.owner_name===n.playerName ? 'selected' : ''}>${escapeHtml(n.nickname)} (${escapeHtml(n.species)}) — de ${escapeHtml(n.playerName)}</option>`).join('');
   html += `</select>`;
-  html += `<button class="btn-primary" onclick="doCastNicknameVote()">${myVote ? 'Trocar voto' : 'Votar'}</button>`;
+  html += `<button class="btn-primary" onclick="doCastNicknameVote(${jsq(t.id)})">${myVote ? 'Trocar voto' : 'Votar'}</button>`;
 
   if(standings.length){
     html += `<div style="margin-top:14px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;">Votação atual</div>`;
@@ -509,11 +532,15 @@ async function renderNicknameVoteCard(){
   el.innerHTML = html;
 }
 
-async function doCastNicknameVote(){
-  const [ownerName, nickname, species] = document.getElementById('nicknameVoteSelect').value.split('|');
-  const result = await castNicknameVote(SUPABASE_URL, SUPABASE_ANON_KEY, activeTournament.id, loggedInPlayerName, ownerName, nickname, species);
+async function doCastNicknameVote(tournamentId){
+  const sel = document.getElementById(`nicknameVoteSelect-${tournamentId}`);
+  if(!sel) return;
+  let ownerName, nickname, species;
+  try{ [ownerName, nickname, species] = JSON.parse(decodeURIComponent(sel.value)); } catch(e){ return; }
+  const result = await castNicknameVote(SUPABASE_URL, SUPABASE_ANON_KEY, tournamentId, loggedInPlayerName, ownerName, nickname, species);
   if(!result.ok){ alert('Não foi possível registar o voto. Tente novamente.'); return; }
-  await renderNicknameVoteCard();
+  if(activeTournament && activeTournament.id === tournamentId) await renderNicknameVoteCard();
+  else { const t = reopenedNicknameTournaments.find(x => x.id === tournamentId); if(t) await renderNicknameVoteInto(document.getElementById('nicknameVoteContainer-' + tournamentId), t); }
   logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'palpite', `Votou em "${nickname}" (${species}) de ${ownerName} para Apelido da Semana`);
 }
 

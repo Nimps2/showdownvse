@@ -461,6 +461,7 @@ function nicknameWinnerOf(r){
   const saved = r && r.data && r.data.nicknameWinner;
   if(saved && saved.nickname && saved.species) return saved;
   if(!r || !r.id || (allTournamentRows[0] && allTournamentRows[0].id === r.id)) return null;
+  if(r.data && r.data.nicknameVoteOpen) return null;      // votação reaberta pelo organizador: ainda sem resultado (aparece quando ele a fechar)
   return voteWinnersByTournament[r.id] || null;
 }
 
