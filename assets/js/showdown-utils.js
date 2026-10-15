@@ -1375,6 +1375,30 @@ function initTheme(){
     document.body.classList.add('light-theme');
   }
   updateThemeIcon();
+  setupMobileScrollers();
+}
+
+// Telemóvel: o menu de cima e as abas deslizam na horizontal. Põe a página atual à vista (o cabeçalho só aparece depois do login, por isso espera-se que o menu ganhe largura)
+// e, ao carregar numa aba, centra-a. Em ecrãs grandes (sem deslize) não faz nada.
+function setupMobileScrollers(){
+  try{
+    const nav = document.querySelector('.topnav');
+    if(nav && 'ResizeObserver' in window){
+      let done = false;
+      new ResizeObserver(() => {
+        if(done || !nav.clientWidth) return;
+        done = true;
+        const cur = nav.querySelector('a.current');
+        if(cur && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, cur.offsetLeft - (nav.clientWidth - cur.offsetWidth) / 2);
+      }).observe(nav);
+    }
+    document.addEventListener('click', e => {
+      const b = e.target && e.target.closest ? e.target.closest('.tabs .tab-btn') : null;
+      if(!b) return;
+      const box = b.parentElement;
+      if(box && box.scrollWidth > box.clientWidth) box.scrollTo({ left: Math.max(0, b.offsetLeft - (box.clientWidth - b.offsetWidth) / 2), behavior: 'smooth' });
+    });
+  } catch(e){ /* não crítico */ }
 }
 function toggleTheme(){
   document.body.classList.toggle('light-theme');
