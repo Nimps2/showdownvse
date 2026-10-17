@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261017a">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261017b">
 <style>
 .match-bet-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;}
 .match-bet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
@@ -117,7 +117,7 @@
   <div class="footer-note">Aposta moedas em quem vai vencer cada partida — acerta e ganha o dobro, erra e perde a aposta. Jogos de sorte como a roleta agora ficam na <a class="nav-link" href="loja.html">loja</a>. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261017a"></script>
+<script src="assets/js/showdown-utils.js?v=20261017b"></script>
 <script>
 initTheme();
 document.getElementById('nicknamePrizeLabel').textContent = NICKNAME_VOTE_PRIZE;
@@ -233,9 +233,22 @@ async function refundOrphanBets(){
   } catch(e){ /* não crítico */ }
 }
 
+// Resolve E PAGA os palpites e as apostas no campeão que já têm resultado, na própria base de dados (settle_bets, SQL v35): tudo numa só transação, por isso um F5
+// a meio já não deixa uma aposta "ganha" sem pagamento (era a página que marcava a aposta e só depois pedia o pagamento). Corre antes de ler o saldo.
+async function settleBets(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/settle_bets`, { method:'POST', headers: Object.assign(sbHeaders(), {'Content-Type':'application/json'}), body: '{}' });
+    if(!res.ok) return;      // 404 = a base ainda não tem a função: as apostas ficam por resolver até ela existir
+    const r = await res.json();
+    const mine = r && r.by_player && loggedInPlayerName ? r.by_player[loggedInPlayerName] : 0;
+    if(mine > 0) showCelebrationToast(`🎉 Ganhaste 🪙${mine} nas tuas apostas!`, 5000);
+  } catch(e){ /* não crítico: tenta-se na próxima vez */ }
+}
+
 async function init(){
   try{
     await refundOrphanBets();
+    await settleBets();
     // Torneios e perfis ao mesmo tempo (eram um a seguir ao outro).
     const profilesPromise = fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=id,tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
@@ -243,9 +256,6 @@ async function init(){
     const rows = rowsWithoutFlash(await res.json());      // o Palpiteiro, as apostas no campeão e o apelido da semana são do torneio normal: os relâmpagos ficam de fora
     setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
 
-    // (estas duas pagam moedas: ficam uma a seguir à outra, para não haver duas escritas de saldo ao mesmo tempo)
-    await resolvePendingPredictions(rows);
-    await resolvePendingChampionBets(SUPABASE_URL, SUPABASE_ANON_KEY, rows);
 
     const profiles = await profilesPromise;
     document.getElementById('playerCornerContainer').innerHTML = renderPlayerCornerBadge(loggedInPlayerName, profiles[loggedInPlayerName]);
@@ -333,31 +343,6 @@ async function doPlaceChampionBet(multiplier){
   await renderChampionBetCard();
   await renderChampionBetHistory();
   logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'palpite', `Apostou 🪙${amount} em ${picked} ser campeão da semana (${multiplier}x)`);
-}
-
-async function resolvePendingPredictions(allRows){
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/predictions?resolved=eq.false&select=*`, {headers: sbHeaders()});
-  if(!res.ok) return;
-  const pending = await res.json();
-  if(!pending.length) return;
-
-  const tournamentsById = {};
-  allRows.forEach(r=>{ tournamentsById[r.id] = r.data || {}; });
-
-  for(const pred of pending){
-    const data = tournamentsById[pred.tournament_id];
-    if(!data) continue;
-    const match = (data.matches || []).find(m => m.id === pred.match_id);
-    if(!match || !match.winner) continue; // ainda não decidido, deixa pendente
-
-    const correct = match.winner === pred.predicted_winner;
-    // Reclama a aposta ANTES de pagar: se dois jogadores abrirem a página ao mesmo tempo, só um consegue (e só esse paga).
-    if(!(await claimBetResolution(SUPABASE_URL, SUPABASE_ANON_KEY, 'predictions', pred.id, correct))) continue;
-    if(correct && pred.wager > 0){
-      const paid = await adjustPlayerCoins(SUPABASE_URL, SUPABASE_ANON_KEY, pred.predictor_name, pred.wager * 2, `Palpite correto: ${pred.predicted_winner}`);
-      if(!paid) await releaseBetResolution(SUPABASE_URL, SUPABASE_ANON_KEY, 'predictions', pred.id); // volta a ficar pendente
-    }
-  }
 }
 
 async function loadMyPredictions(){

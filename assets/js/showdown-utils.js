@@ -2760,57 +2760,7 @@ async function fetchMyChampionBet(supabaseUrl, supabaseAnonKey, tournamentId, na
   return (rows && rows[0]) ? rows[0] : null;
 }
 
-// Resolve apostas de campeão pendentes — chamado sempre que a página carrega,
-// tal como já fazemos com os palpites por partida.
-async function resolvePendingChampionBets(supabaseUrl, supabaseAnonKey, allRows){
-  const res = await fetch(`${supabaseUrl}/rest/v1/champion_bets?resolved=eq.false&select=*`, {headers: sbAuthHeaders(supabaseAnonKey)});
-  if(!res.ok) return;
-  const pending = await res.json();
-  if(!pending.length) return;
-
-  const tournamentsById = {};
-  allRows.forEach(r=>{ tournamentsById[r.id] = r.data || {}; });
-
-  for(const bet of pending){
-    const data = tournamentsById[bet.tournament_id];
-    if(!data || !data.champion) continue; // torneio ainda não tem campeão definido, deixa pendente
-
-    const correct = data.champion === bet.predicted_champion;
-    // Primeiro reclama a aposta (marca-a como resolvida), só depois paga: dois jogadores a abrir a página ao mesmo
-    // tempo já não pagam o prémio a dobrar — só quem conseguir marcar a aposta é que paga.
-    if(!(await claimBetResolution(supabaseUrl, supabaseAnonKey, 'champion_bets', bet.id, correct))) continue;
-    const payout = Math.round(bet.wager * bet.multiplier);
-    if(correct && payout > 0){
-      const paid = await adjustPlayerCoins(supabaseUrl, supabaseAnonKey, bet.predictor_name, payout, `Acertou o campeão da semana: ${bet.predicted_champion} (${bet.multiplier}x)`);
-      if(!paid) await releaseBetResolution(supabaseUrl, supabaseAnonKey, 'champion_bets', bet.id); // volta a ficar pendente, tenta-se de novo
-    }
-  }
-}
-
-// Reclama a resolução de uma aposta (tabelas predictions / champion_bets): o PATCH só altera a linha se ainda estiver por
-// resolver e devolve-a; só quem a recebe de volta (true) deve pagar o prémio.
-async function claimBetResolution(supabaseUrl, supabaseAnonKey, table, id, correct){
-  try{
-    const res = await fetch(`${supabaseUrl}/rest/v1/${table}?id=eq.${id}&resolved=eq.false`, {
-      method:'PATCH',
-      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=representation'}),
-      body: JSON.stringify({ resolved:true, correct })
-    });
-    if(!res.ok) return false;
-    const rows = await res.json();
-    return !!(rows && rows.length);
-  } catch(e){ return false; }
-}
-// Desfaz a reclamação se o pagamento falhou (a aposta volta a ficar pendente).
-async function releaseBetResolution(supabaseUrl, supabaseAnonKey, table, id){
-  try{
-    await fetch(`${supabaseUrl}/rest/v1/${table}?id=eq.${id}`, {
-      method:'PATCH',
-      headers: Object.assign(sbAuthHeaders(supabaseAnonKey), {'Content-Type':'application/json','Prefer':'return=minimal'}),
-      body: JSON.stringify({ resolved:false, correct:null })
-    });
-  } catch(e){ /* sem rede: fica por resolver e o organizador pode acertar à mão */ }
-}
+// (As apostas no campeão e os palpites são resolvidos E pagos pela base de dados — função settle_bets, SQL v35 —, chamada pelo Palpiteiro ao abrir.)
 
 async function fetchChampionBetHistory(supabaseUrl, supabaseAnonKey, name, limit){
   const res = await fetch(`${supabaseUrl}/rest/v1/champion_bets?predictor_name=eq.${encodeURIComponent(name)}&select=*&order=created_at.desc&limit=${limit||20}`, {headers: sbAuthHeaders(supabaseAnonKey)});
