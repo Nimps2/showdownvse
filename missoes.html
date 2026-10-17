@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261015a">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261017a">
 </head>
 <body>
 <div id="playerCornerContainer"></div>
@@ -74,7 +74,7 @@
   <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261015a"></script>
+<script src="assets/js/showdown-utils.js?v=20261017a"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -206,8 +206,10 @@ async function loadWeek(){
   const ms = d.missions || [];
   const earned = ms.filter(m => m.claimed).reduce((s, m) => s + m.coins, 0), total = ms.reduce((s, m) => s + m.coins, 0);
   const claimable = ms.filter(m => m.done && !m.claimed).length;
+  const claimableCoins = ms.filter(m => m.done && !m.claimed).reduce((s, m) => s + m.coins, 0);
   head.innerHTML = `<div class="mw-week"><b>Esta semana</b> · ${fmtDay(d.week_start)} → ${fmtDay(d.week_end)} · <span>${leftText(d.seconds_left)}</span></div>
-    <div class="mw-sum">🪙 ${earned} de ${total} ganhas${claimable ? ` · <b>${claimable} por reclamar</b>` : ''}</div>`;
+    <div class="mw-sum">🪙 ${earned} de ${total} ganhas${claimable ? ` · <b>${claimable} por reclamar</b>` : ''}</div>
+    ${claimable ? `<div style="margin-top:10px;"><button type="button" class="mw-claim" id="mwClaimAll" onclick="claimAllWeekly(this)">🎁 Coletar todas as recompensas (${claimable} · 🪙${claimableCoins})</button></div>` : ''}`;
   list.innerHTML = ms.map(m => {
     const pct = Math.round(m.value / m.target * 100);
     const link = MISSION_LINKS[m.id];
@@ -221,6 +223,27 @@ async function loadWeek(){
       <div class="mw-side"><div class="mw-reward">🪙 ${m.coins}</div><div class="mw-prog">${m.value}/${m.target}</div><div class="mw-act">${action}</div></div>
     </div>`;
   }).join('') || '<div class="empty-state">Sem missões.</div>';
+}
+
+// "Coletar todas": reclama de seguida todas as missões semanais já cumpridas.
+async function claimAllWeekly(btn){
+  if(claimBusy) return;
+  const ids = Array.from(document.querySelectorAll('#mwList .mw-claim')).map(b => b.dataset.id).filter(Boolean);
+  if(!ids.length) return;
+  claimBusy = true; if(btn) btn.disabled = true;
+  let n = 0, coins = 0, expired = false, failed = 0;
+  try{
+    for(const id of ids){
+      const r = await dbFunction(SUPABASE_URL, SUPABASE_ANON_KEY, 'claim_weekly_mission', { p_name: loggedInPlayerName, p_mission: id, p_weeks_ago: 0, p_token: getPlayerToken(loggedInPlayerName) });
+      const d = r.data || {};
+      if(d.reason === 'auth'){ expired = true; break; }
+      if(d.ok){ n++; coins += d.coins || 0; } else if(d.reason !== 'already') failed++;
+    }
+  } finally { claimBusy = false; }
+  if(expired){ handleSessionExpired(); return; }
+  if(n) showCelebrationToast(`📋 ${n} missã${n === 1 ? 'o cumprida' : 'es cumpridas'}! +${coins} 🪙`, 5000);
+  if(failed) alert(`${failed} missã${failed === 1 ? 'o' : 'es'} não ${failed === 1 ? 'foi reclamada' : 'foram reclamadas'}. Tenta outra vez.`);
+  await loadWeek();
 }
 
 document.getElementById('mwList').addEventListener('click', async e => {

@@ -256,7 +256,8 @@
 
   function renderMissions(ctx, api){
     const all = EventCore.expandMissions(mod, ctx.ev, { x1: api.x1On }, ctx);
-    let html = '';
+    const nReady = all.filter(m => { const s = EventCore.evaluate(ctx, m); return s.done && !s.claimed && !m.locked; }).length;
+    let html = nReady ? `<div class="hw-claimall"><button type="button" class="hw-claim" onclick="doClaimAll(this)">🎁 Coletar todas as recompensas (${nReady})</button></div>` : '';
     mod.weeks.forEach((w, i) => { html += weekMissionsHtml(ctx, api, all, i + 1); });
     const ev = all.filter(m => m.scope === 'event');
     const evReady = ev.filter(m => { const s = EventCore.evaluate(ctx, m); return s.done && !s.claimed && !m.locked; }).length;

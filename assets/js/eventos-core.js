@@ -288,12 +288,33 @@ const EventCore = (function(){
   // ---------- Reclamar uma missão ----------
   const claimsInFlight = new Set();
   // Devolve {ok, reason, rewards}. reason: 'notdone' | 'already' | 'locked' | 'payment' | 'error' | 'busy'
-  async function claimMission(ctx, mission){
+  async function claimMission(ctx, mission){ return claimOne(ctx, mission, null); }
+  // Missões prontas a reclamar: cumpridas, ainda não reclamadas e já abertas.
+  function claimable(mod, ctx, opts){
+    return expandMissions(mod, ctx.ev, opts, ctx).filter(m => { const s = evaluate(ctx, m); return s.done && !s.claimed && !m.locked; });
+  }
+  // Reclama várias de uma vez ("coletar todas"): UM carregamento de dados frescos para todas (em vez de um por missão) e outro no fim.
+  // Pára à primeira falha a sério (pagamento/erro). Devolve {done:[{mission, rewards, granted}], failed:[{mission, reason}]}.
+  async function claimMissions(ctx, missions){
+    const out = { done: [], failed: [] };
+    if(!missions.length) return out;
+    const fresh = await load(ctx.ev, ctx.me);
+    for(const m of missions){
+      const r = await claimOne(ctx, m, fresh);
+      if(r.ok){ out.done.push({ mission: m, rewards: r.rewards, granted: r.granted }); fresh.claimedIds.add(m.id); }
+      else out.failed.push({ mission: m, reason: r.reason });
+      if(r.reason === 'payment' || r.reason === 'error') break;
+    }
+    Object.assign(ctx, await load(ctx.ev, ctx.me));
+    return out;
+  }
+  // freshIn = dados já carregados (reclamar em lote); null = carrega aqui e recarrega no fim (uma missão só).
+  async function claimOne(ctx, mission, freshIn){
     if(claimsInFlight.has(mission.id)) return { ok:false, reason:'busy' };
     claimsInFlight.add(mission.id);
     try{
       // dados frescos: o progresso pode ter mudado desde que a página abriu
-      const fresh = await load(ctx.ev, ctx.me);
+      const fresh = freshIn || await load(ctx.ev, ctx.me);
       const st = evaluate(fresh, mission);
       if(mission.locked) return { ok:false, reason:'locked' };
       if(st.claimed) { Object.assign(ctx, fresh); return { ok:false, reason:'already' }; }
@@ -330,7 +351,7 @@ const EventCore = (function(){
         const g = await grantCosmetic(URL_, KEY_, ctx.me, [mission.grantsCosmeticId]);
         granted = g.added || [];
       }
-      Object.assign(ctx, await load(ctx.ev, ctx.me));
+      if(!freshIn) Object.assign(ctx, await load(ctx.ev, ctx.me));
       return { ok:true, rewards: { xp: row.xp, miles: row.currency, coins: row.coins }, granted };
     } finally {
       claimsInFlight.delete(mission.id);
@@ -809,5 +830,5 @@ const EventCore = (function(){
     }
   };
 
-  return { init, load, refresh, signature, computeWeekStats, measure, expandMissions, evaluate, totals, levelFor, ranking, claimMission, syncLevelRewards, board, x1, shop, utcDay };
+  return { init, load, refresh, signature, computeWeekStats, measure, expandMissions, evaluate, totals, levelFor, ranking, claimMission, claimMissions, claimable, syncLevelRewards, board, x1, shop, utcDay };
 })();

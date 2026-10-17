@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261015a">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261017a">
 </head>
 <body>
 <div id="playerCornerContainer"></div>
@@ -81,7 +81,7 @@
   <div class="footer-note">Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261015a"></script>
+<script src="assets/js/showdown-utils.js?v=20261017a"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -242,7 +242,8 @@ function renderPass(){
     <div class="ps-levelrow"><div class="ps-level">Nível ${x.level}<small> / ${cfg.max_level}</small></div><div class="ps-xp">${x.total} XP${maxed ? ' · nível máximo! 🏆' : ` · faltam ${cfg.level_xp - x.into_level} para o nível ${x.level + 1}`}</div></div>
     <div class="ps-bar"><i style="width:${pct}%"></i></div>
     <div class="ps-src">${sources.map(([i, l, v]) => `<span class="ps-chip" title="${escapeHtml(l)}">${i} ${escapeHtml(l)}: <b>${v}</b> XP</span>`).join('')}</div>
-    ${s.unclaimed > 0 ? `<div style="margin-top:12px;"><button type="button" class="mw-claim" onclick="claimAllRewards()">🎁 Reclamar ${s.unclaimed} recompensa${s.unclaimed === 1 ? '' : 's'}</button></div>` : ''}`;
+    ${(() => { const nm = s.state === 'ended' ? 0 : (s.missions || []).filter(m => m.done && !m.claimed && !m.locked).length, n = nm + (s.unclaimed || 0);
+      return n > 0 ? `<div style="margin-top:12px;"><button type="button" class="mw-claim" onclick="claimEverything()">🎁 Coletar tudo (${nm ? nm + (nm === 1 ? ' missão' : ' missões') : ''}${nm && s.unclaimed ? ' + ' : ''}${s.unclaimed ? s.unclaimed + ' recompensa' + (s.unclaimed === 1 ? '' : 's') : ''})</button></div>` : ''; })()}`;
   rewardsCard.style.display = '';
   document.getElementById('psRewardsNote').textContent = s.state === 'ended' ? 'As recompensas dos níveis que alcançaste continuam por reclamar até as levantares.' : 'Chega ao nível indicado e carrega para reclamar. As cinzentas ainda estão por alcançar.';
   document.getElementById('psTrack').innerHTML = (s.rewards || []).map(r => psRewardHtml(r, true)).join('');
@@ -283,6 +284,26 @@ function psRewardMsg(d){
   if(d.kind === 'coins') return `+${d.coins} 🪙`;
   if(d.kind === 'perk') return d.fallback ? `+${d.coins} 🪙 (já tinhas a vantagem)` : escapeHtml(d.label);
   return escapeHtml(d.label || 'Cosmético novo');
+}
+// "Coletar tudo": primeiro as missões cumpridas (dão XP e podem subir de nível), depois as recompensas de todos os níveis já alcançados.
+async function claimEverything(){
+  if(passBusy || !passState) return;
+  passBusy = true;
+  let nm = 0, xp = 0, expired = false;
+  try{
+    const todo = (passState.missions || []).filter(m => m.done && !m.claimed && !m.locked && passState.state !== 'ended').map(m => m.id);
+    for(const id of todo){
+      const r = await dbFunction(SUPABASE_URL, SUPABASE_ANON_KEY, 'claim_pass_mission', { p_name: loggedInPlayerName, p_mission: id, p_token: getPlayerToken(loggedInPlayerName) });
+      const d = r.data || {};
+      if(d.reason === 'auth'){ expired = true; break; }
+      if(d.ok){ nm++; xp += d.xp || 0; }
+    }
+  } finally { passBusy = false; }
+  if(expired){ handleSessionExpired(); return; }
+  const lvBefore = passState && passState.xp ? passState.xp.level : 0;
+  if(nm){ showCelebrationToast(`📋 ${nm} ${nm === 1 ? 'missão' : 'missões'} do passe cumprida${nm === 1 ? '' : 's'}! +${xp} XP`, 4500); await loadPass(); }    // recarrega: o XP novo pode ter alcançado níveis novos
+  await claimAllRewards();
+  if(passState && passState.xp && passState.xp.level > lvBefore) showCelebrationToast(`⬆️ Subiste para o nível ${passState.xp.level} do passe!`, 5000);
 }
 async function claimAllRewards(){
   if(passBusy || !passState) return;

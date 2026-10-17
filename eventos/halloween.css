@@ -214,6 +214,8 @@ body.light-theme .ev-theme-halloween [data-region="halloween"]{--accent:#c25a00;
 .ev-theme-halloween .hw-claim{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:13px;padding:7px 16px;border:0;border-radius:9px;cursor:pointer;color:#0a0c14;
   background:linear-gradient(135deg,var(--hw-gold),var(--tera-cyan));animation:hwClaimGlow 2s ease-in-out infinite;}
 .ev-theme-halloween .hw-claim:disabled{opacity:0.5;cursor:default;animation:none;}
+.ev-theme-halloween .hw-claimall{margin:0 0 14px;}
+.ev-theme-halloween .hw-claimall .hw-claim{width:100%;padding:12px 16px;font-size:14px;}
 @keyframes hwClaimGlow{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--hw-gold) 0%,transparent);}50%{box-shadow:0 0 12px 2px color-mix(in srgb,var(--hw-gold) 55%,transparent);}}
 .ev-theme-halloween .hw-pass.ready{border-color:color-mix(in srgb,var(--hw-gold) 70%,var(--line));}
 .ev-theme-halloween .hw-pass.claimed{opacity:0.72;}

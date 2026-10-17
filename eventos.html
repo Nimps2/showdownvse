@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@600;700&family=Special+Elite&family=Caveat:wght@500;600&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261015a">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261017a">
 <style>
 /* O visual de cada evento vive em eventos/<slug>.css (carregado dinamicamente). */
 #eventRoot{min-height:240px;}
@@ -92,8 +92,8 @@
   <div class="footer-note">As missões são calculadas a partir do que já fizeste no site — clica em "Reclamar" para receber os prémios.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261015a"></script>
-<script src="assets/js/eventos-core.js?v=20261015a"></script>
+<script src="assets/js/showdown-utils.js?v=20261017a"></script>
+<script src="assets/js/eventos-core.js?v=20261017a"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -203,7 +203,7 @@ const visibleTabs = () => mod.tabs.filter(t => !t.needs || (t.needs === 'x1' && 
 // Versão dos ficheiros do evento (showdown-utils.js, eventos-core.js e eventos/<slug>.*): MUDAR (aqui e nas
 // duas <script src="...?v="> lá em cima) sempre que algum deles mudar, para o browser não misturar ficheiros
 // novos com versões antigas em cache.
-const EV_ASSET_VERSION = '20261015a';
+const EV_ASSET_VERSION = '20261017a';
 
 // Carrega o CSS e o JS do evento ativo (cada evento tem o seu par). O slug só pode ter a-z, 0-9 e "-".
 function loadEventAssets(slug){
@@ -394,6 +394,36 @@ async function doClaim(missionId, btn){
     if(msg) alert(msg);
     renderAll();
   }
+}
+
+// "Coletar todas": reclama de uma vez as missões já cumpridas e abertas (as moedas, o XP e os cosméticos como se as reclamasses uma a uma).
+async function doClaimAll(btn){
+  const list = EventCore.claimable(mod, ctx, { x1: X1_ENABLED });
+  if(!list.length){ renderAll(); return; }
+  if(btn) btn.disabled = true;
+  const levelBefore = EventCore.levelFor(mod, EventCore.totals(ctx, loggedInPlayerName).xp).level;
+  const r = await EventCore.claimMissions(ctx, list);
+  const sum = r.done.reduce((a, d) => ({ xp: a.xp + d.rewards.xp, miles: a.miles + d.rewards.miles, coins: a.coins + d.rewards.coins }), { xp: 0, miles: 0, coins: 0 });
+  const granted = r.done.reduce((n, d) => n + (d.granted ? d.granted.length : 0), 0);
+  if(r.done.length){
+    showCelebrationToast(`🎫 ${r.done.length} missã${r.done.length === 1 ? 'o cumprida' : 'es cumpridas'}!<br><span style="font-size:11px;opacity:0.9;">+${sum.xp} XP · ${mod.currency.emoji} ${sum.miles}${sum.coins ? ' · 🪙 ' + sum.coins : ''}${granted ? ' · 🎁 ' + granted + ' cosmético' + (granted === 1 ? '' : 's') + ' novo' + (granted === 1 ? '' : 's') : ''}</span>`, 5500);
+    refreshMyCoins();
+  }
+  if(r.failed.length){
+    const pay = r.failed.some(f => f.reason === 'payment');
+    const others = r.failed.filter(f => f.reason !== 'already' && f.reason !== 'busy' && f.reason !== 'notdone');
+    if(pay) alert('Não consegui pagar as moedas de uma missão — essa NÃO foi marcada como reclamada. Tenta outra vez (as anteriores já foram reclamadas).');
+    else if(others.length) alert('Algumas missões não foram reclamadas (' + others.length + '). Tenta outra vez.');
+  }
+  renderAll();
+  const levelAfter = EventCore.levelFor(mod, EventCore.totals(ctx, loggedInPlayerName).xp).level;
+  if(levelAfter > levelBefore){
+    setTimeout(() => {
+      showCelebrationToast(`⬆️ Subiste para o <b>nível ${levelAfter}</b>!`, 5500);
+      if(mod.celebrate) mod.celebrate({ getBoundingClientRect: () => ({ left: window.innerWidth / 2, top: window.innerHeight / 3, width: 0, height: 0 }) }, 'level');
+    }, 700);
+  }
+  await syncRewards();
 }
 
 async function doPostCard(btn){

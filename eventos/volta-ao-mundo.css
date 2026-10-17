@@ -256,6 +256,8 @@ body.light-theme .ev-theme-volta-ao-mundo [data-region="sinnoh"]{--accent:#7c4dc
 .ev-theme-volta-ao-mundo .vm-claim{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:13px;padding:7px 16px;border:0;border-radius:9px;cursor:pointer;color:#0a0c14;
   background:linear-gradient(135deg,var(--vm-gold),var(--tera-cyan));animation:vmClaimGlow 2s ease-in-out infinite;}
 .ev-theme-volta-ao-mundo .vm-claim:disabled{opacity:0.5;cursor:default;animation:none;}
+.ev-theme-volta-ao-mundo .vm-claimall{margin:0 0 14px;}
+.ev-theme-volta-ao-mundo .vm-claimall .vm-claim{width:100%;padding:12px 16px;font-size:14px;}
 @keyframes vmClaimGlow{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--vm-gold) 0%,transparent);}50%{box-shadow:0 0 12px 2px color-mix(in srgb,var(--vm-gold) 55%,transparent);}}
 .ev-theme-volta-ao-mundo .vm-pass.ready{border-color:color-mix(in srgb,var(--vm-gold) 70%,var(--line));}
 .ev-theme-volta-ao-mundo .vm-pass.claimed{opacity:0.72;}
