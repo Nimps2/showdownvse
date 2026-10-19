@@ -3195,27 +3195,88 @@ function countOwnedPokemonMvps(allRows, name){
   return (allRows || []).filter(r => r && r.data && r.data.mvp && r.data.mvp.mvp && r.data.mvp.mvp.owner === name).length;
 }
 // Estilo de jogo (pelos replays): data.mvp.styles[jogador] de cada torneio, somado. Devolve sempre um objeto (games = 0 quando não há dados).
+// A partir da leitura v3 cada estilo traz também os contadores novos (g3 = jogos lidos com eles): só esses jogos entram nas taxas novas, para os torneios antigos não as diluírem.
+function replayStyleV3Keys(){ return REPLAY_SIDE_SUMS.map(k => k === 'moves' ? 'moves3' : k).concat(['g3', 'turns3', 'teraTurnSum', 'teraGames3']); }       // função (e não const) porque REPLAY_SIDE_SUMS é definido mais abaixo no ficheiro
+function addReplaySideToStyle(s, parsed, side){
+  const sd = parsed && parsed.side && parsed.side[side]; if(!sd) return;
+  replayStyleV3Keys().forEach(k => { if(typeof s[k] !== 'number') s[k] = 0; });
+  s.g3++; s.turns3 += parsed.turns || 0;
+  REPLAY_SIDE_SUMS.forEach(k => { const key = k === 'moves' ? 'moves3' : k; s[key] += sd[k] || 0; });
+  if(sd.teraTurn){ s.teraTurnSum += sd.teraTurn; s.teraGames3++; }
+  if(sd.lead){ s.leads = s.leads || {}; s.leads[sd.lead] = (s.leads[sd.lead] || 0) + 1; }
+  if(sd.closer){ s.closers = s.closers || {}; s.closers[sd.closer] = (s.closers[sd.closer] || 0) + 1; }
+}
 function sumReplayStyle(allRows, name){
   const t = { tournaments: 0, games: 0, wins: 0, turns: 0, kos: 0, dmgDealt: 0, dmgTaken: 0, switches: 0, moves: 0, sweeps: 0, tanks: 0, comebacks: 0, tera: 0 };
+  replayStyleV3Keys().forEach(k => { t[k] = 0; });
+  t.leads = {}; t.closers = {};
   (allRows || []).forEach(r => {
     const s = r && r.data && r.data.mvp && r.data.mvp.styles && r.data.mvp.styles[name];
     if(!s || !s.games) return;
     t.tournaments++;
-    Object.keys(t).forEach(k => { if(k !== 'tournaments') t[k] += +s[k] || 0; });
+    Object.keys(t).forEach(k => { if(k !== 'tournaments' && k !== 'leads' && k !== 'closers') t[k] += +s[k] || 0; });
+    ['leads', 'closers'].forEach(m => Object.keys(s[m] || {}).forEach(k => { t[m][k] = (t[m][k] || 0) + (+s[m][k] || 0); }));
   });
   return t;
 }
-// O "estilo" de um jogador, com números e uma etiqueta. Limiares calibrados com os replays reais (mediana: 25 turnos, 0,15 trocas por turno, 21% de dano por turno).
-// Precisa de pelo menos 3 jogos lidos para dar uma etiqueta (menos que isso é ruído). Devolve null se não houver dados nenhuns.
+// As características de estilo. Cada uma mede UMA coisa por jogo (ou por turno) e só se mostra quando o jogador a tem claramente acima da média do grupo (ratio) E acima de um mínimo (min).
+// Limiares calibrados com os 68 replays reais (Backups/calibra_estilo_v3.html). get(t) recebe a soma do jogador (sumReplayStyle) e só corre com t.g3 > 0.
+const REPLAY_TRAIT_DEFS = [
+  { id: 'trap', icon: '🪤', name: 'Armadilheiro', get: t => t.hazardsSet / t.g3, min: 0.8, ratio: 1.4, unit: 'armadilhas por jogo', text: 'Põe armadilhas (Stealth Rock, Spikes…) para desgastar o adversário à entrada.' },
+  { id: 'setup', icon: '📈', name: 'Acumulador', get: t => t.boosts / t.g3, min: 4, ratio: 1.4, unit: 'subidas de atributo por jogo', text: 'Gosta de subir atributos (Swords Dance, Calm Mind…) e varrer o adversário.' },
+  { id: 'chip', icon: '☠️', name: 'Desgastador', get: t => t.chip / t.g3, min: 50, ratio: 1.4, unit: '% de dano indireto por jogo', text: 'Tira vida com estados, armadilhas e prisões antes de atacar a sério.' },
+  { id: 'wall', icon: '🛡️', name: 'Muralha', get: t => (t.protects + t.heals + t.subs) / t.g3, min: 2.5, ratio: 1.5, unit: 'defesas por jogo (Protect, curas, Substitute)', text: 'Joga à defesa: protege-se, cura-se e faz o adversário gastar turnos.' },
+  { id: 'switch', icon: '🔁', name: 'Estratégico', get: t => t.manualSwitches / Math.max(1, t.turns3), min: 0.15, ratio: 1.3, unit: 'trocas a sério por turno', fmt: v => (v * 100).toFixed(0) + '%', text: 'Troca muito de Pokémon de propósito: lê o jogo e vive do posicionamento.' },
+  { id: 'pivot', icon: '🔀', name: 'Pivô', get: t => t.pivotSwitches / t.g3, min: 1.2, ratio: 1.5, unit: 'trocas de pivô por jogo (U-turn, Volt Switch…)', text: 'Mantém a pressão trocando a atacar com U-turn, Volt Switch e semelhantes.' },
+  { id: 'field', icon: '🌦️', name: 'Controlador de campo', get: t => (t.field + t.screens) / t.g3, min: 0.6, ratio: 1.5, unit: 'campos e telas por jogo (clima, terreno, Tailwind, Reflect…)', text: 'Domina o campo: clima, terreno, Tailwind, Trick Room e telas.' },
+  { id: 'kamikaze', icon: '💣', name: 'Kamikaze', get: t => t.sacs / t.g3, min: 0.25, ratio: 1.5, unit: 'sacrifícios por jogo (Explosion, Memento…)', text: 'Não tem medo de sacrificar um Pokémon para virar o jogo.' },
+  { id: 'attack', icon: '⚔️', name: 'Ofensivo', get: t => t.attackMoves / Math.max(1, t.moves3), min: 0.74, ratio: 1.12, unit: 'dos golpes são ataques', fmt: v => Math.round(v * 100) + '%', text: 'Quase todos os turnos são a atacar: pouca paciência para jogos de espera.' },
+  { id: 'weakness', icon: '🎯', name: 'Caçador de fraquezas', get: t => t.seHits / t.g3, min: 5, ratio: 1.3, unit: 'golpes super eficazes por jogo', text: 'Acerta onde dói: aproveita as fraquezas do adversário.' },
+  { id: 'oneshot', icon: '💥', name: 'Executor', get: t => t.oneShots / t.g3, min: 1.5, ratio: 1.4, unit: 'KOs de um só golpe por jogo', text: 'Tira Pokémon de vida cheia de uma só pancada.' }
+];
+function replayTraitFmt(def, v){ return def.fmt ? def.fmt(v) : (Math.round(v * 10) / 10).toLocaleString('pt-PT'); }
+// A média do GRUPO de cada característica: média das taxas dos jogadores com jogos suficientes (cada jogador pesa o mesmo, não quem tem mais jogos). null se houver menos de 3 jogadores com dados.
+function replayStyleGroupBase(allRows){
+  const names = {};
+  (allRows || []).forEach(r => Object.keys((r && r.data && r.data.mvp && r.data.mvp.styles) || {}).forEach(n => { names[n] = 1; }));
+  const totals = Object.keys(names).map(n => sumReplayStyle(allRows, n)).filter(t => t.g3 >= STYLE_MIN_GAMES);
+  if(totals.length < 3) return null;
+  const base = {};
+  REPLAY_TRAIT_DEFS.forEach(d => { base[d.id] = totals.reduce((a, t) => a + d.get(t), 0) / totals.length; });
+  base.players = totals.length;
+  return base;
+}
+// O "estilo" de um jogador, com números e características. Precisa de pelo menos 3 jogos lidos para dar etiquetas (menos que isso é ruído). Devolve null se não houver dados nenhuns.
 const STYLE_MIN_GAMES = 3;
 function playerReplayStyle(allRows, name){
   const t = sumReplayStyle(allRows, name);
   if(!t.games) return null;
   const turns = Math.max(1, t.turns), g = t.games;
   const out = { games: g, tournaments: t.tournaments, winrate: Math.round(t.wins / g * 100), avgTurns: Math.round(t.turns / g), switchRate: t.switches / turns, switchesPerGame: Math.round(t.switches / g * 10) / 10,
-    koPerGame: Math.round(t.kos / g * 10) / 10, dmgPerTurn: Math.round(t.dmgDealt / turns), teraPct: Math.round(t.tera / g * 100), sweeps: t.sweeps, tanks: t.tanks, comebacks: t.comebacks, label: null };
+    koPerGame: Math.round(t.kos / g * 10) / 10, dmgPerTurn: Math.round(t.dmgDealt / turns), teraPct: Math.round(t.tera / g * 100), sweeps: t.sweeps, tanks: t.tanks, comebacks: t.comebacks, label: null, traits: [], v3: false };
+  if(t.g3 > 0){          // há jogos lidos com os contadores novos
+    const g3 = t.g3, per = k => Math.round(t[k] / g3 * 10) / 10;
+    out.v3 = true; out.games3 = g3;
+    out.stats = { manualSwitches: per('manualSwitches'), pivotSwitches: per('pivotSwitches'), hazardsSet: per('hazardsSet'), boosts: per('boosts'), statuses: per('statuses'), defenses: Math.round((t.protects + t.heals + t.subs) / g3 * 10) / 10,
+      field: Math.round((t.field + t.screens) / g3 * 10) / 10, crits: per('crits'), critsTaken: per('critsTaken'), misses: per('misses'), chip: Math.round(t.chip / g3), oneShots: per('oneShots'), seHits: per('seHits'),
+      attackPct: Math.round(t.attackMoves / Math.max(1, t.moves3) * 100), teraTurn: t.teraGames3 ? Math.round(t.teraTurnSum / t.teraGames3) : null };
+    const top = m => { const e = Object.entries(t[m] || {}).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]; return e ? { name: e[0], count: e[1] } : null; };
+    out.lead = top('leads'); out.closer = top('closers');
+  }
   if(g >= STYLE_MIN_GAMES){
-    if(out.switchRate >= 0.22) out.label = { icon: '🔁', name: 'Estratégico', text: 'Troca muito de Pokémon: lê o jogo e joga com o posicionamento.' };
+    if(t.g3 >= STYLE_MIN_GAMES){
+      const base = replayStyleGroupBase(allRows);
+      out.groupPlayers = base ? base.players : 0;
+      const all = REPLAY_TRAIT_DEFS.map(d => {
+        const v = d.get(t), b = base ? base[d.id] : null, ratio = b && b > 0 ? v / b : (b === 0 && v > 0 ? 99 : 1);
+        return { id: d.id, icon: d.icon, name: d.name, text: d.text, unit: d.unit, value: v, valueText: replayTraitFmt(d, v), base: b, baseText: b === null ? null : replayTraitFmt(d, b), ratio, ok: v >= d.min && (base ? ratio >= d.ratio : true) };
+      });
+      out.compare = base ? all.slice().sort((a, b) => b.ratio - a.ratio) : [];       // todas as medidas contra a média do grupo (para a tabela de comparação)
+      out.traits = all.filter(x => x.ok).sort((a, b) => b.ratio - a.ratio).slice(0, 3);
+    }
+    if(out.traits.length) out.label = { icon: out.traits[0].icon, name: out.traits[0].name, text: out.traits[0].text };
+    else if(out.v3 && t.g3 >= STYLE_MIN_GAMES) out.label = { icon: '⚖️', name: 'Equilibrado', text: 'Nenhum traço se destaca da média do grupo: mistura ataque, trocas e defesa sem se prender a um estilo.' };
+    else if(out.switchRate >= 0.22) out.label = { icon: '🔁', name: 'Estratégico', text: 'Troca muito de Pokémon: lê o jogo e joga com o posicionamento.' };
     else if(out.switchRate <= 0.10) out.label = { icon: '⚔️', name: 'Atacante', text: 'Raramente troca: deixa os Pokémon a atacar de frente.' };
     else out.label = { icon: '⚖️', name: 'Equilibrado', text: 'Mistura ataque e trocas, sem se prender a um estilo.' };
   }
@@ -3288,10 +3349,30 @@ function replayLogFromHtml(html){
   const m = /<script type="text\/plain" class="battle-log-data">([\s\S]*?)<\/script>/.exec(String(html || ''));
   return m ? m[1].split('\\/').join('/') : null;      // nos ficheiros de replay as barras vêm como "\/" (para não fecharem o <script>)
 }
+// Golpes/campos que a leitura dos replays reconhece pelo nome (o resto vem dos próprios eventos do registo: -boost, -status, -crit...).
+const REPLAY_PIVOT_MOVES = { 'U-turn': 1, 'Volt Switch': 1, 'Flip Turn': 1, 'Parting Shot': 1, 'Teleport': 1, 'Baton Pass': 1, 'Shed Tail': 1, 'Chilly Reception': 1 };
+const REPLAY_HAZARDS = { 'Stealth Rock': 1, 'Spikes': 1, 'Toxic Spikes': 1, 'Sticky Web': 1 };
+const REPLAY_SCREENS = { 'Reflect': 1, 'Light Screen': 1, 'Aurora Veil': 1 };
+const REPLAY_PROTECTS = { 'Protect': 1, 'Detect': 1, "King's Shield": 1, 'Spiky Shield': 1, 'Baneful Bunker': 1, 'Obstruct': 1, 'Silk Trap': 1, 'Burning Bulwark': 1 };
+const REPLAY_SAC_MOVES = { 'Explosion': 1, 'Self-Destruct': 1, 'Misty Explosion': 1, 'Memento': 1, 'Healing Wish': 1, 'Lunar Dance': 1, 'Final Gambit': 1 };
+// Números que o leitor guarda POR LADO em cada jogo (res.side[p1|p2]) e que o estilo de jogo soma por jogador. teraTurn (turno do 1.º Tera), lead e closer não são somas.
+const REPLAY_SIDE_SUMS = ['moves', 'attackMoves', 'manualSwitches', 'pivotSwitches', 'hazardsSet', 'hazardsCleared', 'screens', 'field', 'statuses', 'boosts', 'heals', 'healPct', 'protects', 'subs',
+  'crits', 'critsTaken', 'misses', 'seHits', 'resistedHits', 'chip', 'sacs', 'oneShots'];
 function parseReplayLog(log){
   // Além dos Pokémon, devolve por jogo: teamSize (tamanho do time de cada lado), switches (trocas VOLUNTÁRIAS: o Pokémon que saía ainda estava de pé), deficit (a maior desvantagem em
   // Pokémon que cada lado chegou a ter) e left/leftHp (quantos Pokémon sobraram de pé no fim e a vida, em %, dos que se viram). Servem os "Momentos" e o "Estilo de jogo".
-  const res = { players: {}, winnerName: null, winnerSide: null, turns: 0, mons: [], teamSize: {}, switches: { p1: 0, p2: 0 }, deficit: { p1: 0, p2: 0 }, left: {}, leftHp: {} };
+  // res.side[p1|p2] (v3): contadores por lado — golpes de ataque vs. outros, trocas a sério vs. trocas de pivô (U-turn...), armadilhas postas/retiradas, telas, campo (clima, terreno, Tailwind, Trick Room),
+  // estados causados, subidas de atributos, curas, Protect, Substitute, críticos dados/sofridos, falhanços, golpes super eficazes/pouco eficazes, desgaste (dano indireto causado), sacrifícios,
+  // turno do Tera, KOs de um só golpe, Pokémon de abertura e Pokémon que fechou o jogo.
+  const res = { players: {}, winnerName: null, winnerSide: null, turns: 0, mons: [], teamSize: {}, switches: { p1: 0, p2: 0 }, deficit: { p1: 0, p2: 0 }, left: {}, leftHp: {}, side: {} };
+  const newSide = () => ({ moves: 0, attackMoves: 0, manualSwitches: 0, pivotSwitches: 0, hazardsSet: 0, hazardsCleared: 0, screens: 0, field: 0, statuses: 0, boosts: 0, heals: 0, healPct: 0, protects: 0, subs: 0,
+    crits: 0, critsTaken: 0, misses: 0, seHits: 0, resistedHits: 0, chip: 0, sacs: 0, oneShots: 0, teraTurn: 0, lead: null, closer: null });
+  res.side.p1 = newSide(); res.side.p2 = newSide();
+  const sideOf = s => { const m = /^(p[12])/.exec(String(s || '')); return m ? m[1] : null; };       // 'p1a: X' ou 'p1: nome' -> 'p1'
+  const otherSide = s => s === 'p1' ? 'p2' : (s === 'p2' ? 'p1' : null);
+  const bareMove = s => String(s || '').replace(/^move: /, '').trim();
+  const pivotPending = { p1: false, p2: false }, forcedPending = { p1: false, p2: false }, moveTokens = [];
+  let curMove = null, actorMove = '';
   const pokeCount = {}, faints = { p1: 0, p2: 0 };
   const sizeOf = side => res.teamSize[side] || pokeCount[side] || 6;
   const byKey = {}, active = {};
@@ -3316,15 +3397,74 @@ function parseReplayLog(log){
     if(cmd === 'poke'){ if(/^p[1-4]$/.test(p[2])) pokeCount[p[2]] = (pokeCount[p[2]] || 0) + 1; return; }
     if(cmd === 'switch' || cmd === 'drag'){
       const pos = posOf(p[2]); if(!pos) return;
-      if(cmd === 'switch' && active[pos] && !active[pos].fainted && res.switches[pos.slice(0, 2)] !== undefined) res.switches[pos.slice(0, 2)]++;
-      const species = String(p[3] || '').split(',')[0].trim(), m = mon(pos.slice(0, 2), species);
+      const sd = pos.slice(0, 2);
+      if(cmd === 'switch' && active[pos] && !active[pos].fainted && res.switches[sd] !== undefined){
+        res.switches[sd]++;
+        // trocas a sério (o jogador escolheu trocar) vs. de pivô (U-turn...) vs. forçadas (Eject Button, Emergency Exit): só as primeiras dizem algo do estilo
+        if(pivotPending[sd]){ res.side[sd].pivotSwitches++; pivotPending[sd] = false; }
+        else if(forcedPending[sd]) forcedPending[sd] = false;
+        else res.side[sd].manualSwitches++;
+      }
+      const species = String(p[3] || '').split(',')[0].trim(), m = mon(sd, species);
+      if(cmd === 'switch' && !active[pos] && res.turns === 0 && res.side[sd] && !res.side[sd].lead) res.side[sd].lead = species;       // o Pokémon de abertura
       m.appeared = true;
       const nick = String(p[2]).slice(String(p[2]).indexOf(':') + 1).trim();
       if(nick && nick !== species) m.nickname = nick;
       m.hp = parseHp(p[4], m.hp);
       active[pos] = m; return;
     }
-    if(cmd === 'move'){ const m = active[posOf(p[2])]; actor = m || null; if(m) m.moves++; return; }
+    if(cmd === 'move'){
+      const pos = posOf(p[2]), m = active[pos]; actor = m || null; if(m) m.moves++;
+      const sd = pos ? pos.slice(0, 2) : null;
+      actorMove = String(p[3] || '').trim();
+      curMove = sd && res.side[sd] ? { side: sd, hit: false } : null;
+      if(curMove){ res.side[sd].moves++; moveTokens.push(curMove); }
+      if(sd && REPLAY_PIVOT_MOVES[actorMove]) pivotPending[sd] = true;
+      return;
+    }
+    if(cmd === '-sidestart' || cmd === '-sideend'){
+      const sd = sideOf(p[2]), what = bareMove(p[3]), rest = p.slice(4);
+      if(!sd || !res.side[sd]) return;
+      if(cmd === '-sidestart'){
+        if(REPLAY_HAZARDS[what]){ const setter = otherSide(sd); if(setter) res.side[setter].hazardsSet++; }       // as armadilhas ficam do lado de quem as sofre
+        else if(REPLAY_SCREENS[what]) res.side[sd].screens++;
+        else if(what === 'Tailwind') res.side[sd].field++;
+      } else if(REPLAY_HAZARDS[what]){
+        const from = rest.find(x => x.indexOf('[from]') === 0), of = rest.find(x => x.indexOf('[of]') === 0);
+        if(from && /move:/i.test(from)){ const remover = of ? sideOf(of.slice(4).trim()) : (actor ? actor.side : null); if(remover && res.side[remover]) res.side[remover].hazardsCleared++; }
+      }
+      return;
+    }
+    if(cmd === '-weather' || cmd === '-fieldstart'){
+      if(cmd === '-weather' && (p[2] === 'none' || p.indexOf('[upkeep]') > 0)) return;
+      const of = p.slice(3).find(x => x.indexOf('[of]') === 0), sd = of ? sideOf(of.slice(4).trim()) : (actor ? actor.side : null);       // quem pôs o clima/terreno: a habilidade de quem entrou, ou o golpe
+      if(sd && res.side[sd]) res.side[sd].field++;
+      return;
+    }
+    if(cmd === '-status'){
+      const sd = sideOf(p[2]); if(!sd) return;
+      const rest = p.slice(4), from = rest.find(x => x.indexOf('[from]') === 0) || '', of = rest.find(x => x.indexOf('[of]') === 0);
+      if(/item:/i.test(from) || /move: Rest/i.test(from)) return;                    // Toxic Orb, Flame Orb e Rest: o estado foi escolhido pelo próprio
+      const setter = of ? sideOf(of.slice(4).trim()) : otherSide(sd);
+      if(setter && setter !== sd && res.side[setter]) res.side[setter].statuses++;
+      return;
+    }
+    if(cmd === '-boost' || cmd === '-setboost'){
+      const sd = sideOf(p[2]); if(!sd || !res.side[sd]) return;
+      const stat = p[3], n = cmd === '-setboost' ? (/Belly Drum/i.test(raw) ? 6 : 0) : (+p[4] || 0);
+      if(n > 0 && (cmd === '-setboost' || /^(atk|def|spa|spd|spe)$/.test(stat))) res.side[sd].boosts += n;
+      return;
+    }
+    if(cmd === '-singleturn'){ const sd = sideOf(p[2]); if(sd && res.side[sd] && REPLAY_PROTECTS[bareMove(p[3])]) res.side[sd].protects++; return; }
+    if(cmd === '-start'){ const sd = sideOf(p[2]); if(sd && res.side[sd] && bareMove(p[3]) === 'Substitute') res.side[sd].subs++; return; }
+    if(cmd === '-enditem'){ const sd = sideOf(p[2]); if(sd && /^(Eject Button|Eject Pack)$/.test(String(p[3] || '').trim())) forcedPending[sd] = true; return; }
+    if(cmd === '-activate'){ const sd = sideOf(p[2]); if(sd && /(Emergency Exit|Wimp Out)/.test(String(p[3] || ''))) forcedPending[sd] = true; return; }
+    if(cmd === '-crit'){ const sd = sideOf(p[2]), o = otherSide(sd); if(o && res.side[o]){ res.side[o].crits++; res.side[sd].critsTaken++; } return; }
+    if(cmd === '-miss'){ const sd = sideOf(p[2]); if(sd && res.side[sd]) res.side[sd].misses++; return; }
+    if(cmd === '-supereffective' || cmd === '-resisted'){
+      const o = otherSide(sideOf(p[2])); if(o && res.side[o]) res.side[o][cmd === '-supereffective' ? 'seHits' : 'resistedHits']++;
+      return;
+    }
     if(cmd === '-damage'){
       const t = active[posOf(p[2])]; if(!t) return;
       const nh = parseHp(p[3], t.hp), drop = Math.max(0, t.hp - nh);
@@ -3334,17 +3474,41 @@ function parseReplayLog(log){
       else if(from){
         const f = from.slice(6).trim();
         if(/^(item:|Recoil|Struggle|Substitute|ability:)/i.test(f)) self = true;      // dano a si próprio: ninguém é culpado
-        else { src = t.lastHit; indirect = true; }                                      // veneno, pedras, areia...: o último que o atingiu
+        else {
+          src = t.lastHit; indirect = true;                                            // veneno, pedras, areia...: o último que o atingiu
+          // desgaste: o dano indireto de armadilhas, estados e prisões conta para o lado contrário (quem as pôs)
+          if(/^(Stealth Rock|Spikes|psn|tox|brn|Leech Seed|Salt Cure|Curse|Nightmare|Bind|Wrap|Fire Spin|Whirlpool|Sand Tomb|Magma Storm|Clamp|Infestation|Snap Trap|Thunder Cage|partiallytrapped)/i.test(f)){
+            const o = otherSide(t.side); if(o && res.side[o]) res.side[o].chip += drop;
+          }
+        }
       } else { src = actor; }
       if(src && (src === t || src.side === t.side)) src = null;
       t.hp = nh; t.dmgTaken += drop;
-      if(src && !indirect){ src.dmgDealt += drop; t.lastHit = src; }
+      if(src && !indirect){
+        src.dmgDealt += drop; t.lastHit = src;
+        if(!from && !of && src === actor && res.side[src.side]){
+          if(curMove && curMove.side === src.side) curMove.hit = true;                  // este golpe fez dano (conta como golpe de ataque)
+          if(drop >= 99.5 && nh <= 0) res.side[src.side].oneShots++;                      // tirou um Pokémon de vida cheia de uma só vez
+        }
+      }
       t.lastIndirect = indirect; t.lastSelf = self || (!src && !indirect);
       return;
     }
-    if(cmd === '-heal' || cmd === '-sethp'){ const t = active[posOf(p[2])]; if(t) t.hp = parseHp(p[3], t.hp); return; }
+    if(cmd === '-heal' || cmd === '-sethp'){
+      const t = active[posOf(p[2])];
+      if(t){
+        const nh = parseHp(p[3], t.hp);
+        if(cmd === '-heal' && res.side[t.side]){
+          const from = p.slice(4).find(x => x.indexOf('[from]') === 0) || '', gain = nh - t.hp;
+          if(gain > 0 && (!from || /move:/i.test(from))){ res.side[t.side].heals++; res.side[t.side].healPct += gain; }      // curas de golpe (Recover, Roost, Wish...); itens e habilidades não contam
+        }
+        t.hp = nh;
+      }
+      return;
+    }
     if(cmd === 'faint'){
       const t = active[posOf(p[2])]; if(!t || t.fainted) return;
+      if(actor === t && REPLAY_SAC_MOVES[actorMove] && res.side[t.side]) res.side[t.side].sacs++;        // desmaiou do próprio golpe (Explosion, Memento...): foi um sacrifício
       t.fainted = true; t.hp = 0;
       const by = t.lastSelf ? null : t.lastHit;
       if(by && by.side !== t.side){ by.kos++; if(!t.lastIndirect) by.directKos++; }
@@ -3356,12 +3520,26 @@ function parseReplayLog(log){
       }
       return;
     }
-    if(cmd === '-terastallize'){ const m = active[posOf(p[2])]; if(m) m.tera = p[3] || true; return; }
-    if(cmd === 'turn'){ res.turns = +p[2] || res.turns; Object.keys(active).forEach(k => { if(!active[k].fainted) active[k].turnsActive++; }); return; }
+    if(cmd === '-terastallize'){
+      const m = active[posOf(p[2])]; if(m){ m.tera = p[3] || true; if(res.side[m.side] && !res.side[m.side].teraTurn) res.side[m.side].teraTurn = Math.max(1, res.turns); }
+      return;
+    }
+    if(cmd === 'turn'){
+      res.turns = +p[2] || res.turns; pivotPending.p1 = pivotPending.p2 = false; forcedPending.p1 = forcedPending.p2 = false;
+      Object.keys(active).forEach(k => { if(!active[k].fainted) active[k].turnsActive++; });
+      return;
+    }
     if(cmd === 'win'){ res.winnerName = p[2] || null; }
   });
   Object.keys(res.players).forEach(side => { if(res.winnerName && res.players[side] === res.winnerName) res.winnerSide = side; });
+  moveTokens.forEach(t => { if(t.hit && res.side[t.side]) res.side[t.side].attackMoves++; });
+  if(res.winnerSide && res.side[res.winnerSide]){      // o Pokémon que fechou o jogo: o que estava em campo no fim (ou o último de pé)
+    const w = res.winnerSide, act = active[w + 'a'];
+    const alive = act && !act.fainted ? act : Object.keys(byKey).map(k => byKey[k]).filter(m => m.side === w && m.appeared && !m.fainted).pop();
+    if(alive) res.side[w].closer = alive.species;
+  }
   ['p1', 'p2'].forEach(side => {
+    res.side[side].healPct = Math.round(res.side[side].healPct); res.side[side].chip = Math.round(res.side[side].chip);
     res.left[side] = Math.max(0, sizeOf(side) - faints[side]);
     res.leftHp[side] = Object.keys(byKey).map(k => byKey[k]).filter(m => m.side === side && m.appeared && !m.fainted).map(m => Math.round(m.hp));
   });
@@ -3409,6 +3587,7 @@ function aggregateReplayMvp(games, draws, players){
       s.turns += g.parsed.turns || 0; s.switches += (g.parsed.switches && g.parsed.switches[side]) || 0;
       mine.forEach(m => { s.kos += m.kos; s.dmgDealt += m.dmgDealt; s.dmgTaken += m.dmgTaken; s.moves += m.moves; if(m.kos >= STYLE_SWEEP_KOS) s.sweeps++; if(!m.fainted && m.dmgTaken >= STYLE_TANK_DMG) s.tanks++; });
       if(mine.some(m => m.tera)) s.tera++;
+      addReplaySideToStyle(s, g.parsed, side);
     });
     g.parsed.mons.forEach(m => {
       const k = id(m.species);
@@ -3423,7 +3602,7 @@ function aggregateReplayMvp(games, draws, players){
     .sort((a, b) => b.score - a.score || b.kos - a.kos || b.dmgDealt - a.dmgDealt || a.species.localeCompare(b.species));
   const mvp = stats.find(s => s.owner) || null;
   Object.keys(styles).forEach(k => { const s = styles[k]; s.dmgDealt = Math.round(s.dmgDealt); s.dmgTaken = Math.round(s.dmgTaken); });
-  return { v: 2, computedAt: new Date().toISOString(), replays: used, skipped, mvp, stats: stats.slice(0, 24), moments: computeReplayMoments(momentGames), styles };
+  return { v: 3, computedAt: new Date().toISOString(), replays: used, skipped, mvp, stats: stats.slice(0, 24), moments: computeReplayMoments(momentGames), styles };
 }
 
 // Momentos do torneio: os destaques que se tiram dos replays (um de cada tipo, o mais extremo). momentGames = [{label, parsed, owner:{p1,p2}}].
@@ -3451,6 +3630,16 @@ function computeReplayMoments(momentGames){
   }));
   if(sweep) out.push({ kind: 'sweep', label: sweep.g.label, species: sweep.species, n: sweep.kos, owner: nameOf(sweep.g, sweep.side) });
   if(tank) out.push({ kind: 'tank', label: tank.g.label, species: tank.species, dmg: tank.dmg, owner: nameOf(tank.g, tank.side) });
+  // Momentos da leitura v3: o jogador que mais fez uma coisa num só jogo (limiares altos, calibrados com os replays reais: só 1 a 4 jogos em 68 chegam a cada um)
+  const bestSide = key => {
+    let best = null;
+    games.forEach(g => ['p1', 'p2'].forEach(side => { const sd = g.parsed.side && g.parsed.side[side]; if(sd && sd[key] > 0 && (!best || sd[key] > best.n)) best = { n: sd[key], g, side }; }));
+    return best;
+  };
+  [['crit', 'crits', 3], ['oneshot', 'oneShots', 5], ['swaps', 'manualSwitches', 11], ['hazards', 'hazardsSet', 4], ['protect', 'protects', 5], ['chip', 'chip', 200]].forEach(([kind, key, min]) => {
+    const b = bestSide(key);
+    if(b && b.n >= min) out.push({ kind, label: b.g.label, n: b.n, owner: nameOf(b.g, b.side), vs: nameOf(b.g, opp(b.side)) });
+  });
   return out;
 }
 // A frase de cada momento (português). Devolve { icon, title, text }.
@@ -3465,6 +3654,12 @@ function momentText(it){
     case 'thread': return { icon: '😅', title: 'Por um fio', text: `${J(it.winner)} fechou o jogo contra ${J(it.loser)} só com ${J(it.species)} com ${it.hp}% de vida${where}` };
     case 'sweep': return { icon: '🧹', title: 'Varredura', text: `${J(it.species)} de ${J(it.owner)} derrubou ${it.n} Pokémon num só jogo${where}` };
     case 'tank': return { icon: '🧱', title: 'Muralha', text: `${J(it.species)} de ${J(it.owner)} aguentou ${it.dmg}% de dano e continuou de pé${where}` };
+    case 'crit': return { icon: '🍀', title: 'Sorte de campeão', text: `${J(it.owner)} acertou ${it.n} críticos num só jogo contra ${J(it.vs)}${where}` };
+    case 'oneshot': return { icon: '💥', title: 'Mão pesada', text: `${J(it.owner)} tirou ${it.n} Pokémon de vida cheia de uma só pancada contra ${J(it.vs)}${where}` };
+    case 'swaps': return { icon: '🪑', title: 'Dança das cadeiras', text: `${J(it.owner)} trocou ${it.n} vezes de Pokémon num só jogo contra ${J(it.vs)}${where}` };
+    case 'hazards': return { icon: '🪤', title: 'Campo minado', text: `${J(it.owner)} pôs ${it.n} camadas de armadilhas contra ${J(it.vs)}${where}` };
+    case 'protect': return { icon: '🙈', title: 'Esconde-esconde', text: `${J(it.owner)} usou Protect ${it.n} vezes num só jogo contra ${J(it.vs)}${where}` };
+    case 'chip': return { icon: '☠️', title: 'Morte lenta', text: `${J(it.owner)} causou ${it.n}% de dano acumulado a ${J(it.vs)} só com estados e armadilhas${where}` };
     default: return null;
   }
 }

@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261017b">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261019a">
 <style>
 .customize-toggle-btn{
   background:var(--bg-card);border:1px solid var(--line);color:var(--tera-cyan);padding:9px 16px;
@@ -127,7 +127,7 @@
   <div class="footer-note">Estatísticas calculadas a partir de todos os torneios guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261017b"></script>
+<script src="assets/js/showdown-utils.js?v=20261019a"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -465,17 +465,40 @@ async function renderProfile(){
     <div class="card" id="styleCard">
       <h2>🎭 Estilo de jogo <span style="font-size:10.5px;color:var(--text-faint);font-weight:400;text-transform:none;">lido dos replays dos torneios</span></h2>
       ${replayStyle.label
-        ? `<div class="style-badge"><span class="si">${replayStyle.label.icon}</span><div><b>${escapeHtml(replayStyle.label.name)}</b><div class="st">${escapeHtml(replayStyle.label.text)}</div></div></div>`
+        ? `<div class="style-badge"><span class="si">${replayStyle.label.icon}</span><div><b>${escapeHtml(replayStyle.label.name)}</b><div class="st">${escapeHtml(replayStyle.label.text)}</div>${replayStyle.traits && replayStyle.traits[0] ? `<div class="sv">${escapeHtml(replayStyle.traits[0].valueText)} ${escapeHtml(replayStyle.traits[0].unit)}${replayStyle.traits[0].baseText !== null ? ` · média do grupo ${escapeHtml(replayStyle.traits[0].baseText)}` : ''}</div>` : ''}</div></div>`
         : `<div style="font-size:12px;color:var(--text-faint);margin-bottom:10px;">Só há ${replayStyle.games} jogo${replayStyle.games === 1 ? '' : 's'} lido${replayStyle.games === 1 ? '' : 's'} — com 3 já dá para dizer que estilo tens.</div>`}
+      ${replayStyle.traits && replayStyle.traits.length > 1 ? `<div class="style-traits">${replayStyle.traits.slice(1).map(tr => `<div class="style-trait"><span class="si">${tr.icon}</span><div><b>${escapeHtml(tr.name)}</b><div class="st">${escapeHtml(tr.text)}</div><div class="sv">${escapeHtml(tr.valueText)} ${escapeHtml(tr.unit)}${tr.baseText !== null ? ` · média do grupo ${escapeHtml(tr.baseText)}` : ''}</div></div></div>`).join('')}</div>` : ''}
       <div class="stat-grid">
         <div class="stat-box"><div class="n">${replayStyle.games}</div><div class="l">Jogos lidos</div></div>
         <div class="stat-box"><div class="n">${replayStyle.avgTurns}</div><div class="l">Turnos por jogo</div></div>
-        <div class="stat-box"><div class="n">${replayStyle.switchesPerGame}</div><div class="l">Trocas por jogo</div></div>
+        <div class="stat-box"><div class="n">${replayStyle.v3 ? replayStyle.stats.manualSwitches : replayStyle.switchesPerGame}</div><div class="l">${replayStyle.v3 ? 'Trocas a sério por jogo' : 'Trocas por jogo'}</div></div>
         <div class="stat-box"><div class="n">${replayStyle.koPerGame}</div><div class="l">KOs por jogo</div></div>
         <div class="stat-box"><div class="n">${replayStyle.dmgPerTurn}%</div><div class="l">Dano por turno</div></div>
         <div class="stat-box"><div class="n">${replayStyle.teraPct}%</div><div class="l">Jogos com Tera</div></div>
       </div>
+      ${replayStyle.v3 ? `
+      <div class="stat-grid" style="margin-top:8px;">
+        <div class="stat-box"><div class="n">${replayStyle.stats.attackPct}%</div><div class="l">Turnos a atacar</div></div>
+        <div class="stat-box"><div class="n">${replayStyle.stats.pivotSwitches}</div><div class="l">Pivôs por jogo</div></div>
+        <div class="stat-box"><div class="n">${replayStyle.stats.hazardsSet}</div><div class="l">Armadilhas por jogo</div></div>
+        <div class="stat-box"><div class="n">${replayStyle.stats.boosts}</div><div class="l">Subidas por jogo</div></div>
+        <div class="stat-box"><div class="n">${replayStyle.stats.statuses}</div><div class="l">Estados por jogo</div></div>
+        <div class="stat-box"><div class="n">${replayStyle.stats.defenses}</div><div class="l">Defesas por jogo</div></div>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--text-dim);line-height:1.7;">
+        🍀 Críticos: <b>${replayStyle.stats.crits}</b> dados · <b>${replayStyle.stats.critsTaken}</b> sofridos por jogo
+        · 💥 <b>${replayStyle.stats.oneShots}</b> KO${replayStyle.stats.oneShots === 1 ? '' : 's'} de um só golpe por jogo
+        · 🎯 <b>${replayStyle.stats.seHits}</b> golpes super eficazes por jogo
+        ${replayStyle.stats.teraTurn ? `· ✨ Tera ao turno <b>${replayStyle.stats.teraTurn}</b> (em média)` : ''}
+        ${replayStyle.lead ? `<br>🎬 Abre mais vezes com <b>${escapeHtml(replayStyle.lead.name)}</b> (${replayStyle.lead.count}×)` : ''}${replayStyle.closer ? ` · 🏁 Fecha jogos com <b>${escapeHtml(replayStyle.closer.name)}</b> (${replayStyle.closer.count}×)` : ''}
+      </div>` : ''}
       <div style="margin-top:10px;font-size:12px;color:var(--text-dim);">🧹 ${replayStyle.sweeps} varredura${replayStyle.sweeps === 1 ? '' : 's'} · 🧱 ${replayStyle.tanks} muralha${replayStyle.tanks === 1 ? '' : 's'} · 🔥 ${replayStyle.comebacks} virada${replayStyle.comebacks === 1 ? '' : 's'}</div>
+      ${replayStyle.compare && replayStyle.compare.length ? `
+      <details style="margin-top:12px;"><summary style="cursor:pointer;font-weight:700;font-size:12.5px;">📊 Comparação com a média do grupo (${replayStyle.groupPlayers} jogadores)</summary>
+        <table class="style-compare"><thead><tr><th></th><th>Tu</th><th>Grupo</th></tr></thead><tbody>
+          ${replayStyle.compare.map(c => `<tr title="${escapeHtml(c.unit)}"><td>${c.icon} ${escapeHtml(c.name)}<div class="u">${escapeHtml(c.unit)}</div></td><td><b>${escapeHtml(c.valueText)}</b></td><td>${escapeHtml(c.baseText === null ? '—' : c.baseText)}</td></tr>`).join('')}
+        </tbody></table>
+      </details>` : ''}
     </div>
     ` : ''}
 
