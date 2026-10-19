@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261019a">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261019b">
 <style>
 :root{ --bg-code:#0d0f18; }
 body.light-theme{ --bg-code:#e4e7f0; }
@@ -186,7 +186,7 @@ textarea:focus{outline:none;border-color:var(--tera-cyan);}
 
 <div class="hover-card" id="hoverCard"></div>
 
-<script src="assets/js/showdown-utils.js?v=20261019a"></script>
+<script src="assets/js/showdown-utils.js?v=20261019b"></script>
 <script>
 initTheme();
 // SUPABASE_URL e SUPABASE_ANON_KEY são definidos no próximo bloco de script,
@@ -473,6 +473,7 @@ function matchRow(m){
   if(open && mine){
     infoBits.push(`<button type="button" class="match-info-btn" onclick="setMatchInfo(${jsq(m.id)},'when')">🗓 ${whenOk ? 'Mudar horário' : 'Combinar horário'}</button>`);
     infoBits.push(`<button type="button" class="match-info-btn" onclick="setMatchInfo(${jsq(m.id)},'live')">📺 ${liveOk ? 'Mudar link da batalha' : 'Partilhar link da batalha'}</button>`);
+    infoBits.push(`<a class="match-info-btn" style="text-decoration:none;" href="dossie.html?contra=${encodeURIComponent(m.p1 === loggedInPlayerName ? m.p2 : m.p1)}">🕵️ Dossiê do adversário</a>`);
   }
   const infoRow = infoBits.length ? `<div class="match-info">${infoBits.join('')}</div>` : '';
 

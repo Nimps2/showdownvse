@@ -1303,6 +1303,121 @@ function computeRivalry(rows, a, b){
     balanced: meetings.length >= 4 && Math.abs(aWins - bWins) <= 1 };
 }
 
+// ---------- Dossiê do adversário (dossie.html) ----------
+// Tudo o que se sabe de um adversário antes de o defrontar, pelos torneios e pelos replays. rows = torneios SEM relâmpagos.
+// As dicas saem dos traços de estilo dele (playerReplayStyle): cada traço tem a sua. Sem replays lidos não há traços (só a rivalidade, a forma e os Pokémon).
+const DOSSIER_TIP_TEXT = {
+  trap: 'Põe armadilhas: leva um Pokémon que as retire (Rapid Spin, Defog) ou com Magic Bounce, e não deixes à vista os Pokémon frágeis a Stealth Rock.',
+  setup: 'Sobe atributos: guarda uma resposta (Haze, Roar/Dragon Tail, Unaware ou um atacante com prioridade) para travar o varredor a tempo.',
+  chip: 'Desgasta com estados e armadilhas: Natural Cure, Regenerator, Heal Bell/Aromatherapy e Pokémon que se curam a si próprios ajudam a aguentar.',
+  wall: 'Joga à defesa (Protect, curas, Substitute): precisas de golpes que furem a defesa (Taunt, Toxic, atacantes fortes) para não gastares turnos.',
+  switch: 'Troca muito: tenta prever a troca e usa o golpe que acerta no Pokémon que vai entrar, em vez de insistir no que está em campo.',
+  pivot: 'Joga com pivôs (U-turn, Volt Switch…): cuidado com o Pokémon que entra a seguir; Rocky Helmet, Rough Skin ou uma imunidade ao pivô compensam.',
+  field: 'Controla o campo (clima, terreno, Tailwind): tirar do jogo o Pokémon que o põe, ou ter o teu próprio clima, passa a ser prioridade.',
+  kamikaze: 'Sacrifica Pokémon (Explosion, Memento…): não tenhas medo de trocar para um fantasma, ou para um Pokémon que não te custa perder.',
+  attack: 'Ataca quase todos os turnos: aguenta com Pokémon robustos e contra-ataca; Focus Sash, Sturdy ou Multiscale dão-te o turno que precisas.',
+  weakness: 'Aproveita as fraquezas: cobre bem os teus tipos fracos e não deixes Pokémon expostos em campo.',
+  oneshot: 'Tira Pokémon de vida cheia de uma só pancada: Focus Sash, Sturdy, Multiscale ou resistências ao tipo preferido dele salvam-te.'
+};
+function dossierTips(style){
+  if(!style) return ['Ainda não há replays lidos deste jogador: o estilo aparece quando os replays dos torneios dele forem ligados e calculados no gestor.'];
+  const tips = (style.traits || []).map(t => DOSSIER_TIP_TEXT[t.id]).filter(Boolean);
+  if(!tips.length && style.v3 && style.games3 >= STYLE_MIN_GAMES) tips.push('Jogo equilibrado: nenhum traço se destaca da média do grupo, por isso não há um ponto fraco evidente — joga o teu jogo.');
+  if(!style.v3) tips.push(style.label && style.label.name === 'Estratégico' ? DOSSIER_TIP_TEXT.switch : (style.label && style.label.name === 'Atacante' ? DOSSIER_TIP_TEXT.attack : 'Estilo misto: sem um padrão claro (os replays dele ainda vão ser relidos com a leitura nova).'));
+  if(style.lead) tips.push(`Costuma abrir com ${style.lead.name} (${style.lead.count}×): prepara a tua abertura.`);
+  if(style.closer) tips.push(`Costuma fechar os jogos ganhos com ${style.closer.name} (${style.closer.count}×): guarda uma resposta para o fim.`);
+  return tips;
+}
+// Os últimos resultados de um jogador (mais recentes primeiro).
+function recentResultsOf(rows, name, limit){
+  const out = [];
+  (rows || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).forEach(r => {
+    const d = r.data || {};
+    (d.matches || []).slice().reverse().forEach(m => {
+      if(out.length >= (limit || 6) || !m || !m.winner || !m.p1 || !m.p2 || (m.p1 !== name && m.p2 !== name)) return;
+      out.push({ won: m.winner === name, vs: m.p1 === name ? m.p2 : m.p1, label: m.label || 'Partida', tournament: d.name || `Torneio (${d.tier || r.tier || '?'})`, date: r.created_at || null });
+    });
+  });
+  return out;
+}
+// A próxima partida por jogar de um jogador (no torneio mais recente em que ainda tem uma com os dois adversários definidos). null se não houver.
+function nextOpenMatchFor(rows, name){
+  const sorted = (rows || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  for(const r of sorted){
+    const d = r.data || {};
+    if(d.champion) continue;
+    const m = (d.matches || []).find(x => x && x.p1 && x.p2 && !x.winner && (x.p1 === name || x.p2 === name));
+    if(m) return { opponent: m.p1 === name ? m.p2 : m.p1, label: m.label || 'Partida', tournament: d.name || `Torneio (${d.tier || r.tier || '?'})` };
+  }
+  return null;
+}
+function computeOpponentDossier(rows, me, opp){
+  const stats = aggregatePlayers(rows || []), st = stats[opp] || { wins: 0, losses: 0, titles: 0 };
+  const { mons, moves } = aggregatePlayerPokemon(rows || [], opp);
+  const top = o => Object.entries(o).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5).map(([name, count]) => ({ name, count }));
+  const style = playerReplayStyle(rows || [], opp), recent = recentResultsOf(rows, opp, 6);
+  const games = st.wins + st.losses;
+  return { me, opp, wins: st.wins, losses: st.losses, titles: st.titles, winrate: games ? Math.round(st.wins / games * 100) : null, rivalry: computeRivalry(rows || [], me, opp),
+    style, myStyle: me ? playerReplayStyle(rows || [], me) : null, topMons: top(mons), topMoves: top(moves), recent, formWins: recent.filter(x => x.won).length, tips: dossierTips(style) };
+}
+
+// ---------- Recordes de sempre e prémios da temporada (Hall da Fama; o gestor anuncia os prémios no Discord) ----------
+// Recordes: o melhor de cada tipo de momento (data.mvp.moments) em todos os torneios; em caso de empate fica o mais antigo.
+const RECORD_DEFS = [
+  { kind: 'long', key: 'turns', best: 'max' }, { kind: 'short', key: 'turns', best: 'min' }, { kind: 'comeback', key: 'deficit', best: 'max' }, { kind: 'thread', key: 'hp', best: 'min' },
+  { kind: 'sweep', key: 'n', best: 'max' }, { kind: 'tank', key: 'dmg', best: 'max' }, { kind: 'crit', key: 'n', best: 'max' }, { kind: 'oneshot', key: 'n', best: 'max' },
+  { kind: 'swaps', key: 'n', best: 'max' }, { kind: 'hazards', key: 'n', best: 'max' }, { kind: 'protect', key: 'n', best: 'max' }, { kind: 'chip', key: 'n', best: 'max' }
+];
+function computeAllTimeRecords(rows){
+  const sorted = (rows || []).slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const out = [];
+  RECORD_DEFS.forEach(d => {
+    let best = null;
+    sorted.forEach(r => {
+      const ms = (r && r.data && r.data.mvp && Array.isArray(r.data.mvp.moments)) ? r.data.mvp.moments : [];
+      ms.forEach(m => {
+        if(!m || m.kind !== d.kind || typeof m[d.key] !== 'number') return;
+        if(!best || (d.best === 'max' ? m[d.key] > best.item[d.key] : m[d.key] < best.item[d.key])) best = { kind: d.kind, item: m, tournament: (r.data || {}).name || `Torneio (${r.tier || '?'})`, date: r.created_at || null };
+      });
+    });
+    if(best) out.push(best);
+  });
+  return out;
+}
+// Prémios da temporada: para cada traço de estilo (e a sorte com os críticos) ganha quem o tem mais alto, com 3+ jogos lidos e acima do mínimo do traço.
+// Cada jogador leva no máximo 2 prémios (os traços mais "dominados" escolhem primeiro; o 2.º classificado herda o que sobra).
+const REPLAY_AWARD_NAMES = { trap: 'Armadilheiro da temporada', setup: 'Rei do setup', chip: 'Mestre do desgaste', wall: 'Muralha da temporada', switch: 'Mestre das trocas', pivot: 'Rei dos pivôs',
+  field: 'Senhor do campo', kamikaze: 'Kamikaze da temporada', attack: 'O mais ofensivo', weakness: 'Caçador de fraquezas', oneshot: 'Executor da temporada', luck: 'Sortudo da temporada' };
+const AWARD_MAX_PER_PLAYER = 2;
+function computeSeasonAwards(allRows, season){
+  const rows = filterRowsBySeason(allRows || [], season);
+  const names = {};
+  rows.forEach(r => Object.keys((r && r.data && r.data.mvp && r.data.mvp.styles) || {}).forEach(n => { names[n] = 1; }));
+  const totals = Object.keys(names).map(n => ({ name: n, t: sumReplayStyle(rows, n) })).filter(x => x.t.g3 >= STYLE_MIN_GAMES);
+  if(totals.length < 2) return [];
+  const defs = REPLAY_TRAIT_DEFS.concat([{ id: 'luck', icon: '🍀', name: 'Sortudo', get: t => (t.crits - t.critsTaken) / t.g3, min: 0.4, unit: 'críticos a mais do que os sofridos, por jogo' }]);
+  const lists = defs.map(d => {
+    const ranked = totals.map(x => ({ name: x.name, v: d.get(x.t), g: x.t.g3 })).sort((a, b) => b.v - a.v || b.g - a.g || a.name.localeCompare(b.name));
+    const mean = ranked.reduce((a, x) => a + x.v, 0) / ranked.length;
+    return { d, ranked, dominance: ranked[0].v / Math.max(mean, 0.0001) };
+  }).sort((a, b) => b.dominance - a.dominance);
+  const wins = {}, out = [];
+  lists.forEach(({ d, ranked }) => {
+    const w = ranked.find(x => x.v >= d.min && (wins[x.name] || 0) < AWARD_MAX_PER_PLAYER);
+    if(!w) return;
+    wins[w.name] = (wins[w.name] || 0) + 1;
+    out.push({ id: d.id, icon: d.icon, title: REPLAY_AWARD_NAMES[d.id] || d.name, player: w.name, value: w.v, valueText: replayTraitFmt(d, w.v), unit: d.unit, games: w.g });
+  });
+  const order = defs.map(d => d.id);
+  return out.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+}
+// O texto dos prémios para o Discord. nameOf(nome) devolve o nome a mostrar (apelido).
+function seasonAwardsText(awards, season, nameOf){
+  const NL = String.fromCharCode(10), f = nameOf || (n => n);
+  if(!awards || !awards.length) return '';
+  return `🏅 **Prémios da Temporada ${season}** (pelos replays dos torneios)` + NL + awards.map(a => `${a.icon} ${a.title}: **${f(a.player)}** (${a.valueText} ${a.unit})`).join(NL);
+}
+
 // ---------- Mini-perfil (hover) ----------
 // Devolve o HTML de dentro do mini-cartão que aparece ao passar o rato sobre
 // o nome/avatar de um jogador. Usado por viewer.html e estatisticas.html.

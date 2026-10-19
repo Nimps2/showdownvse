@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261019a">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261019b">
 <style>
 .nav-link{color:var(--tera-cyan);font-size:12.5px;text-decoration:none;font-family:'Chakra Petch',sans-serif;}
 .nav-link:hover{text-decoration:underline;}
@@ -62,6 +62,16 @@
   font-size:13px;text-decoration:none;
 }
 .spotlight-btn:hover{filter:brightness(1.08);}
+.rec-row{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line);}
+.rec-row:first-child{border-top:none;}
+.rec-ic{font-size:24px;line-height:1.1;flex-shrink:0;}
+.rec-row b,.award-title{font-family:'Chakra Petch',sans-serif;font-size:13.5px;color:var(--tera-cyan);}
+.rec-tx{font-size:13px;color:var(--text-main);margin-top:2px;}
+.rec-sub{font-size:11.5px;color:var(--text-faint);margin-top:2px;}
+.award-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
+.award-card{display:flex;gap:12px;align-items:flex-start;background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
+.award-who{display:block;font-size:15px;font-weight:700;color:var(--text-main);text-decoration:none;margin-top:2px;}
+.award-who:hover{color:var(--tera-cyan);}
 </style>
 </head>
 <body>
@@ -110,6 +120,7 @@
     <button class="tab-btn active" onclick="switchHofTab('torneios')">Torneios</button>
     <button class="tab-btn" onclick="switchHofTab('apelidos')">Apelidos</button>
     <button class="tab-btn" onclick="switchHofTab('melhorpartida')">Melhor Partida</button>
+    <button class="tab-btn" onclick="switchHofTab('recordes')">Recordes e Prémios</button>
   </div>
 
   <div id="panel-torneios" class="shop-panel active">
@@ -141,6 +152,20 @@
     </div>
   </div>
 
+  <div id="panel-recordes" class="shop-panel">
+    <div class="card">
+      <h2>🏅 Prémios da temporada</h2>
+      <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:12px;">Lidos dos replays: ganha quem tem cada traço de estilo mais forte na temporada (com 3 jogos lidos, pelo menos). Cada jogador leva no máximo 2.</div>
+      <select id="awardsSeason" onchange="renderAwards()" style="max-width:240px;"></select>
+      <div id="awardsContainer" style="margin-top:12px;"></div>
+    </div>
+    <div class="card">
+      <h2>📜 Recordes de sempre</h2>
+      <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:12px;">O melhor de cada tipo de momento, em todos os torneios (só entram os momentos que passam os limiares dos replays).</div>
+      <div id="recordsContainer"><div class="empty-state">A carregar…</div></div>
+    </div>
+  </div>
+
   <div id="panel-melhorpartida" class="shop-panel">
     <div class="card">
       <h2>🎬 Melhor Partida de Cada Torneio</h2>
@@ -152,7 +177,7 @@
   <div class="footer-note">Linha do tempo calculada a partir de todos os torneios concluídos guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261019a"></script>
+<script src="assets/js/showdown-utils.js?v=20261019b"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -258,7 +283,7 @@ const NICKNAMES_PER_PAGE = 12;
 function switchHofTab(tab){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.shop-panel').forEach(p=>p.classList.remove('active'));
-  const map = {torneios:0, apelidos:1, melhorpartida:2};
+  const map = {torneios:0, apelidos:1, melhorpartida:2, recordes:3};
   document.querySelectorAll('.tab-btn')[map[tab]].classList.add('active');
   document.getElementById('panel-'+tab).classList.add('active');
 }
@@ -290,6 +315,8 @@ async function init(){
     onHofFilterChange(); // respeita a pesquisa/filtro de tier já escolhidos (importa quando isto corre de novo sozinho, via polling)
     renderMvpList(rows);
     renderFeaturedMatches(rows);
+    renderRecords(rows);
+    fillAwardsSeasons(rows);
     allNicknames = aggregateNicknames(rows);
     renderNicknameHall();
   } catch(e){
@@ -449,6 +476,33 @@ function renderTimeline(rows){
 }
 
 // O Pokémon MVP do torneio (calculado pelo gestor a partir dos replays: data.mvp).
+// Recordes de sempre (dos momentos guardados em cada torneio) e prémios da temporada (dos estilos lidos nos replays): a lógica está em showdown-utils.js.
+function renderRecords(rows){
+  const el = document.getElementById('recordsContainer'); if(!el) return;
+  if(typeof computeAllTimeRecords !== 'function'){ el.innerHTML = '<div class="empty-state">Atualiza a página (Ctrl+F5) para ver os recordes.</div>'; return; }
+  const recs = computeAllTimeRecords(rows);
+  if(!recs.length){ el.innerHTML = '<div class="empty-state">Ainda sem recordes: aparecem quando o organizador calcular os replays dos torneios.</div>'; return; }
+  const fmt = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: '2-digit' }); };
+  el.innerHTML = recs.map(r => { const t = momentText(r.item); return t ? `<div class="rec-row"><span class="rec-ic">${t.icon}</span><div><b>${escapeHtml(t.title)}</b><div class="rec-tx">${escapeHtml(t.text)}</div><div class="rec-sub">${escapeHtml(r.tournament)}${r.date ? ' · ' + fmt(r.date) : ''}</div></div></div>` : ''; }).join('');
+}
+let awardsRows = [];
+function fillAwardsSeasons(rows){
+  awardsRows = rows;
+  const sel = document.getElementById('awardsSeason'); if(!sel) return;
+  const previous = sel.value;
+  const cur = getCurrentSeasonNumber(rows);
+  sel.innerHTML = Array.from({ length: cur }, (_, i) => cur - i).map(n => `<option value="${n}">Temporada ${n}${n === cur ? ' (a atual)' : ''}</option>`).join('');
+  if(previous && Array.from(sel.options).some(o => o.value === previous)) sel.value = previous;
+  renderAwards();
+}
+function renderAwards(){
+  const el = document.getElementById('awardsContainer'), sel = document.getElementById('awardsSeason'); if(!el || !sel) return;
+  if(typeof computeSeasonAwards !== 'function'){ el.innerHTML = '<div class="empty-state">Atualiza a página (Ctrl+F5) para ver os prémios.</div>'; return; }
+  const n = parseInt(sel.value, 10), awards = computeSeasonAwards(awardsRows, n);
+  if(!awards.length){ el.innerHTML = '<div class="empty-state">Ainda sem prémios nesta temporada: precisam de pelo menos 2 jogadores com 3 jogos lidos dos replays.</div>'; return; }
+  el.innerHTML = `<div class="award-grid">${awards.map(a => `<div class="award-card"><span class="rec-ic">${a.icon}</span><div><div class="award-title">${escapeHtml(a.title)}</div><a href="perfil.html?jogador=${encodeURIComponent(a.player)}" class="award-who">${displayName(a.player)}</a><div class="rec-sub">${escapeHtml(a.valueText)} ${escapeHtml(a.unit)} · ${a.games} jogos</div></div></div>`).join('')}</div>`;
+}
+
 function mvpLine(data){
   const m = data && data.mvp && data.mvp.mvp;
   if(!m) return '';

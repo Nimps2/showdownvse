@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dossiê do adversário — Torneio Showdown - VSE</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgo8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM0ZmQ4ZDAiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTU2YmYwIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHBvbHlnb24gcG9pbnRzPSI1MCw0IDk2LDMyIDc5LDk2IDIxLDk2IDQsMzIiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0c14">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VSE">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261019b">
+<style>
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:12px 0;}
+.stat-box{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-align:center;}
+.stat-box .n{font-family:'Chakra Petch',sans-serif;font-size:20px;font-weight:700;color:var(--tera-cyan);}
+.stat-box .l{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.4px;margin-top:3px;}
+.dz-versus{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:stretch;margin:6px 0 4px;}
+.dz-side{background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-align:center;}
+.dz-side .nm{font-family:'Chakra Petch',sans-serif;font-size:17px;font-weight:700;overflow-wrap:anywhere;}
+.dz-side .sub{font-size:12px;color:var(--text-dim);margin-top:4px;line-height:1.5;}
+.dz-side.opp{border-color:rgba(165,107,240,0.5);}
+.dz-vs{align-self:center;font-family:'Chakra Petch',sans-serif;font-weight:700;color:var(--text-faint);}
+.dz-tips{margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--text-dim);}
+.dz-tips li{margin-bottom:6px;}
+.dz-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.dz-mon{display:flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:6px 12px 6px 6px;font-size:13px;}
+.dz-mon span{color:var(--text-faint);font-size:11.5px;}
+.dz-form{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px;}
+.dz-pill{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);}
+.dz-pill.w{color:#5ed890;border-color:rgba(94,216,144,0.5);}
+.dz-pill.l{color:#ff6b6b;border-color:rgba(255,107,107,0.5);}
+.dz-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:12.5px;}
+.dz-row:first-child{border-top:none;}
+.dz-row .res{font-family:'Chakra Petch',sans-serif;font-weight:700;flex-shrink:0;}
+.dz-next{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 0;padding:10px 12px;border:1px dashed var(--line);border-radius:10px;font-size:12.5px;color:var(--text-dim);}
+.dz-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media (max-width:640px){.dz-cols{grid-template-columns:1fr;}.dz-versus{grid-template-columns:1fr;}.dz-vs{justify-self:center;}}
+</style>
+</head>
+<body>
+<div id="playerCornerContainer"></div>
+<div id="authGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div class="card" style="max-width:340px;width:100%;margin:0 20px;">
+    <h2>Entrar</h2>
+    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Nome</label>
+    <select id="gateNameSelect"><option value="">— carregando jogadores —</option></select>
+    <label style="display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Password</label>
+    <input type="password" id="gatePassword" placeholder="A sua password" onkeydown="if(event.key==='Enter') doGateLogin()">
+    <button class="btn-primary" onclick="doGateLogin()">Entrar</button>
+    <div id="gateError" style="color:var(--danger);font-size:12.5px;margin-top:8px;display:none;"></div>
+  </div>
+</div>
+
+<div id="topbar" class="topbar" style="display:none;">
+  <a href="index.html" class="brand">
+    <div class="brand-mark"></div>
+    <div class="brand-name">Torneio VSE</div>
+  </a>
+  <nav class="topnav">
+    <a href="index.html">Início</a>
+    <a href="viewer.html">Bracket</a>
+    <a href="estatisticas.html">Estatísticas</a>
+    <a href="hall-da-fama.html">Hall da Fama</a>
+    <a href="loja.html">Loja</a>
+    <a href="conquistas.html">Conquistas</a>
+    <a href="palpites.html">Palpiteiro</a>
+    <a href="missoes.html">Missões</a>
+    <a href="passe.html">Passe</a>
+    <a href="calendario.html">Calendário</a>
+  </nav>
+  <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro" style="position:static;">🌙</button>
+</div>
+
+<div id="mainContent" class="wrap" style="display:none;">
+  <div class="status-strip">
+    <span class="status-dot" id="statusDot"></span>
+    <span class="status-text" id="statusText">Conectando…</span>
+    <span class="status-text">Ligado como <b id="loggedInNameTop" style="color:var(--tera-cyan);"></b></span>
+    <a href="#" class="nav-link" style="margin-left:auto;" onclick="doPlayerLogout(); return false;">Trocar jogador</a>
+  </div>
+
+  <div class="card">
+    <h2>🕵️ Dossiê do adversário</h2>
+    <div style="font-size:12px;color:var(--text-faint);margin-bottom:10px;">Prepara-te antes de jogar: como ele joga, o que costuma usar, como tem estado e o que aconteceu entre vocês. Tudo calculado dos torneios e dos replays.</div>
+    <select id="oppSelect" onchange="renderDossier(true)"><option value="">— escolhe o adversário —</option></select>
+    <div id="nextMatch"></div>
+  </div>
+
+  <div id="dossierBody"></div>
+
+  <div class="footer-note">Os números vêm dos torneios e dos replays já lidos pelo gestor; com poucos jogos servem de indicação, não de regra. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
+</div>
+
+<script src="assets/js/showdown-utils.js?v=20261019b"></script>
+<script>
+initTheme();
+const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeWtteXlncXV5dHhlemV2bGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTY0ODgsImV4cCI6MjEwMDM5MjQ4OH0.8WfJ_uc4nT1p8tX4fcfYKwdmF7wwL5QGa8KfKyNMSfs";
+
+let loggedInPlayerName = null;
+
+async function doGateLogin(){
+  const name = document.getElementById('gateNameSelect').value;
+  const password = document.getElementById('gatePassword').value;
+  const errEl = document.getElementById('gateError');
+  errEl.style.display = 'none';
+  if(!name){ errEl.textContent = 'Selecione o seu nome.'; errEl.style.display='block'; return; }
+  if(!password){ errEl.textContent = 'Escreva a sua password.'; errEl.style.display='block'; return; }
+  const result = await verifyPlayerLogin(SUPABASE_URL, SUPABASE_ANON_KEY, name, password);
+  if(!result.ok){
+    errEl.textContent = result.reason==='notfound' ? 'Este jogador ainda não foi registrado pelo organizador.'
+      : result.reason==='wrongpass' ? 'Password incorreta.'
+      : 'Erro ao ligar à base de dados.';
+    errEl.style.display = 'block';
+    return;
+  }
+  localStorage.setItem('player_login_name', name);
+  loggedInPlayerName = name;
+  unlockContent();
+}
+
+function unlockContent(){
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('topbar').style.display = 'flex';
+  document.getElementById('loggedInNameTop').textContent = loggedInPlayerName;
+  init();
+}
+
+function doPlayerLogout(){
+  localStorage.removeItem('player_login_name');
+  endPlayerSession(SUPABASE_URL, SUPABASE_ANON_KEY);
+  loggedInPlayerName = null;
+  document.getElementById('gatePassword').value = '';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('topbar').style.display = 'none';
+  document.getElementById('authGate').style.display = 'flex';
+}
+
+async function pageBoot(){
+  const sel = document.getElementById('gateNameSelect');
+  try{
+    const names = await fetchRegisteredPlayerNames(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sel.innerHTML = '<option value="">— selecione o seu nome —</option>';
+    names.forEach(n=>{
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+    const saved = localStorage.getItem('player_login_name');
+    if(saved && names.includes(saved)){
+      loggedInPlayerName = saved;
+      unlockContent();
+    }
+  } catch(e){
+    sel.innerHTML = '<option value="">— erro ao carregar jogadores —</option>';
+  }
+}
+
+function sbHeaders(){
+  return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+}
+function setStatus(ok, text){
+  document.getElementById('statusDot').className = 'status-dot ' + (ok?'on':'off');
+  document.getElementById('statusText').textContent = text;
+}
+
+let allRows = [], playerProfiles = {}, eloRatings = {}, playerStats = {};
+
+async function init(){
+  try{
+    const [rows, profiles] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }),
+      fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY)
+    ]);
+    allRows = rowsWithoutFlash(rows);
+    playerProfiles = profiles || {};
+    playerStats = aggregatePlayers(allRows);
+    eloRatings = computeEloRatings(allRows);
+    setStatus(true, `Ligado — ${allRows.length} torneio(s) encontrados.`);
+    fillOpponents();
+    renderDossier(false);
+    checkDailyBonusAvailable(SUPABASE_URL, SUPABASE_ANON_KEY, loggedInPlayerName).then(available=>{
+      document.getElementById('playerCornerContainer').insertAdjacentHTML('beforeend', renderDailyBonusIcon(available));
+    });
+    if(typeof mountEventCornerIcon === 'function') mountEventCornerIcon(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } catch(e){
+    setStatus(false, 'Não foi possível ligar à base de dados.');
+    document.getElementById('dossierBody').innerHTML = '<div class="card"><div class="empty-state">Erro ao carregar dados.</div></div>';
+  }
+}
+
+function shownName(n){ const p = playerProfiles[n]; return (p && p.nickname) ? p.nickname : n; }
+
+// O adversário vem de ?contra=Nome; sem isso, o da próxima partida por jogar do jogador (se houver).
+function fillOpponents(){
+  const sel = document.getElementById('oppSelect');
+  const names = Object.keys(playerStats).filter(n => n !== loggedInPlayerName).sort((a, b) => a.localeCompare(b));
+  sel.innerHTML = '<option value="">— escolhe o adversário —</option>' + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(shownName(n))}</option>`).join('');
+  const asked = new URLSearchParams(location.search).get('contra');
+  const next = nextOpenMatchFor(allRows, loggedInPlayerName);
+  const pick = asked && names.includes(asked) ? asked : (next && names.includes(next.opponent) ? next.opponent : '');
+  if(pick) sel.value = pick;
+  const box = document.getElementById('nextMatch');
+  if(next && names.includes(next.opponent)){
+    box.innerHTML = `<div class="dz-next">📅 A tua próxima partida: <b>${escapeHtml(next.label)}</b> contra <b>${escapeHtml(shownName(next.opponent))}</b> (${escapeHtml(next.tournament)}) <button type="button" class="match-info-btn" onclick="pickNext(${jsq(next.opponent)})">Ver o dossiê dele</button></div>`;
+  } else box.innerHTML = '';
+}
+function pickNext(n){ document.getElementById('oppSelect').value = n; renderDossier(true); }
+
+function fmtDate(iso){ const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: '2-digit' }); }
+
+function renderDossier(userChoice){
+  const opp = document.getElementById('oppSelect').value, body = document.getElementById('dossierBody');
+  if(!opp){ body.innerHTML = '<div class="card"><div class="empty-state">Escolhe um adversário para ver o dossiê.</div></div>'; return; }
+  if(userChoice){ try{ history.replaceState(null, '', '?contra=' + encodeURIComponent(opp)); } catch(e){} }
+  const me = loggedInPlayerName, d = computeOpponentDossier(allRows, me, opp);
+  const st = d.style, my = d.myStyle;
+  const label = s => s && s.label ? `${s.label.icon} ${escapeHtml(s.label.name)}` : '<span style="color:var(--text-faint);">sem estilo lido</span>';
+  const elo = n => eloRatings[n] ? Math.round(eloRatings[n]) : null;
+  const side = (n, s, wins, losses, winrate, titles, cls) => `<div class="dz-side ${cls}"><div class="nm">${escapeHtml(shownName(n))}</div>
+      <div class="sub">${wins}V-${losses}D${winrate !== null ? ' (' + winrate + '%)' : ''}${titles ? ' · 🏆 ' + titles : ''}${elo(n) ? ' · Elo ' + elo(n) : ''}<br>${label(s)}</div></div>`;
+  const mine = playerStats[me] || { wins: 0, losses: 0, titles: 0 }, mg = mine.wins + mine.losses;
+  const rv = d.rivalry;
+  const rivalryHtml = !rv ? '<div class="empty-state">Ainda não jogaram um contra o outro.</div>' : `
+    <div class="stat-grid">
+      <div class="stat-box"><div class="n">${rv.aWins}</div><div class="l">Vitórias tuas</div></div>
+      <div class="stat-box"><div class="n">${rv.bWins}</div><div class="l">Vitórias dele</div></div>
+      <div class="stat-box"><div class="n">${rv.total ? Math.round(rv.aWins / rv.total * 100) : 0}%</div><div class="l">O teu winrate</div></div>
+    </div>
+    <div style="font-size:12.5px;color:var(--text-dim);line-height:1.6;">
+      <b style="color:var(--text-main);">${rv.aWins === rv.bWins ? '⚖️ Empatados' : (rv.aWins > rv.bWins ? '👑 Estás à frente' : '👑 Ele está à frente')}</b>${rv.balanced ? ' · 🔥 rivalidade equilibrada' : ''}
+      ${rv.streak.count >= 2 ? `<br>🔁 ${rv.streak.who === me ? 'Ganhaste' : escapeHtml(shownName(rv.streak.who)) + ' ganhou'} os últimos <b>${rv.streak.count}</b> encontros` : ''}
+      ${rv.decisive.total ? `<br>🏁 Em finais e semifinais: tu ${rv.decisive.a} - ${rv.decisive.b} ele` : ''}
+    </div>
+    <details style="margin-top:8px;" open><summary class="history-toggle">Últimos ${rv.last.length} encontro${rv.last.length === 1 ? '' : 's'}</summary>
+      ${rv.last.map(x => `<div class="dz-row"><span>${fmtDate(x.date)} · ${escapeHtml(x.tournament)} · ${escapeHtml(x.label)}${x.score ? ' (' + escapeHtml(x.score) + ')' : ''}</span><span class="res">${x.winner === me ? '✅ tu' : '❌ ele'}</span></div>`).join('')}
+    </details>`;
+  const stylesHtml = !st ? '<div class="empty-state">Ainda sem replays lidos deste jogador.</div>' : `
+    ${st.label ? `<div class="style-badge"><span class="si">${st.label.icon}</span><div><b>${escapeHtml(st.label.name)}</b><div class="st">${escapeHtml(st.label.text)}</div>${st.traits && st.traits[0] ? `<div class="sv">${escapeHtml(st.traits[0].valueText)} ${escapeHtml(st.traits[0].unit)}${st.traits[0].baseText !== null ? ` · média do grupo ${escapeHtml(st.traits[0].baseText)}` : ''}</div>` : ''}</div></div>` : `<div style="font-size:12px;color:var(--text-faint);margin-bottom:10px;">Só há ${st.games} jogo${st.games === 1 ? '' : 's'} lido${st.games === 1 ? '' : 's'} — com 3 já dá para dizer o estilo.</div>`}
+    ${st.traits && st.traits.length > 1 ? `<div class="style-traits">${st.traits.slice(1).map(tr => `<div class="style-trait"><span class="si">${tr.icon}</span><div><b>${escapeHtml(tr.name)}</b><div class="st">${escapeHtml(tr.text)}</div><div class="sv">${escapeHtml(tr.valueText)} ${escapeHtml(tr.unit)}${tr.baseText !== null ? ` · média do grupo ${escapeHtml(tr.baseText)}` : ''}</div></div></div>`).join('')}</div>` : ''}
+    <div class="stat-grid">
+      <div class="stat-box"><div class="n">${st.games}</div><div class="l">Jogos lidos</div></div>
+      <div class="stat-box"><div class="n">${st.avgTurns}</div><div class="l">Turnos por jogo</div></div>
+      <div class="stat-box"><div class="n">${st.v3 ? st.stats.manualSwitches : st.switchesPerGame}</div><div class="l">Trocas por jogo</div></div>
+      <div class="stat-box"><div class="n">${st.koPerGame}</div><div class="l">KOs por jogo</div></div>
+      <div class="stat-box"><div class="n">${st.teraPct}%</div><div class="l">Jogos com Tera</div></div>
+      ${st.v3 && st.stats.teraTurn ? `<div class="stat-box"><div class="n">${st.stats.teraTurn}</div><div class="l">Turno do Tera</div></div>` : ''}
+    </div>
+    ${st.lead || st.closer ? `<div style="font-size:12.5px;color:var(--text-dim);">${st.lead ? `🎬 Abre mais vezes com <b>${escapeHtml(st.lead.name)}</b> (${st.lead.count}×)` : ''}${st.closer ? ` · 🏁 Fecha jogos com <b>${escapeHtml(st.closer.name)}</b> (${st.closer.count}×)` : ''}</div>` : ''}`;
+  const monsHtml = d.topMons.length ? `<div class="dz-chips">${d.topMons.map(m => `<div class="dz-mon">${pokeSpriteHtml(m.name, 36)} <b>${escapeHtml(m.name)}</b> <span>${m.count}×</span></div>`).join('')}</div>` : '<div class="empty-state">Ainda sem Pokémon registados.</div>';
+  const movesHtml = d.topMoves.length ? `<div class="dz-chips">${d.topMoves.map(m => `<div class="dz-mon" style="padding:6px 12px;"><b>${escapeHtml(m.name)}</b> <span>${m.count}×</span></div>`).join('')}</div>` : '<div class="empty-state">Ainda sem golpes registados.</div>';
+  const formHtml = d.recent.length ? `<div class="dz-form">${d.recent.map(x => `<span class="dz-pill ${x.won ? 'w' : 'l'}" title="${escapeHtml(x.label)} contra ${escapeHtml(shownName(x.vs))}">${x.won ? 'V' : 'D'}</span>`).join('')}</div>
+      ${d.recent.map(x => `<div class="dz-row"><span>${fmtDate(x.date)} · ${escapeHtml(x.tournament)} · ${escapeHtml(x.label)} vs ${escapeHtml(shownName(x.vs))}</span><span class="res">${x.won ? '✅' : '❌'}</span></div>`).join('')}` : '<div class="empty-state">Ainda sem partidas.</div>';
+  body.innerHTML = `
+    <div class="card"><div class="dz-versus">${side(me, my, mine.wins, mine.losses, mg ? Math.round(mine.wins / mg * 100) : null, mine.titles, '')}<div class="dz-vs">VS</div>${side(opp, st, d.wins, d.losses, d.winrate, d.titles, 'opp')}</div></div>
+    <div class="card"><h2>💡 Dicas de preparação</h2><ul class="dz-tips">${d.tips.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul></div>
+    <div class="card"><h2>🎭 Como joga</h2>${stylesHtml}</div>
+    <div class="card"><div class="dz-cols"><div><h2>⭐ Pokémon que mais usa</h2>${monsHtml}</div><div><h2>⚔️ Golpes que mais usa</h2>${movesHtml}</div></div></div>
+    <div class="card"><h2>📈 Forma recente <span style="font-size:11px;color:var(--text-faint);font-weight:400;text-transform:none;">${d.recent.length ? d.formWins + ' vitória(s) nas últimas ' + d.recent.length : ''}</span></h2>${formHtml}</div>
+    <div class="card"><h2>⚔️ Entre vocês os dois</h2>${rivalryHtml}<a class="shop-btn" style="display:block;text-align:center;margin-top:10px;text-decoration:none;" href="perfil.html?jogador=${encodeURIComponent(opp)}">Ver o perfil completo de ${escapeHtml(shownName(opp))}</a></div>`;
+}
+
+pageBoot();
+</script>
+</body>
+</html>
