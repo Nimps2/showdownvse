@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261019b">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261019c">
 <style>
 .match-bet-card{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;}
 .match-bet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
@@ -88,6 +88,12 @@
   </div>
 
   <div class="card">
+    <h2>🏅 Pokémon MVP da Semana</h2>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Aposta em UM Pokémon dos sorteios para ser o <b>MVP do torneio</b> (o organizador calcula-o dos replays: KOs, dano, sobreviver e ganhar). Acertar paga <b>8×</b> o que apostaste. Uma aposta por torneio, de 5 a 100 moedas, antes de o torneio começar.</div>
+    <div id="mvpBetContainer"><div class="empty-state">A carregar…</div></div>
+  </div>
+
+  <div class="card">
     <h2>😂 Apelido da Semana</h2>
     <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Vote no apelido mais engraçado/criativo usado neste torneio. Quem vencer ganha 🪙<span id="nicknamePrizeLabel">?</span> quando o próximo torneio for criado.</div>
     <div id="nicknameVoteContainer"><div class="empty-state">A carregar…</div></div>
@@ -110,6 +116,11 @@
   </div>
 
   <div class="card">
+    <h2>Meu histórico de apostas no Pokémon MVP</h2>
+    <div id="mvpBetHistoryContainer"><div class="empty-state">Sem apostas ainda.</div></div>
+  </div>
+
+  <div class="card">
     <h2>🏅 Ranking de Palpiteiros</h2>
     <div id="rankingContainer"><div class="empty-state">A calcular…</div></div>
   </div>
@@ -117,7 +128,7 @@
   <div class="footer-note">Aposta moedas em quem vai vencer cada partida — acerta e ganha o dobro, erra e perde a aposta. Jogos de sorte como a roleta agora ficam na <a class="nav-link" href="loja.html">loja</a>. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261019b"></script>
+<script src="assets/js/showdown-utils.js?v=20261019c"></script>
 <script>
 initTheme();
 document.getElementById('nicknamePrizeLabel').textContent = NICKNAME_VOTE_PRIZE;
@@ -249,11 +260,13 @@ async function init(){
   try{
     await refundOrphanBets();
     await settleBets();
+    await settleMvpBets();
     // Torneios e perfis ao mesmo tempo (eram um a seguir ao outro).
     const profilesPromise = fetchPlayerProfiles(SUPABASE_URL, SUPABASE_ANON_KEY);
     const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?select=id,tier,status,created_at,data&order=created_at.desc`, {headers: sbHeaders()});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows = rowsWithoutFlash(await res.json());      // o Palpiteiro, as apostas no campeão e o apelido da semana são do torneio normal: os relâmpagos ficam de fora
+    tournamentNames = {}; rows.forEach(r => { tournamentNames[r.id] = (r.data && r.data.name) || `Torneio ${r.tier || ''}`; });
     setStatus(true, `Ligado — ${rows.length} torneio(s) encontrados.`);
 
 
@@ -274,7 +287,7 @@ async function init(){
     await loadMyPredictions();
     renderOpenMatches();
     // Cada cartão desenha-se no seu próprio contentor e consulta a BD à parte: em paralelo.
-    await Promise.all([renderMyPredictions(), renderRanking(), renderChampionBetCard(), renderChampionBetHistory(), renderNicknameVoteCard(), renderReopenedNicknameVotes()]);
+    await Promise.all([renderMyPredictions(), renderRanking(), renderChampionBetCard(), renderChampionBetHistory(), renderMvpBetCard(), renderMvpBetHistory(), renderNicknameVoteCard(), renderReopenedNicknameVotes()]);
   } catch(e){
     setStatus(false, 'Não foi possível ligar à base de dados.');
   }
@@ -343,6 +356,85 @@ async function doPlaceChampionBet(multiplier){
   await renderChampionBetCard();
   await renderChampionBetHistory();
   logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'palpite', `Apostou 🪙${amount} em ${picked} ser campeão da semana (${multiplier}x)`);
+}
+
+// ---------- Aposta no Pokémon MVP (SQL v37: place_mvp_bet / settle_mvp_bets) ----------
+let tournamentNames = {};
+// Paga as apostas no MVP que já têm resultado (o gestor guarda o MVP ao calcular os replays) e devolve as de torneios apagados. Corre antes de ler o saldo.
+async function settleMvpBets(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/settle_mvp_bets`, { method:'POST', headers: Object.assign(sbHeaders(), {'Content-Type':'application/json'}), body: '{}' });
+    if(!res.ok) return;      // 404 = a base ainda não tem a função
+  } catch(e){ /* não crítico */ }
+}
+// Os Pokémon dos sorteios do torneio, agrupados pelo dono: [{owner, mons:[nome...]}]
+function mvpCandidates(data){
+  const players = (data.players || []), draws = data.draws || {}, out = [];
+  Object.keys(draws).forEach(idx => {
+    const owner = players[parseInt(idx, 10)]; if(!owner) return;
+    const e = draws[idx] || {}, mons = [].concat((e.random || []).map(x => x && x.mon), (e.free || []).map(x => x && x.name)).filter(Boolean);
+    if(mons.length) out.push({ owner, mons: Array.from(new Set(mons)).sort((a, b) => a.localeCompare(b)) });
+  });
+  return out.sort((a, b) => a.owner.localeCompare(b.owner));
+}
+async function fetchMyMvpBets(limit, tournamentId){
+  let q = `${SUPABASE_URL}/rest/v1/mvp_bets?bettor_name=eq.${encodeURIComponent(loggedInPlayerName)}&select=*&order=created_at.desc&limit=${limit}`;
+  if(tournamentId) q += `&tournament_id=eq.${tournamentId}`;
+  try{ const res = await fetch(q, {headers: sbHeaders()}); return res.ok ? await res.json() : []; } catch(e){ return []; }
+}
+function mvpBetResultText(b){
+  if(b.refunded) return '↩️ Devolvida';
+  if(!b.resolved) return '⏳ À espera do MVP';
+  return b.correct ? `✅ Acertou (+${Math.round(b.wager * b.multiplier)})` : `❌ Errou (-${b.wager})`;
+}
+async function renderMvpBetCard(){
+  const el = document.getElementById('mvpBetContainer'); if(!el) return;
+  if(!activeTournament){ el.innerHTML = '<div class="empty-state">Não há torneio em curso agora.</div>'; return; }
+  const d = activeTournament.data, started = (d.matches || []).some(m => m.winner), concluded = !!d.champion;
+  const mine = (await fetchMyMvpBets(1, activeTournament.id))[0];
+  if(mine){
+    el.innerHTML = `<div class="bet-placed">Apostaste <b>🪙 ${mine.wager}</b> em <b>${escapeHtml(mine.species)}</b> ser o MVP (${trimMult(mine.multiplier)}x — se acertares, recebes 🪙 ${Math.round(mine.wager * mine.multiplier)}). ${mvpBetResultText(mine)}</div>`;
+    return;
+  }
+  const mvp = d.mvp && d.mvp.mvp;
+  if(mvp && mvp.species){ el.innerHTML = `<div class="empty-state">O MVP deste torneio foi <b style="color:var(--tera-amber);">${escapeHtml(mvp.species)}</b> (de ${escapeHtml(mvp.owner || '?')}). Aguarda o próximo torneio para apostar de novo.</div>`; return; }
+  if(concluded || started){ el.innerHTML = '<div class="empty-state">As apostas fecharam — este torneio já começou. Aguarda o próximo para apostar no Pokémon MVP.</div>'; return; }
+  const groups = mvpCandidates(d);
+  if(!groups.length){ el.innerHTML = '<div class="empty-state">Os sorteios ainda não estão feitos: quando houver Pokémon sorteados, aparecem aqui para apostares.</div>'; return; }
+  el.innerHTML = `
+    <select id="mvpPickSelect">
+      <option value="">— escolhe o Pokémon MVP —</option>
+      ${groups.map(g => `<optgroup label="${escapeHtml(g.owner)}">${g.mons.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('')}</optgroup>`).join('')}
+    </select>
+    <input type="number" id="mvpBetAmount" placeholder="Quantas moedas apostar? (5 a 100)" min="5" max="100">
+    <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:8px;">Se o MVP for o teu Pokémon, recebes <b style="color:var(--tera-amber);">8x</b> o que apostaste (podes apostar em qualquer Pokémon, até nos teus).</div>
+    <button class="btn-primary" onclick="doPlaceMvpBet()">Apostar</button>
+  `;
+}
+function trimMult(m){ return String(Math.round(+m * 100) / 100); }
+async function doPlaceMvpBet(){
+  const species = document.getElementById('mvpPickSelect').value, amount = parseInt(document.getElementById('mvpBetAmount').value, 10);
+  if(!species){ alert('Escolhe primeiro o Pokémon.'); return; }
+  if(!amount || amount < 5 || amount > 100){ alert('A aposta tem de ser de 5 a 100 moedas.'); return; }
+  if(amount > playerCoins){ alert('Não tens moedas suficientes para essa aposta.'); return; }
+  const r = await placeMvpBet(SUPABASE_URL, SUPABASE_ANON_KEY, activeTournament.id, loggedInPlayerName, species, amount);
+  if(!r.ok){
+    const m = { insufficient: 'Não tens moedas suficientes.', auth: 'Volta a entrar (a tua sessão expirou) e tenta outra vez.', already: 'Já apostaste no MVP deste torneio.', closed: 'As apostas fecharam: o torneio já começou.',
+      unknown_species: 'Esse Pokémon não está nos sorteios deste torneio.', amount: 'A aposta tem de ser de 5 a 100 moedas.' };
+    alert(m[r.reason] || 'Não foi possível processar. Tenta outra vez.');
+    if(r.reason === 'already' || r.reason === 'closed') await renderMvpBetCard();
+    return;
+  }
+  playerCoins -= amount;
+  document.getElementById('myCoinsDisplay').textContent = `🪙 ${playerCoins}`;
+  await renderMvpBetCard(); await renderMvpBetHistory();
+  logActivity(SUPABASE_URL, SUPABASE_ANON_KEY, 'jogador', loggedInPlayerName, 'palpite', `Apostou 🪙${amount} em ${species} ser o Pokémon MVP da semana (8x)`);
+}
+async function renderMvpBetHistory(){
+  const el = document.getElementById('mvpBetHistoryContainer'); if(!el) return;
+  const rows = await fetchMyMvpBets(15);
+  if(!rows.length){ el.innerHTML = '<div class="empty-state">Sem apostas ainda.</div>'; return; }
+  el.innerHTML = rows.map(r => `<div class="history-row"><span>Apostaste <b>🪙 ${r.wager}</b> em ${escapeHtml(r.species)} (${trimMult(r.multiplier)}x) · ${escapeHtml(tournamentNames[r.tournament_id] || 'torneio apagado')}</span><span class="res ${r.resolved && r.correct ? 'win' : (r.resolved && !r.refunded ? 'loss' : '')}">${mvpBetResultText(r)}</span></div>`).join('');
 }
 
 async function loadMyPredictions(){

@@ -2845,6 +2845,14 @@ function computeChampionBetMultiplier(playerCount){
 }
 
 // Devolve {ok, reason} — 'insufficient' | 'invalid' | 'error' | true
+// Aposta no Pokémon MVP do torneio (SQL v37): a base valida, gasta as moedas (exige o bilhete de login) e regista numa só transação.
+// Devolve {ok, reason?, species?, wager?, multiplier?}; reason: invalid | amount | auth | notfound | notfound_tournament | closed | unknown_species | already | insufficient | error.
+async function placeMvpBet(supabaseUrl, supabaseAnonKey, tournamentId, name, species, wager){
+  const r = await dbFunction(supabaseUrl, supabaseAnonKey, 'place_mvp_bet', { p_name: name, p_tournament: tournamentId, p_species: species, p_wager: Math.round(wager), p_token: getPlayerToken(name) });
+  if(!r.ok || !r.data) return { ok: false, reason: 'error' };
+  return r.data;
+}
+
 async function placeChampionBet(supabaseUrl, supabaseAnonKey, tournamentId, name, predictedChampion, wager, multiplier){
   if(!wager || wager <= 0) return {ok:false, reason:'invalid'};
   const res = await fetch(`${supabaseUrl}/rest/v1/players?name=eq.${encodeURIComponent(name)}&select=coins`, {headers: sbAuthHeaders(supabaseAnonKey)});
