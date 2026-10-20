@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261020a">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261020b">
 <style>
 .highlight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
 .highlight-box{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
@@ -194,7 +194,7 @@
 
 <div class="hover-card" id="hoverCard"></div>
 
-<script src="assets/js/showdown-utils.js?v=20261020a"></script>
+<script src="assets/js/showdown-utils.js?v=20261020b"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -314,6 +314,7 @@ async function handleDailyBonusClick(){
 
 let pokeStats = {};
 let globalMoves = {};
+let replayMovesByName = {}, replayGlobalMoves = {};      // uso REAL de golpes nos jogos (replays v4): por espécie e no geral
 let totalTournaments = 0;
 let totalSlots = 0;
 
@@ -452,6 +453,7 @@ function processItem(name, item, record){
 function aggregate(rows){
   pokeStats = {};
   globalMoves = {};
+  replayMovesByName = {}; replayGlobalMoves = {};
   totalTournaments = rows.length;
   totalSlots = 0;
   rows.forEach(r=>{
@@ -488,12 +490,24 @@ function aggregate(rows){
       });
     });
   });
+  // o que os replays mostram em jogo (data.mvp.usage, escrito pelo gestor): golpes mesmo usados, por Pokémon e no geral
+  rows.forEach(r => {
+    const us = r && r.data && r.data.mvp && r.data.mvp.usage;
+    if(!us) return;
+    Object.keys(us).forEach(k => {
+      const u = us[k]; if(!u || !u.species) return;
+      const e = replayMovesByName[u.species] || (replayMovesByName[u.species] = { moves: {}, games: 0 });
+      e.games += u.games || 0;
+      Object.keys(u.moves || {}).forEach(m => { e.moves[m] = (e.moves[m] || 0) + u.moves[m]; replayGlobalMoves[m] = (replayGlobalMoves[m] || 0) + u.moves[m]; });
+    });
+  });
 }
 
 function renderHighlights(){
   const card = document.getElementById('highlightsCard');
   const distinctCount = Object.keys(pokeStats).length;
   const topMoveEntry = Object.entries(globalMoves).sort((a,b)=>b[1]-a[1])[0];
+  const topReplayMove = Object.entries(replayGlobalMoves).sort((a,b)=>b[1]-a[1])[0];
   const topPokeEntry = Object.entries(pokeStats).sort((a,b)=>b[1].total-a[1].total)[0];
   const eligibleForLucky = Object.entries(pokeStats).filter(([,s])=>(s.wins+s.losses)>=3);
   const topLucky = eligibleForLucky.sort((a,b)=>(b[1].wins/(b[1].wins+b[1].losses)) - (a[1].wins/(a[1].wins+a[1].losses)))[0];
@@ -502,7 +516,7 @@ function renderHighlights(){
   html += `<div class="highlight-box"><div class="label">Torneios</div><div class="value">${totalTournaments}</div></div>`;
   html += `<div class="highlight-box"><div class="label">Pokémon distintos</div><div class="value">${distinctCount}</div></div>`;
   html += `<div class="highlight-box"><div class="label">Pokémon mais usado</div><div class="value">${topPokeEntry?escapeHtml(topPokeEntry[0]):'—'}</div><div class="sub">${topPokeEntry?topPokeEntry[1].total+' vezes':''}</div></div>`;
-  html += `<div class="highlight-box"><div class="label">Golpe mais visto</div><div class="value">${topMoveEntry?escapeHtml(topMoveEntry[0]):'—'}</div><div class="sub">${topMoveEntry?topMoveEntry[1]+' vezes':''}</div></div>`;
+  html += `<div class="highlight-box"><div class="label">${topReplayMove?'Golpe mais usado nos jogos':'Golpe mais visto'}</div><div class="value">${topReplayMove?escapeHtml(topReplayMove[0]):(topMoveEntry?escapeHtml(topMoveEntry[0]):'—')}</div><div class="sub">${topReplayMove?topReplayMove[1]+' usos (replays)':(topMoveEntry?topMoveEntry[1]+' vezes nos sets':'')}</div></div>`;
   html += `</div>`;
   if(topLucky){
     const wr = ((topLucky[1].wins/(topLucky[1].wins+topLucky[1].losses))*100).toFixed(0);
@@ -574,7 +588,8 @@ function renderPokemonList(){
     const freePct = Math.round((st.free/st.total)*100);
     const overallPct = totalSlots ? ((st.total/totalSlots)*100).toFixed(1) : '0';
     const topAbility = Object.entries(st.abilities).sort((a,b)=>b[1]-a[1])[0];
-    const topMoves = Object.entries(st.moves).sort((a,b)=>b[1]-a[1]).slice(0,4);
+    const ru = replayMovesByName[name];
+    const topMoves = Object.entries(ru ? ru.moves : st.moves).sort((a,b)=>b[1]-a[1]).slice(0,4);
     const movesHtml = topMoves.length
       ? topMoves.map(([mv,c])=>`<span class="move-chip">${escapeHtml(mv)} <b>${c}x</b></span>`).join('')
       : '<span style="font-size:11.5px;color:var(--text-faint);">Sem golpes registrados</span>';
@@ -590,7 +605,7 @@ function renderPokemonList(){
       <div class="poke-stat-row" style="margin-top:8px;"><span>Winrate do time*</span><b style="color:var(--tera-amber);">${winrate!==null ? winrate+'% ('+st.wins+'V-'+st.losses+'D)' : '—'}</b></div>
       <div class="poke-stat-row"><span>Ability mais comum</span><b>${topAbility ? escapeHtml(topAbility[0]) : '—'}</b></div>
       <div class="poke-moves">
-        <div class="label">Golpes mais usados</div>
+        <div class="label">Golpes mais usados <span style="text-transform:none;">${ru ? '· nos jogos (replays)' : '· nos sets'}</span></div>
         ${movesHtml}
       </div>
       ${nicksForThis.length ? `<div class="poke-moves"><div class="label">Apelidos vistos</div><span style="font-size:11.5px;color:var(--text-dim);">${nicksForThis.map(n=>escapeHtml(n)).join(', ')}</span></div>` : ''}

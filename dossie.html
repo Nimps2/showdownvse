@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261020a">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261020b">
 <style>
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:12px 0;}
 .stat-box{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-align:center;}
@@ -98,7 +98,7 @@
   <div class="footer-note">Os números vêm dos torneios e dos replays já lidos pelo gestor; com poucos jogos servem de indicação, não de regra. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261020a"></script>
+<script src="assets/js/showdown-utils.js?v=20261020b"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -256,14 +256,14 @@ function renderDossier(userChoice){
     </div>
     ${st.lead || st.closer ? `<div style="font-size:12.5px;color:var(--text-dim);">${st.lead ? `🎬 Abre mais vezes com <b>${escapeHtml(st.lead.name)}</b> (${st.lead.count}×)` : ''}${st.closer ? ` · 🏁 Fecha jogos com <b>${escapeHtml(st.closer.name)}</b> (${st.closer.count}×)` : ''}</div>` : ''}`;
   const monsHtml = d.topMons.length ? `<div class="dz-chips">${d.topMons.map(m => `<div class="dz-mon">${pokeSpriteHtml(m.name, 36)} <b>${escapeHtml(m.name)}</b> <span>${m.count}×</span></div>`).join('')}</div>` : '<div class="empty-state">Ainda sem Pokémon registados.</div>';
-  const movesHtml = d.topMoves.length ? `<div class="dz-chips">${d.topMoves.map(m => `<div class="dz-mon" style="padding:6px 12px;"><b>${escapeHtml(m.name)}</b> <span>${m.count}×</span></div>`).join('')}</div>` : '<div class="empty-state">Ainda sem golpes registados.</div>';
+  const movesHtml = d.topMoves.length ? `<div class="dz-chips">${d.topMoves.map(m => `<div class="dz-mon" style="padding:6px 12px;"><b>${escapeHtml(m.name)}</b> <span>${m.count}×${d.moveKos && d.moveKos[m.name] ? ' · ' + d.moveKos[m.name] + ' KO' + (d.moveKos[m.name] === 1 ? '' : 's') : ''}</span></div>`).join('')}</div>` : '<div class="empty-state">Ainda sem golpes registados.</div>';
   const formHtml = d.recent.length ? `<div class="dz-form">${d.recent.map(x => `<span class="dz-pill ${x.won ? 'w' : 'l'}" title="${escapeHtml(x.label)} contra ${escapeHtml(shownName(x.vs))}">${x.won ? 'V' : 'D'}</span>`).join('')}</div>
       ${d.recent.map(x => `<div class="dz-row"><span>${fmtDate(x.date)} · ${escapeHtml(x.tournament)} · ${escapeHtml(x.label)} vs ${escapeHtml(shownName(x.vs))}</span><span class="res">${x.won ? '✅' : '❌'}</span></div>`).join('')}` : '<div class="empty-state">Ainda sem partidas.</div>';
   body.innerHTML = `
     <div class="card"><div class="dz-versus">${side(me, my, mine.wins, mine.losses, mg ? Math.round(mine.wins / mg * 100) : null, mine.titles, '')}<div class="dz-vs">VS</div>${side(opp, st, d.wins, d.losses, d.winrate, d.titles, 'opp')}</div></div>
     <div class="card"><h2>💡 Dicas de preparação</h2><ul class="dz-tips">${d.tips.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul></div>
     <div class="card"><h2>🎭 Como joga</h2>${stylesHtml}</div>
-    <div class="card"><div class="dz-cols"><div><h2>⭐ Pokémon que mais usa</h2>${monsHtml}</div><div><h2>⚔️ Golpes que mais usa</h2>${movesHtml}</div></div></div>
+    <div class="card"><div class="dz-cols"><div><h2>⭐ Pokémon que mais usa</h2>${monsHtml}</div><div><h2>⚔️ Golpes que mais usa <small style="font-size:10.5px;color:var(--text-faint);font-weight:400;text-transform:none;">${d.movesFrom === 'replays' ? 'nos jogos (replays)' : 'nos sets'}</small></h2>${movesHtml}</div></div></div>
     <div class="card"><h2>📈 Forma recente <span style="font-size:11px;color:var(--text-faint);font-weight:400;text-transform:none;">${d.recent.length ? d.formWins + ' vitória(s) nas últimas ' + d.recent.length : ''}</span></h2>${formHtml}</div>
     <div class="card"><h2>⚔️ Entre vocês os dois</h2>${rivalryHtml}<a class="shop-btn" style="display:block;text-align:center;margin-top:10px;text-decoration:none;" href="perfil.html?jogador=${encodeURIComponent(opp)}">Ver o perfil completo de ${escapeHtml(shownName(opp))}</a></div>`;
 }

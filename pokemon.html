@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261020a">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261020b">
 </head>
 <body>
 <div id="playerCornerContainer"></div>
@@ -73,7 +73,7 @@
   <div class="footer-note">*O winrate é o do time do jogador nesse torneio (não sabemos qual Pokémon jogou cada partida), por isso é só uma aproximação. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261020a"></script>
+<script src="assets/js/showdown-utils.js?v=20261020b"></script>
 <script>
 initTheme();
 const SUPABASE_URL = "https://irykmyygquytxezevlas.supabase.co";
@@ -229,7 +229,7 @@ function renderSpecies(name){
   const sets = `<div class="card"><h2>🧩 Sets mais comuns</h2>
       <div class="pk-set"><div class="pk-lab">Habilidades</div>${chipsHtml(st.abilities, 6)}</div>
       <div class="pk-set"><div class="pk-lab">Itens</div>${chipsHtml(st.items, 6)}</div>
-      <div class="pk-set"><div class="pk-lab">Golpes</div>${chipsHtml(st.moves, 10)}</div>
+      <div class="pk-set"><div class="pk-lab">Golpes <span style="text-transform:none;font-weight:400;">(nos sets sorteados)</span></div>${chipsHtml(st.moves, 10)}</div>
       <div class="pk-set"><div class="pk-lab">Tera Type</div>${chipsHtml(st.tera, 6)}</div>
       <div class="pk-set"><div class="pk-lab">Natureza</div>${chipsHtml(st.natures, 6)}</div></div>`;
   const R = st.replay;
@@ -241,8 +241,14 @@ function renderSpecies(name){
         <div class="pk-box"><div class="l">Sobreviveu</div><div class="v">${R.survived}/${R.games}</div><div class="s">${R.teraGames ? 'Tera em ' + R.teraGames + ' jogo' + (R.teraGames === 1 ? '' : 's') : 'sem Tera'}</div></div>
         <div class="pk-box"><div class="l">🏅 Pokémon MVP</div><div class="v">${R.mvpTitles}</div><div class="s">torneio${R.mvpTitles === 1 ? '' : 's'} em que foi o MVP</div></div>
       </div></div>` : '';
+  const U = st.usage;       // o que os replays mostram em jogo (leitura v4): golpes realmente usados e KOs por golpe, itens e habilidades vistos, Tera
+  const uso = U ? `<div class="card"><h2>⚔️ O que usou nos jogos <small style="font-weight:400;color:var(--text-faint);">(${U.games} jogo${U.games === 1 ? '' : 's'} lido${U.games === 1 ? '' : 's'} nos replays)</small></h2>
+      <div class="pk-set"><div class="pk-lab">Golpes usados <span style="text-transform:none;font-weight:400;">(vezes · KOs que deu)</span></div>${Object.entries(U.moves).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 14).map(([k, c]) => `<span class="pk-chip">${escapeHtml(k)} <b>${c}x</b>${U.koMoves[k] ? ` · ${U.koMoves[k]} KO${U.koMoves[k] === 1 ? '' : 's'}` : ''}</span>`).join('') || '<span class="pk-none">Sem dados</span>'}</div>
+      <div class="pk-set"><div class="pk-lab">Itens vistos <span style="text-transform:none;font-weight:400;">(só aparecem quando fazem algo)</span></div>${chipsHtml(U.items, 6)}</div>
+      <div class="pk-set"><div class="pk-lab">Habilidades vistas</div>${chipsHtml(U.abilities, 6)}</div>
+      <div class="pk-set"><div class="pk-lab">Tera usado</div>${chipsHtml(U.teras, 6)}</div></div>` : '';
   const hist = `<div class="card"><h2>🗂️ Histórico</h2>${st.appearances.slice(0, 40).map(a => `<div class="pk-row"><span class="pk-date">${fmtDate(a.date)}</span><span class="pk-who2">${escapeHtml(a.player)} <small>${a.free ? '(escolha livre)' : '(sorteado)'}</small></span><span class="pk-tn">${escapeHtml(a.tournament)}</span><span class="pk-rec">${a.wins + a.losses ? a.wins + 'V-' + a.losses + 'D' : '—'}</span><span class="pk-t">${a.champion ? '🏆' : ''}</span></div>`).join('')}${st.appearances.length > 40 ? `<div class="pk-none" style="margin-top:8px;">+ ${st.appearances.length - 40} aparições mais antigas.</div>` : ''}</div>`;
-  body.innerHTML = head + replays + `<div class="pk-cols">${players}${sets}</div>` + hist;
+  body.innerHTML = head + replays + uso + `<div class="pk-cols">${players}${sets}</div>` + hist;
 }
 
 function goSearch(){

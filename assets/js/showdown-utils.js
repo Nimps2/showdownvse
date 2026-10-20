@@ -1355,10 +1355,10 @@ function computeOpponentDossier(rows, me, opp){
   const stats = aggregatePlayers(rows || []), st = stats[opp] || { wins: 0, losses: 0, titles: 0 };
   const { mons, moves } = aggregatePlayerPokemon(rows || [], opp);
   const top = o => Object.entries(o).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5).map(([name, count]) => ({ name, count }));
-  const style = playerReplayStyle(rows || [], opp), recent = recentResultsOf(rows, opp, 6);
+  const style = playerReplayStyle(rows || [], opp), recent = recentResultsOf(rows, opp, 6), mu = playerMoveUsage(rows || [], opp, 5);
   const games = st.wins + st.losses;
   return { me, opp, wins: st.wins, losses: st.losses, titles: st.titles, winrate: games ? Math.round(st.wins / games * 100) : null, rivalry: computeRivalry(rows || [], me, opp),
-    style, myStyle: me ? playerReplayStyle(rows || [], me) : null, topMons: top(mons), topMoves: top(moves), recent, formWins: recent.filter(x => x.won).length, tips: dossierTips(style) };
+    style, myStyle: me ? playerReplayStyle(rows || [], me) : null, topMons: top(mons), topMoves: mu.hasData ? mu.uses : top(moves), movesFrom: mu.hasData ? 'replays' : 'sets', moveKos: mu.hasData ? mu.koOf : {}, recent, formWins: recent.filter(x => x.won).length, tips: dossierTips(style) };
 }
 
 // ---------- Recordes de sempre e prémios da temporada (Hall da Fama; o gestor anuncia os prémios no Discord) ----------
@@ -3309,6 +3309,7 @@ function aggregateSpecies(rows, species){
     }
   });
   if(!out.total) return null;
+  out.usage = speciesReplayUsage(rows, species);      // o que os replays dizem (golpes mesmo usados, itens e habilidades vistos, Tera); null sem replays v4
   out.appearances.sort((a, b) => new Date(b.date) - new Date(a.date));
   out.playerList = Object.values(out.players).sort((a, b) => b.count - a.count || b.wins - a.wins || a.name.localeCompare(b.name));
   return out;
@@ -3332,13 +3333,13 @@ function addReplaySideToStyle(s, parsed, side){
 function sumReplayStyle(allRows, name){
   const t = { tournaments: 0, games: 0, wins: 0, turns: 0, kos: 0, dmgDealt: 0, dmgTaken: 0, switches: 0, moves: 0, sweeps: 0, tanks: 0, comebacks: 0, tera: 0 };
   replayStyleV3Keys().forEach(k => { t[k] = 0; });
-  t.leads = {}; t.closers = {};
+  t.leads = {}; t.closers = {}; t.moveUse = {}; t.moveKos = {};
   (allRows || []).forEach(r => {
     const s = r && r.data && r.data.mvp && r.data.mvp.styles && r.data.mvp.styles[name];
     if(!s || !s.games) return;
     t.tournaments++;
-    Object.keys(t).forEach(k => { if(k !== 'tournaments' && k !== 'leads' && k !== 'closers') t[k] += +s[k] || 0; });
-    ['leads', 'closers'].forEach(m => Object.keys(s[m] || {}).forEach(k => { t[m][k] = (t[m][k] || 0) + (+s[m][k] || 0); }));
+    Object.keys(t).forEach(k => { if(k !== 'tournaments' && k !== 'leads' && k !== 'closers' && k !== 'moveUse' && k !== 'moveKos') t[k] += +s[k] || 0; });
+    ['leads', 'closers', 'moveUse', 'moveKos'].forEach(m => Object.keys(s[m] || {}).forEach(k => { t[m][k] = (t[m][k] || 0) + (+s[m][k] || 0); }));
   });
   return t;
 }
@@ -3405,6 +3406,41 @@ function playerReplayStyle(allRows, name){
   }
   return out;
 }
+// ---------- Uso REAL de golpes, itens e habilidades (lido dos replays, leitura v4) ----------
+// Antes os "golpes mais usados" contavam quantas vezes o golpe estava nos SETS dos Pokémon sorteados; agora contam as vezes que o golpe foi mesmo usado nos jogos.
+// Só há dados dos jogos com replay lido (v4); o resto continua a poder usar os sets (aggregatePlayerPokemon / aggregateSpecies).
+function topCounts(map, limit){
+  return Object.entries(map || {}).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, limit || 5).map(([name, count]) => ({ name, count }));
+}
+function mergeCounts(to, from){ Object.keys(from || {}).forEach(k => { to[k] = (to[k] || 0) + (+from[k] || 0); }); }
+// Os golpes de UM jogador nos jogos lidos: { hasData, games (jogos com golpes lidos), total (usos), uses:[{name,count}], kos:[{name,count}], koOf:{golpe:KOs} }.
+function playerMoveUsage(rows, name, limit){
+  const uses = {}, kos = {}; let games = 0;
+  (rows || []).forEach(r => {
+    const s = r && r.data && r.data.mvp && r.data.mvp.styles && r.data.mvp.styles[name];
+    if(!s || !s.moveUse) return;
+    games += s.games || 0; mergeCounts(uses, s.moveUse); mergeCounts(kos, s.moveKos);
+  });
+  const total = Object.values(uses).reduce((a, b) => a + b, 0);
+  return { hasData: total > 0, games, total, uses: topCounts(uses, limit || 5), kos: topCounts(kos, limit || 5), koOf: kos };
+}
+// O uso REAL de uma espécie nos jogos (somado dos torneios): { games, moves, koMoves, items, abilities, teras } ou null se nenhum replay v4 a viu.
+function speciesReplayUsage(rows, species){
+  const want = eventSpeciesId(species);
+  const out = { games: 0, moves: {}, koMoves: {}, items: {}, abilities: {}, teras: {} };
+  (rows || []).forEach(r => {
+    const u = r && r.data && r.data.mvp && r.data.mvp.usage && r.data.mvp.usage[want];
+    if(!u) return;
+    out.games += u.games || 0; ['moves', 'koMoves', 'items', 'abilities', 'teras'].forEach(k => mergeCounts(out[k], u[k]));
+  });
+  return out.games ? out : null;
+}
+// Os golpes mais usados de todos os Pokémon nos jogos lidos: { golpe: usos }.
+function globalMoveUsage(rows){
+  const out = {};
+  (rows || []).forEach(r => { const us = r && r.data && r.data.mvp && r.data.mvp.usage; if(us) Object.keys(us).forEach(k => mergeCounts(out, us[k].moves)); });
+  return out;
+}
 // Os nomes de todas as espécies que já saíram (para a pesquisa), ordenados A-Z.
 function listSeenSpecies(rows){
   const set = {};
@@ -3442,12 +3478,13 @@ function computeSeasonRecap(allRows, name, season){
   const pk = aggregatePlayerPokemon(rows, name);
   const topMons = Object.entries(pk.mons).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 3).map(([n, c]) => ({ name: n, count: c }));
   const topMoveE = Object.entries(pk.moves).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+  const mu = playerMoveUsage(rows, name, 1);
   const list = Object.values(opp);
   const victim = list.filter(o => o.wins > 0).sort((a, b) => b.wins - a.wins || a.losses - b.losses || a.name.localeCompare(b.name))[0] || null;
   const nemesis = list.filter(o => o.losses > 0).sort((a, b) => b.losses - a.losses || a.wins - b.wins || a.name.localeCompare(b.name))[0] || null;
   const games = wins + losses;
   return { season, name, start: range.start, end: range.end, tournaments: rows.length, wins, losses, winrate: games ? Math.round(wins / games * 100) : null,
-    titles, finals, bestStreak, topMons, topMove: topMoveE ? { name: topMoveE[0], count: topMoveE[1] } : null, victim, nemesis };
+    titles, finals, bestStreak, topMons, topMove: mu.hasData ? { name: mu.uses[0].name, count: mu.uses[0].count, replay: true } : (topMoveE ? { name: topMoveE[0], count: topMoveE[1] } : null), victim, nemesis };
 }
 // Texto pronto a colar no Discord.
 function seasonRecapText(rc, displayName){
@@ -3457,7 +3494,7 @@ function seasonRecapText(rc, displayName){
     `🏟️ ${rc.tournaments} torneio${rc.tournaments === 1 ? '' : 's'} · ${rc.wins}V-${rc.losses}D${rc.winrate !== null ? ' (' + rc.winrate + '%)' : ''}${rc.titles ? ' · 🏆 ' + rc.titles + ' título' + (rc.titles === 1 ? '' : 's') : ''}${rc.finals ? ' · ' + rc.finals + ' final' + (rc.finals === 1 ? '' : 'is') : ''}`];
   if(rc.bestStreak >= 2) lines.push(`🔥 Maior sequência: ${rc.bestStreak} vitórias seguidas`);
   if(rc.topMons.length) lines.push(`⭐ Pokémon mais usados: ${rc.topMons.map(m => m.name + ' (' + m.count + 'x)').join(', ')}`);
-  if(rc.topMove) lines.push(`⚔️ Golpe preferido: ${rc.topMove.name} (${rc.topMove.count}x)`);
+  if(rc.topMove) lines.push(`⚔️ Golpe preferido: ${rc.topMove.name} (${rc.topMove.count}${rc.topMove.replay ? ' usos nos jogos' : 'x'})`);
   if(rc.victim) lines.push(`🎯 Freguês: ${rc.victim.name} (${rc.victim.wins}V)`);
   if(rc.nemesis) lines.push(`😈 Nemesis: ${rc.nemesis.name} (${rc.nemesis.losses}D)`);
   return lines.join('\n');
@@ -3508,13 +3545,27 @@ function parseReplayLog(log){
   };
   const mon = (side, species) => {
     const k = side + '|' + species;
-    if(!byKey[k]) byKey[k] = { side, species, nickname: null, appeared: false, kos: 0, directKos: 0, fainted: false, dmgDealt: 0, dmgTaken: 0, tera: null, turnsActive: 0, moves: 0, hp: 100, lastHit: null, lastIndirect: false, lastSelf: false };
+    if(!byKey[k]) byKey[k] = { side, species, nickname: null, appeared: false, kos: 0, directKos: 0, fainted: false, dmgDealt: 0, dmgTaken: 0, tera: null, turnsActive: 0, moves: 0, moveUse: {}, moveKos: {}, items: {}, abilities: {}, hp: 100, lastHit: null, lastHitMove: null, lastIndirect: false, lastSelf: false };
     return byKey[k];
   };
   let actor = null;
+  // O que o Showdown mostra do equipamento de um Pokémon durante o jogo (só aparece quando faz algo): item e habilidade, uma vez por jogo.
+  const holderAt = s => active[posOf(s)] || null;
+  const revealGear = (p, cmd) => {
+    const tags = p.slice(3), of = tags.find(x => x.indexOf('[of]') === 0), fi = tags.find(x => x.indexOf('[from] item:') === 0), fa = tags.find(x => x.indexOf('[from] ability:') === 0);
+    if(cmd === '-ability'){ const m = holderAt(p[2]); if(m && p[3]) m.abilities[String(p[3]).trim()] = 1; }
+    else if(cmd === '-item' || cmd === '-enditem'){ const m = holderAt(p[2]); if(m && p[3]) m.items[String(p[3]).trim()] = 1; }
+    else if(cmd === '-activate'){
+      const m = holderAt(p[2]), w = String(p[3] || '');
+      if(m){ if(w.indexOf('item: ') === 0) m.items[w.slice(6).trim()] = 1; else if(w.indexOf('ability: ') === 0) m.abilities[w.slice(9).trim()] = 1; }
+    }
+    if(fi){ const m = holderAt(of ? of.slice(4).trim() : p[2]); if(m) m.items[fi.slice(12).trim()] = 1; }
+    if(fa){ const m = holderAt(of && !/Trace/.test(fa) ? of.slice(4).trim() : p[2]); if(m) m.abilities[fa.slice(15).trim()] = 1; }
+  };
   String(log || '').split('\n').forEach(raw => {
     if(raw.charAt(0) !== '|') return;
     const p = raw.split('|'), cmd = p[1];
+    revealGear(p, cmd);
     if(cmd === 'player'){ if(p[2] && p[3]) res.players[p[2]] = p[3]; return; }
     if(cmd === 'teamsize'){ if(/^p[1-4]$/.test(p[2]) && +p[3] > 0) res.teamSize[p[2]] = +p[3]; return; }
     if(cmd === 'poke'){ if(/^p[1-4]$/.test(p[2])) pokeCount[p[2]] = (pokeCount[p[2]] || 0) + 1; return; }
@@ -3540,6 +3591,8 @@ function parseReplayLog(log){
       const pos = posOf(p[2]), m = active[pos]; actor = m || null; if(m) m.moves++;
       const sd = pos ? pos.slice(0, 2) : null;
       actorMove = String(p[3] || '').trim();
+      const fromTag = p.slice(4).find(x => x.indexOf('[from]') === 0);
+      if(m && actorMove && (!fromTag || /lockedmove/i.test(fromTag))) m.moveUse[actorMove] = (m.moveUse[actorMove] || 0) + 1;
       curMove = sd && res.side[sd] ? { side: sd, hit: false } : null;
       if(curMove){ res.side[sd].moves++; moveTokens.push(curMove); }
       if(sd && REPLAY_PIVOT_MOVES[actorMove]) pivotPending[sd] = true;
@@ -3608,7 +3661,7 @@ function parseReplayLog(log){
       if(src && (src === t || src.side === t.side)) src = null;
       t.hp = nh; t.dmgTaken += drop;
       if(src && !indirect){
-        src.dmgDealt += drop; t.lastHit = src;
+        src.dmgDealt += drop; t.lastHit = src; t.lastHitMove = (!from && !of) ? actorMove : null;
         if(!from && !of && src === actor && res.side[src.side]){
           if(curMove && curMove.side === src.side) curMove.hit = true;                  // este golpe fez dano (conta como golpe de ataque)
           if(drop >= 99.5 && nh <= 0) res.side[src.side].oneShots++;                      // tirou um Pokémon de vida cheia de uma só vez
@@ -3634,7 +3687,7 @@ function parseReplayLog(log){
       if(actor === t && REPLAY_SAC_MOVES[actorMove] && res.side[t.side]) res.side[t.side].sacs++;        // desmaiou do próprio golpe (Explosion, Memento...): foi um sacrifício
       t.fainted = true; t.hp = 0;
       const by = t.lastSelf ? null : t.lastHit;
-      if(by && by.side !== t.side){ by.kos++; if(!t.lastIndirect) by.directKos++; }
+      if(by && by.side !== t.side){ by.kos++; if(!t.lastIndirect){ by.directKos++; if(t.lastHitMove) by.moveKos[t.lastHitMove] = (by.moveKos[t.lastHitMove] || 0) + 1; } }
       if(faints[t.side] !== undefined){
         faints[t.side]++;
         const opp = t.side === 'p1' ? 'p2' : 'p1';
@@ -3666,7 +3719,7 @@ function parseReplayLog(log){
     res.left[side] = Math.max(0, sizeOf(side) - faints[side]);
     res.leftHp[side] = Object.keys(byKey).map(k => byKey[k]).filter(m => m.side === side && m.appeared && !m.fainted).map(m => Math.round(m.hp));
   });
-  res.mons = Object.keys(byKey).map(k => { const m = byKey[k]; delete m.hp; delete m.lastHit; delete m.lastIndirect; delete m.lastSelf; return m; }).filter(m => m.appeared);
+  res.mons = Object.keys(byKey).map(k => { const m = byKey[k]; delete m.hp; delete m.lastHit; delete m.lastHitMove; delete m.lastIndirect; delete m.lastSelf; return m; }).filter(m => m.appeared);
   return res;
 }
 
@@ -3686,7 +3739,8 @@ function aggregateReplayMvp(games, draws, players){
       ownerById[id(n)] = owner; ownerByBase[id(getBaseSpecies(n))] = ownerByBase[id(getBaseSpecies(n))] || owner;
     });
   });
-  const per = {}, skipped = [];
+  const per = {}, skipped = [], usage = {};
+  const addCounts = (to, from) => { Object.keys(from || {}).forEach(k => { to[k] = (to[k] || 0) + from[k]; }); };
   const ownerOfSpecies = sp => ownerById[id(sp)] || ownerByBase[id(getBaseSpecies(sp))] || null;
   const styles = {}, momentGames = [];
   let used = 0;
@@ -3711,6 +3765,8 @@ function aggregateReplayMvp(games, draws, players){
       mine.forEach(m => { s.kos += m.kos; s.dmgDealt += m.dmgDealt; s.dmgTaken += m.dmgTaken; s.moves += m.moves; if(m.kos >= STYLE_SWEEP_KOS) s.sweeps++; if(!m.fainted && m.dmgTaken >= STYLE_TANK_DMG) s.tanks++; });
       if(mine.some(m => m.tera)) s.tera++;
       addReplaySideToStyle(s, g.parsed, side);
+      s.moveUse = s.moveUse || {}; s.moveKos = s.moveKos || {};                // os golpes que ESTE jogador usou nos jogos (e os que deram KOs)
+      mine.forEach(m => { addCounts(s.moveUse, m.moveUse); addCounts(s.moveKos, m.moveKos); });
     });
     g.parsed.mons.forEach(m => {
       const k = id(m.species);
@@ -3719,13 +3775,19 @@ function aggregateReplayMvp(games, draws, players){
       if(m.fainted) st.deaths++; else st.survived++;
       if(m.tera) st.teraGames++;
       if(g.parsed.winnerSide && g.parsed.winnerSide === m.side) st.winGames++;
+      // uso REAL desta espécie nos jogos: golpes usados (e KOs por golpe), itens e habilidades vistos (jogos em que se viram) e Tera
+      const u = usage[k] || (usage[k] = { species: m.species, owner: st.owner, games: 0, moves: {}, koMoves: {}, items: {}, abilities: {}, teras: {} });
+      u.games++; addCounts(u.moves, m.moveUse); addCounts(u.koMoves, m.moveKos);
+      Object.keys(m.items || {}).forEach(i => { u.items[i] = (u.items[i] || 0) + 1; });
+      Object.keys(m.abilities || {}).forEach(i => { u.abilities[i] = (u.abilities[i] || 0) + 1; });
+      if(typeof m.tera === 'string') u.teras[m.tera] = (u.teras[m.tera] || 0) + 1;
     });
   });
   const stats = Object.values(per).map(s => { s.dmgDealt = Math.round(s.dmgDealt); s.dmgTaken = Math.round(s.dmgTaken); s.score = mvpScore(s); return s; })
     .sort((a, b) => b.score - a.score || b.kos - a.kos || b.dmgDealt - a.dmgDealt || a.species.localeCompare(b.species));
   const mvp = stats.find(s => s.owner) || null;
   Object.keys(styles).forEach(k => { const s = styles[k]; s.dmgDealt = Math.round(s.dmgDealt); s.dmgTaken = Math.round(s.dmgTaken); });
-  return { v: 3, computedAt: new Date().toISOString(), replays: used, skipped, mvp, stats: stats.slice(0, 24), moments: computeReplayMoments(momentGames), styles };
+  return { v: 4, computedAt: new Date().toISOString(), replays: used, skipped, mvp, stats: stats.slice(0, 24), moments: computeReplayMoments(momentGames), styles, usage };
 }
 
 // Momentos do torneio: os destaques que se tiram dos replays (um de cada tipo, o mais extremo). momentGames = [{label, parsed, owner:{p1,p2}}].

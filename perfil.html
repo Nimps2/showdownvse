@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261020a">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261020b">
 <style>
 .customize-toggle-btn{
   background:var(--bg-card);border:1px solid var(--line);color:var(--tera-cyan);padding:9px 16px;
@@ -127,7 +127,7 @@
   <div class="footer-note">Estatísticas calculadas a partir de todos os torneios guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261020a"></script>
+<script src="assets/js/showdown-utils.js?v=20261020b"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -279,6 +279,7 @@ async function renderProfile(){
   const { mons, moves } = aggregatePlayerPokemon(allRows, name);
   const topMons = Object.entries(mons).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const topMoves = Object.entries(moves).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const moveUse = typeof playerMoveUsage === 'function' ? playerMoveUsage(allRows, name, 5) : { hasData: false };     // golpes realmente usados nos jogos (replays v4); se a página estiver em cache antiga, só os sets
   const h2h = computeHeadToHead(allRows, name);
   currentH2H = h2h;
   const eloHistory = computeEloHistory(allRows, name);
@@ -559,10 +560,13 @@ async function renderProfile(){
           </div>
         </div>
         <div>
-          <div style="font-size:11.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Golpes mais usados</div>
+          <div style="font-size:11.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Golpes mais usados ${moveUse.hasData ? '<span style="text-transform:none;">· nos jogos (replays)</span>' : '<span style="text-transform:none;">· nos sets</span>'}</div>
           <div class="fav-list">
-            ${topMoves.length ? topMoves.map(([n,c],i)=>`<div class="fav-row"><span><span class="rank">#${i+1}</span>${escapeHtml(n)}</span><b>${c}x</b></div>`).join('') : '<div class="empty-state">Sem dados.</div>'}
+            ${moveUse.hasData
+              ? moveUse.uses.map((m,i)=>`<div class="fav-row"><span><span class="rank">#${i+1}</span>${escapeHtml(m.name)}</span><b>${m.count}x${moveUse.koOf[m.name] ? ` · ${moveUse.koOf[m.name]} KO${moveUse.koOf[m.name] === 1 ? '' : 's'}` : ''}</b></div>`).join('')
+              : (topMoves.length ? topMoves.map(([n,c],i)=>`<div class="fav-row"><span><span class="rank">#${i+1}</span>${escapeHtml(n)}</span><b>${c}x</b></div>`).join('') : '<div class="empty-state">Sem dados.</div>')}
           </div>
+          ${moveUse.hasData ? `<div style="font-size:11px;color:var(--text-faint);margin-top:6px;">${moveUse.total} usos em ${moveUse.games} jogo${moveUse.games === 1 ? '' : 's'} lidos${topMoves.length ? ' · nos sets: ' + topMoves.slice(0,3).map(([n,c]) => escapeHtml(n) + ' ' + c + 'x').join(', ') : ''}</div>` : ''}
         </div>
       </div>
     </div>
@@ -998,7 +1002,7 @@ function downloadRecapImage(){
   if(rc.topMons.length) lines.push('⭐ ' + rc.topMons.map(m => m.name + ' (' + m.count + 'x)').join(' · '));
   if(rc.victim) lines.push('🎯 Freguês: ' + rc.victim.name + ' (' + rc.victim.wins + 'V)    😈 Nemesis: ' + (rc.nemesis ? rc.nemesis.name + ' (' + rc.nemesis.losses + 'D)' : '—'));
   else if(rc.nemesis) lines.push('😈 Nemesis: ' + rc.nemesis.name + ' (' + rc.nemesis.losses + 'D)');
-  if(rc.topMove) lines.push('⚔️ Golpe preferido: ' + rc.topMove.name + ' (' + rc.topMove.count + 'x)');
+  if(rc.topMove) lines.push('⚔️ Golpe preferido: ' + rc.topMove.name + ' (' + rc.topMove.count + (rc.topMove.replay ? ' usos nos jogos' : 'x') + ')');
   lines.forEach((t, i) => g.fillText(t, 44, 424 + i * 32, W - 88));
   g.fillStyle = '#5b6482'; g.font = font(13, 400); g.fillText('gerado em ' + new Date().toLocaleDateString('pt-PT'), W - 190, H - 30);
   c.toBlob(b => {
