@@ -3357,7 +3357,7 @@ const REPLAY_TRAIT_DEFS = [
   { id: 'weakness', icon: '🎯', name: 'Caçador de fraquezas', get: t => t.seHits / t.g3, min: 5, ratio: 1.3, unit: 'golpes super eficazes por jogo', text: 'Acerta onde dói: aproveita as fraquezas do adversário.' },
   { id: 'oneshot', icon: '💥', name: 'Executor', get: t => t.oneShots / t.g3, min: 1.5, ratio: 1.4, unit: 'KOs de um só golpe por jogo', text: 'Tira Pokémon de vida cheia de uma só pancada.' }
 ];
-function replayTraitFmt(def, v){ return def.fmt ? def.fmt(v) : (Math.round(v * 10) / 10).toLocaleString('pt-PT'); }
+function replayTraitFmt(def, v){ return def.fmt ? def.fmt(v) : (Math.round(v * 10) / 10).toLocaleString('pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }       // sempre 1 casa decimal ("1,0 armadilhas", nunca "1 armadilhas")
 // A média do GRUPO de cada característica: média das taxas dos jogadores com jogos suficientes (cada jogador pesa o mesmo, não quem tem mais jogos). null se houver menos de 3 jogadores com dados.
 function replayStyleGroupBase(allRows){
   const names = {};
