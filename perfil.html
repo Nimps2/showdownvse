@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261031a">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261031b">
 <style>
 .customize-toggle-btn{
   background:var(--bg-card);border:1px solid var(--line);color:var(--tera-cyan);padding:9px 16px;
@@ -127,7 +127,7 @@
   <div class="footer-note">Estatísticas calculadas a partir de todos os torneios guardados na base de dados. Ferramenta feita por fãs, sem afiliação com Nintendo, Game Freak ou The Pokémon Company.</div>
 </div>
 
-<script src="assets/js/showdown-utils.js?v=20261031a"></script>
+<script src="assets/js/showdown-utils.js?v=20261031b"></script>
 <script>
 initTheme();
 ensureAvatarFxStyles();
@@ -635,6 +635,10 @@ async function renderProfile(){
       <div class="shop-grid">${COSMETIC_CATALOG.frames.map(item => customizeItemHtml(item, 'frame', profile)).join('')}</div>
       <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Efeito no nome</div>
       <div class="shop-grid">${COSMETIC_CATALOG.nameEffects.map(item => customizeItemHtml(item, 'nameEffect', profile)).join('')}</div>
+      <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:12px;color:var(--text-dim);cursor:pointer;text-transform:none;letter-spacing:0;font-weight:400;">
+        <input type="checkbox" id="forceMotionChk" ${forceNameFxMotion() ? 'checked' : ''} onchange="toggleForceMotion(this.checked)" style="margin-top:2px;">
+        <span>Animar os efeitos de nome mesmo que este aparelho esteja em "menos movimento" (se comprou o Quadro de Partidas ou o Selo Postal e o nome não mexe, ligue isto). Só vale neste aparelho.</span>
+      </label>
       <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Título</div>
       <div class="shop-grid">${COSMETIC_CATALOG.titles.map(item => customizeItemHtml(item, 'title', profile)).join('')}</div>
       <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px 0;">Emblemas (até ${MAX_EQUIPPED_BADGES} ao mesmo tempo)</div>
@@ -886,6 +890,14 @@ function customizeSiteBgHtml(profile){
     <input type="text" id="editSiteBgUrl" placeholder="Link da foto de fundo" value="${escapeHtml(profile.siteBackgroundUrl || '')}">
     <button class="shop-btn" onclick="doSaveSiteBgUrl()">Guardar fundo da página</button>
   </div>`;
+}
+
+async function toggleForceMotion(on){
+  setForceNameFxMotion(!!on);
+  await renderProfile();   // é assíncrona: só depois de redesenhada se reabre o painel (senão fechava-se sozinho)
+  switchProfileTab('conta');
+  const panel = document.getElementById('customizePanel');
+  if(panel) panel.style.display = 'block';
 }
 
 async function doEquipCosmetic(type, id){

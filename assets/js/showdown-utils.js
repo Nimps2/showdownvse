@@ -962,10 +962,20 @@ function frameEffectPreviewHtml(effectType, profileOrColor, multiColor){
 // Quatro identidades bem diferentes (a cor base é sempre a "cor de destaque" do jogador, via currentColor):
 //  Brilho = halo de néon ESTÁTICO · Pulsar = batimento cardíaco (escala + brilho) · Rasto de Avião = linhas de
 //  velocidade atrás do nome, texto inclinado · Aurora de Cabine = gradiente de várias cores a fluir.
+// Opção POR APARELHO (localStorage): animar os efeitos de nome mesmo quando o aparelho pede "menos movimento" (Windows com "Mostrar animações" desligado, telemóvel em poupança de energia...).
+// Por defeito respeita-se o aparelho; quem comprou um efeito animado e não o vê mexer liga isto no perfil (Customizar → Efeito no nome).
+function forceNameFxMotion(){ try{ return localStorage.getItem('vse_force_motion') === '1'; } catch(e){ return false; } }
+function setForceNameFxMotion(on){
+  try{ localStorage.setItem('vse_force_motion', on ? '1' : '0'); } catch(e){}
+  const old = document.getElementById('vseNameFxStyles');
+  if(old) old.remove();
+  ensureNameFxStyles();   // volta a escrever o CSS já com (ou sem) a regra de "menos movimento"
+}
 function ensureNameFxStyles(){
   if(document.getElementById('vseNameFxStyles')) return;
   const style = document.createElement('style');
   style.id = 'vseNameFxStyles';
+  const reducedCss = forceNameFxMotion() ? '' : '@media (prefers-reduced-motion:reduce){.name-fx-splitflap{animation:none;}.name-fx-stamp::after{animation:none;opacity:0.85;}.name-fx-ghost,.name-fx-candle{animation:none;}}';
   style.textContent = `
     .name-fx{display:inline-block;max-width:100%;}
     .name-fx-glow{text-shadow:0 0 3px currentColor,0 0 9px currentColor,0 0 20px color-mix(in srgb,currentColor 60%,transparent);}
@@ -999,7 +1009,7 @@ function ensureNameFxStyles(){
     @keyframes vseNameCandle{0%,100%{text-shadow:0 0 4px currentColor,0 0 10px #ff8a1f;}18%{text-shadow:0 0 6px currentColor,0 0 16px #ffb347,0 0 26px rgba(255,138,31,0.45);}34%{text-shadow:0 0 3px currentColor,0 0 8px #ff8a1f;}52%{text-shadow:0 0 7px currentColor,0 0 18px #ffb347,0 0 24px rgba(255,138,31,0.4);}70%{text-shadow:0 0 4px currentColor,0 0 11px #ff8a1f;}85%{text-shadow:0 0 6px currentColor,0 0 15px #ffb347;}}
     .name-fx-candle{animation:vseNameCandle 2.6s ease-in-out infinite;}
     .name-fx-candle::before{content:'🕯️';font-size:0.7em;margin-right:0.25em;}
-    @media (prefers-reduced-motion:reduce){.name-fx-splitflap{animation:none;}.name-fx-stamp::after{animation:none;opacity:0.85;}.name-fx-ghost,.name-fx-candle{animation:none;}}
+    ${reducedCss}
   `;
   document.head.appendChild(style);
 }
