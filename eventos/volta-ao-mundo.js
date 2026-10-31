@@ -710,6 +710,7 @@
     name: 'Volta ao Mundo',
     currency: { name:'Milhas', emoji:'✈️' },
     weeks: [ { region:'kanto' }, { region:'johto' }, { region:'hoenn' }, { region:'sinnoh' } ],
+    skippedWeeks: [3],   // a Semana 3 (Hoenn) não teve torneio: o carimbo é dado a quem participou nas outras semanas
     levels: LEVELS,
     missions: MISSIONS,
     regionEmoji: REGION_EMOJI,

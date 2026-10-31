@@ -59,6 +59,15 @@ const EventCore = (function(){
     ]);
     const ctx = { ev, me, tournaments, claims, tx, gifts, lottery, nick, preds, board, x1: x1data.rows, x1Available: x1data.available, shop: shopData, x1Board };
     ctx.weekStats = computeWeekStats(ctx);
+    // Semanas que não se realizaram (decisão do organizador, `skippedWeeks` do módulo do evento): quem participou em alguma semana do evento fica com o carimbo (e a missão de participar) dessas semanas.
+    const skipped = ((window.EVENT_MODULES || {})[ev.slug] || {}).skippedWeeks || [];
+    if(skipped.length && Object.values(ctx.weekStats).some(w => w.participated)){
+      skipped.forEach(week => {
+        if(ctx.weekStats[week] || week > ev.current_week) return;
+        ctx.weekStats[week] = { week, tournamentId: null, status: 'concluido', name: '', region: null, participated: true, skipped: true,
+          played: 0, wins: 0, losses: 0, sweeps: 0, reachedFinal: false, champion: false };
+      });
+    }
     ctx.windows = computeWindows(ctx);
     ctx.claimedIds = new Set(claims.filter(c => c.player_name === me).map(c => c.mission_id));
     return ctx;
